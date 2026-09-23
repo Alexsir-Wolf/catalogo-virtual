@@ -1,0 +1,22 @@
+@page "/painel"
+@rendermode InteractiveServer
+
+<PageTitle>Painel</PageTitle>
+
+<h1>Painel</h1>
+
+<p>
+    Área do dono do catálogo. Esta área roda em modo interativo no servidor (ADR-010):
+    o circuito persistente é o que dá interatividade ao cadastro e, mais tarde, o canal
+    de progresso da geração do PDF. O contador abaixo prova que o circuito está ativo.
+</p>
+
+<p role="status">Cliques: @clickCount</p>
+
+<button @onclick="IncrementCount">Clique</button>
+
+@code {
+    private int clickCount;
+
+    private void IncrementCount() => clickCount++;
+}
