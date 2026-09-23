@@ -35,7 +35,10 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapGet("/health", async (IConfiguration configuration, CancellationToken cancellationToken) =>
+app.MapGet("/health", async (
+    IConfiguration configuration,
+    ILoggerFactory loggerFactory,
+    CancellationToken cancellationToken) =>
 {
     var configured = configuration.GetConnectionString("Default");
     if (string.IsNullOrWhiteSpace(configured))
@@ -43,18 +46,34 @@ app.MapGet("/health", async (IConfiguration configuration, CancellationToken can
         return Results.Problem("Connection string 'Default' is not configured.", statusCode: 503);
     }
 
-    await using var connection = new NpgsqlConnection(DatabaseConnectionString.Normalize(configured));
-    await connection.OpenAsync(cancellationToken);
-
-    await using var command = new NpgsqlCommand("select 1", connection);
-    var result = await command.ExecuteScalarAsync(cancellationToken);
-
-    return Results.Ok(new
+    try
     {
-        status = "healthy",
-        database = connection.PostgreSqlVersion.ToString(),
-        query = result
-    });
+        await using var connection = new NpgsqlConnection(DatabaseConnectionString.Normalize(configured));
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new NpgsqlCommand("select 1", connection);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+
+        return Results.Ok(new
+        {
+            status = "healthy",
+            database = connection.PostgreSqlVersion.ToString(),
+            query = result
+        });
+    }
+    catch (Exception exception)
+    {
+        // A mensagem da exceção carrega host e usuário do banco e por isso fica só no log.
+        // A resposta devolve o código SQLSTATE, que identifica a causa sem expor nada.
+        loggerFactory.CreateLogger("Health").LogError(exception, "Falha ao conectar no banco.");
+
+        return Results.Json(new
+        {
+            status = "unhealthy",
+            failure = exception.GetType().Name,
+            sqlState = (exception as PostgresException)?.SqlState
+        }, statusCode: 503);
+    }
 });
 
 app.Run();
