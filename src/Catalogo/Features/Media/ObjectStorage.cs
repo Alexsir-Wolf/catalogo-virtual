@@ -9,10 +9,10 @@ public sealed class ObjectStorageOptions
     public string ServiceKey { get; set; } = string.Empty;
 
     /// <summary>Bucket público: as três derivadas de tela.</summary>
-    public string PublicBucket { get; set; } = "catalogo-publico";
+    public string PublicBucket { get; set; } = "produtos-web";
 
     /// <summary>Bucket privado: apenas a derivada de impressão (RN-12, CA-28).</summary>
-    public string PrivateBucket { get; set; } = "catalogo-impressao";
+    public string PrivateBucket { get; set; } = "produtos-print";
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(Url) && !string.IsNullOrWhiteSpace(ServiceKey);

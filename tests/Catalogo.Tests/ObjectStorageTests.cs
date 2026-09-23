@@ -16,6 +16,8 @@ public sealed class ObjectStorageTests
 {
     private const string UrlVariable = "Supabase__Url";
     private const string ServiceKeyVariable = "Supabase__ServiceKey";
+    private const string PublicBucketVariable = "Supabase__PublicBucket";
+    private const string PrivateBucketVariable = "Supabase__PrivateBucket";
 
     [SkippableFact]
     public async Task Derivadas_de_tela_sao_acessiveis_por_url_publica()
@@ -49,10 +51,17 @@ public sealed class ObjectStorageTests
         using var anonymous = new HttpClient();
         var response = await anonymous.GetAsync(privateUrl);
 
-        Assert.True(
-            response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden
-                or HttpStatusCode.Unauthorized,
+        // A regra não é sobre qual código de recusa o armazenamento escolhe — é sobre o
+        // arquivo não chegar a quem não tem credencial.
+        Assert.False(
+            response.IsSuccessStatusCode,
             $"A derivada de impressão respondeu {(int)response.StatusCode} a uma requisição anônima.");
+
+        var payload = await response.Content.ReadAsByteArrayAsync();
+
+        Assert.False(
+            payload.Length > 2 && payload[0] == 0xFF && payload[1] == 0xD8,
+            "A resposta anônima trouxe um JPEG — a derivada de impressão vazou.");
     }
 
     private static ObjectStorageOptions ReadOptionsOrSkip()
@@ -64,7 +73,19 @@ public sealed class ObjectStorageTests
             string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(serviceKey),
             $"Defina {UrlVariable} e {ServiceKeyVariable} para exercer o armazenamento real.");
 
-        return new ObjectStorageOptions { Url = url!, ServiceKey = serviceKey! };
+        var options = new ObjectStorageOptions { Url = url!, ServiceKey = serviceKey! };
+
+        if (Environment.GetEnvironmentVariable(PublicBucketVariable) is { Length: > 0 } publicBucket)
+        {
+            options.PublicBucket = publicBucket;
+        }
+
+        if (Environment.GetEnvironmentVariable(PrivateBucketVariable) is { Length: > 0 } privateBucket)
+        {
+            options.PrivateBucket = privateBucket;
+        }
+
+        return options;
     }
 
     private static ProductPhotoService CreateService(ObjectStorageOptions options)

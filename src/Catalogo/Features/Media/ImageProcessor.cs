@@ -22,7 +22,11 @@ public sealed class ImageProcessor
 
     public IReadOnlyList<ProcessedDerivative> Process(Stream content, string immutableName)
     {
-        using var source = SKBitmap.Decode(content)
+        // Como o SKCodec, o decodificador fecha o stream que recebe. O envoltório sem
+        // posse deixa o buffer utilizável por quem chamou.
+        using var borrowed = new SKManagedStream(content, disposeManagedStream: false);
+
+        using var source = SKBitmap.Decode(borrowed)
             ?? throw new InvalidOperationException("O conteúdo não pôde ser decodificado como imagem.");
 
         return DerivativeSpecifications.All

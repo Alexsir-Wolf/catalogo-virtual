@@ -37,7 +37,11 @@ public static class ImageValidation
             return new ImageValidationResult(ImageRejection.TooLarge);
         }
 
-        using var codec = SKCodec.Create(content);
+        // O SKCodec assume a posse do stream e o fecha junto consigo. O envoltório sem
+        // posse preserva o buffer para o processamento que vem depois da validação.
+        using var borrowed = new SKManagedStream(content, disposeManagedStream: false);
+
+        using var codec = SKCodec.Create(borrowed);
         if (codec is null)
         {
             return new ImageValidationResult(ImageRejection.NotAnImage);

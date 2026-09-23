@@ -387,7 +387,7 @@ Sem tela de registro, sem convite, sem fluxo de recuperação — as três ausê
 
 #### T-08 — Pipeline de processamento de imagem
 
-- **Status:** Bloqueado
+- **Status:** Concluído
 - **Complexidade:** Alta
 - **Depende de:** T-06
 - **Implementa:** RN-10, RN-11, RN-12, RN-13
@@ -404,8 +404,8 @@ O disco da aplicação é efêmero: **nada pode ser gravado localmente**, nem co
 **Critério de aceite (testável):**
 - [x] Arquivo com extensão de imagem mas conteúdo inválido é recusado *(CA-06)*
 - [x] Upload válido gera exatamente quatro derivadas com nomes imutáveis
-- [ ] As três derivadas de tela são acessíveis por URL pública
-- [ ] A derivada de impressão **não** é acessível sem credencial, testado por requisição anônima ao bucket privado *(CA-28)*
+- [x] As três derivadas de tela são acessíveis por URL pública
+- [x] A derivada de impressão **não** é acessível sem credencial, testado por requisição anônima ao bucket privado *(CA-28)*
 - [x] Reenviar gera nomes novos, sem sobrescrever os anteriores *(RN-13)*
 - [x] Arquivo acima do limite de tamanho ou dimensão é recusado
 
@@ -1353,3 +1353,4 @@ Tarefas em que quem executa **deve parar e pedir confirmação** antes de seguir
 | T-08 | Bloqueado | 2026-09-23 | 3504524 | Pipeline implementado em `Features/Media/`: validação pelo conteúdo com SkiaSharp (RN-10), quatro derivadas em memória — três WebP e uma JPEG de **800 px** (RN-11, ADR-005) —, nomes imutáveis por envio (RN-13) e gravação separada em bucket público e privado (RN-12, ADR-018). Nada toca o disco local. Oito testes verdes cobrem validação, derivadas e imutabilidade de nome. **Bloqueado por falta de credencial do Supabase no ambiente:** os dois critérios de armazenamento — URL pública das derivadas de tela e, sobretudo, o **CA-28** (requisição anônima à derivada de impressão) — exigem bater no armazenamento real, e o próprio plano proíbe simular. Os testes correspondentes existem em `ObjectStorageTests` e são pulados enquanto `Supabase__Url` e `Supabase__ServiceKey` não estiverem definidas. Duas observações herdadas: o lado maior de impressão segue nos 800 px de premissa, pendente de T-04; e nenhuma ADR escolhe biblioteca de imagem — SkiaSharp foi adotado por continuidade com o spike de T-03, e merece ADR própria |
 | T-07 (correção) | Concluído | 2026-09-23 | — | Achado em deploy: senha semeada fora da política do Identity (`PasswordRequiresUpper`) derrubava a aplicação inteira na subida, tirando a **vitrine pública** do ar por causa de uma credencial do painel. O seeder passou a registrar a falha e seguir: o painel fica inacessível, a vitrine continua servindo (ADR-010). Dois testes cobrem o caso — senha fora da política e configuração ausente. **Achado paralelo, ainda aberto:** as chaves de Data Protection ficam no sistema de arquivos do container, que é efêmero (ADR-018) — a cada publicação toda sessão do painel cai e o antiforgery em curso é invalidado. Material para T-28 |
 | Publicação | Concluído | 2026-09-23 | 5bd681f | Fase 1 publicada em `catalogo-virtual-7wpy.onrender.com`. Três obstáculos até subir, todos de ambiente: (1) `libgssapi_krb5.so.2` ausente na imagem de runtime — o Npgsql carrega Kerberos ao abrir conexão, resolvido no `Dockerfile` (`d7fa9f4`); (2) o **Transaction pooler** do Supabase (porta 6543, herdado de T-02) trava a migration — o lock de sessão que o EF Core toma antes de migrar não sobrevive ao pooling em modo transação, e a subida morria por timeout após 32s. Corrigido migrando a conexão para o **Session pooler** (porta 5432), sem mudança de código; (3) senha semeada fora da política do Identity. Validado em produção: `/` responde estática e **sem nenhum marcador de circuito**, `/painel` redireciona ao login, `/painel/entrar` responde 200 e `/health` volta `healthy`. O ponto de validação humana "Após T-06" fica cumprido — o SQL foi revisado e aplicado no Supabase. **Falta o login real do dono**, que só o usuário pode exercer |
+| T-08 (desbloqueio) | Concluído | 2026-09-23 | — | Credenciais do Supabase disponibilizadas: os dois testes de armazenamento saíram do estado de pulados e rodaram contra os buckets reais `produtos-web` e `produtos-print` — os nomes viraram padrão no código, no lugar dos que eu havia suposto. **O teste de integração encontrou um defeito que os unitários não pegavam:** `SKCodec.Create` e `SKBitmap.Decode` assumem a posse do stream e o fecham, de modo que validar a imagem inutilizava o buffer para o processamento seguinte; nos testes unitários cada etapa usava um stream próprio e o problema não aparecia. Corrigido com `SKManagedStream` sem posse nas duas chamadas. O **CA-28 está provado de verdade**: o teste grava a derivada de impressão no bucket privado e a requisição anônima subsequente é recusada, verificando também que o corpo não traz um JPEG. A asserção original exigia um código de recusa específico e foi reescrita para afirmar o que a regra diz — o arquivo não chega a quem não tem credencial. Suíte 31/31, sem pulados |
