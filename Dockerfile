@@ -8,6 +8,14 @@ COPY src/ src/
 RUN dotnet publish src/Catalogo/Catalogo.csproj -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+
+# O Npgsql carrega a biblioteca Kerberos ao abrir a conexão, e ela não vem na imagem de
+# runtime: sem isto a aplicação sobe e falha com `libgssapi_krb5.so.2: cannot open shared
+# object file`.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY --from=build /app .
 
