@@ -38,10 +38,14 @@ public static class OwnerAccountSeeder
         var result = await users.CreateAsync(owner, options.Password);
         if (!result.Succeeded)
         {
-            // Os códigos descrevem qual política a senha violou; nenhum deles traz o valor.
-            throw new InvalidOperationException(
-                "Falha ao semear a conta do dono: " +
+            // A falha fica no log e a aplicação continua subindo: credencial malformada
+            // tranca o painel, mas não pode derrubar a vitrine pública junto (ADR-010).
+            // Os códigos descrevem qual política a senha violou; nenhum traz o valor.
+            app.Logger.LogError(
+                "Conta do dono não semeada: {Reasons}. O painel fica inacessível até a " +
+                "credencial ser corrigida na configuração.",
                 string.Join(", ", result.Errors.Select(error => error.Code)));
+            return;
         }
 
         app.Logger.LogInformation("Conta do dono semeada com troca de senha pendente.");
