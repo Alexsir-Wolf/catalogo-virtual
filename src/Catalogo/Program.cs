@@ -1,12 +1,22 @@
 using Catalogo;
 using Catalogo.Components;
+using Catalogo.Data;
+using Catalogo.Features.Account;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddDbContext<CatalogDbContext>(options =>
+    options.UseNpgsql(DatabaseConnectionString.Normalize(
+        builder.Configuration.GetConnectionString("Default") ?? string.Empty)));
+
+builder.Services.AddPanelAuthentication(builder.Configuration);
+builder.Services.AddCascadingAuthenticationState();
 
 // A plataforma termina o TLS no proxy e encaminha a requisição em HTTP (ADR-018).
 // Sem isso a aplicação se enxerga como insegura e entra em loop de redirecionamento.
@@ -19,6 +29,9 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 var app = builder.Build();
 
+await app.ApplyPendingMigrationsAsync();
+await app.SeedOwnerAccountAsync();
+
 app.UseForwardedHeaders();
 
 if (!app.Environment.IsDevelopment())
@@ -30,6 +43,10 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseHttpsRedirection();
 
 app.UseAntiforgery();
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.UsePanelAuthorization();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
@@ -80,3 +97,6 @@ app.MapGet("/health", async (
 });
 
 app.Run();
+
+// Exposto para o projeto de testes montar a aplicação com WebApplicationFactory.
+public partial class Program;

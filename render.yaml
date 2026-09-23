@@ -15,3 +15,8 @@ services:
         sync: false
       - key: Supabase__ServiceKey
         sync: false
+      # Credencial do dono, semeada na primeira subida (ADR-006). Nunca versionada.
+      - key: Owner__UserName
+        sync: false
+      - key: Owner__Password
+        sync: false

@@ -1,0 +1,97 @@
+@page "/painel/entrar"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<OwnerAccount> SignInManager
+@inject NavigationManager Navigation
+
+<PageTitle>Entrar</PageTitle>
+
+<section class="acesso">
+    <aside class="acesso__marca">
+        <h1>Catálogo Virtual</h1>
+        <p>Painel de manutenção do acervo. O cadastro feito aqui alimenta a vitrine e os catálogos em PDF.</p>
+    </aside>
+
+    <div class="acesso__formulario">
+        <h2>Entrar</h2>
+
+        @if (lockedOutUntilMinutes is not null)
+        {
+            <p class="acesso__aviso" role="alert" data-estado="bloqueado">
+                Acesso temporariamente bloqueado por tentativas malsucedidas.
+                Tente novamente em @lockedOutUntilMinutes minuto(s).
+            </p>
+        }
+        else if (failed)
+        {
+            <p class="acesso__aviso" role="alert" data-estado="erroCredencial">
+                Usuário ou senha incorretos.
+            </p>
+        }
+
+        <EditForm Model="Input" FormName="acesso" OnValidSubmit="AuthenticateAsync" method="post">
+            <DataAnnotationsValidator />
+
+            <label for="usuario">Usuário</label>
+            <InputText id="usuario" @bind-Value="Input.UserName" autocomplete="username"
+                       disabled="@isLockedOut" aria-invalid="@failed" />
+
+            <label for="senha">Senha</label>
+            <InputText id="senha" type="password" @bind-Value="Input.Password"
+                       autocomplete="current-password" disabled="@isLockedOut" aria-invalid="@failed" />
+
+            <button type="submit" disabled="@isLockedOut">Entrar</button>
+        </EditForm>
+
+        <p class="acesso__nota">
+            Não há redefinição de senha pelo sistema. Recuperar o acesso exige
+            procedimento no servidor, com quem administra a aplicação.
+        </p>
+    </div>
+</section>
+
+@code {
+    [SupplyParameterFromForm]
+    private Credentials Input { get; set; } = new();
+
+    [SupplyParameterFromQuery(Name = PanelAuthentication.ReturnUrlParameter)]
+    private string? ReturnUrl { get; set; }
+
+    private bool failed;
+    private bool isLockedOut => lockedOutUntilMinutes is not null;
+    private int? lockedOutUntilMinutes;
+
+    private async Task AuthenticateAsync()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            Input.UserName,
+            Input.Password,
+            isPersistent: false,
+            lockoutOnFailure: true);
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo(ReturnUrl ?? PanelAuthentication.PanelPathPrefix);
+            return;
+        }
+
+        if (result.IsLockedOut)
+        {
+            lockedOutUntilMinutes = (int)Math.Ceiling(PanelAuthentication.LockoutDuration.TotalMinutes);
+            return;
+        }
+
+        // A mensagem não distingue usuário inexistente de senha errada: dizer qual dos
+        // dois falhou entrega metade da credencial a quem tenta adivinhar (UI-03).
+        failed = true;
+    }
+
+    private sealed class Credentials
+    {
+        [Required]
+        public string UserName { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

@@ -283,7 +283,7 @@ Imprimir o PDF do spike em papel e compará-lo ao catálogo de referência, lado
 
 #### T-05 — Criar solution e projeto Blazor
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Baixa
 - **Depende de:** T-04
 - **Implementa:** —
@@ -299,10 +299,10 @@ Imprimir o PDF do spike em papel e compará-lo ao catálogo de referência, lado
 Projeto único Blazor Web App, organizado por funcionalidade conforme a ADR-003 — pastas `Features/Storefront`, `Features/Products`, `Features/Categories`, `Features/Media`, `Features/CatalogBuilder`, `Features/PdfExport`. Configurar os dois modos de renderização da ADR-010: estático como padrão, interativo no servidor apenas sob o prefixo do painel.
 
 **Critério de aceite (testável):**
-- [ ] Aplicação sobe e responde em `/`
-- [ ] Uma página sob `/painel` responde com interatividade de servidor ativa
-- [ ] Uma página pública responde **sem** abrir conexão persistente
-- [ ] Projeto de testes referencia a aplicação e executa
+- [x] Aplicação sobe e responde em `/`
+- [x] Uma página sob `/painel` responde com interatividade de servidor ativa
+- [x] Uma página pública responde **sem** abrir conexão persistente
+- [x] Projeto de testes referencia a aplicação e executa
 
 **Testes a escrever:**
 - *Integration:* teste de fumaça que sobe a aplicação e verifica resposta em `/`
@@ -314,7 +314,7 @@ Projeto único Blazor Web App, organizado por funcionalidade conforme a ADR-003 
 
 #### T-06 — Modelar e migrar o esquema
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Média
 - **Depende de:** T-05
 - **Implementa:** RN-01, RN-08, RN-23
@@ -332,11 +332,11 @@ Entidades de categoria e produto com os campos do PRD, incluindo as três coluna
 Sem identificador de tenant em tabela alguma — a ADR-009 é explícita e a ausência precisa ser deliberada, não esquecimento.
 
 **Critério de aceite (testável):**
-- [ ] Migration cria as tabelas de categoria e produto com todos os campos do PRD
-- [ ] Nome de categoria tem restrição de unicidade *(RN-23)*
-- [ ] Extensões `unaccent` e `pg_trgm` habilitadas, com índice sobre o nome
-- [ ] Nenhuma tabela tem coluna de tenant
-- [ ] Migration aplica em banco limpo e é idempotente na subida
+- [x] Migration cria as tabelas de categoria e produto com todos os campos do PRD
+- [x] Nome de categoria tem restrição de unicidade *(RN-23)*
+- [x] Extensões `unaccent` e `pg_trgm` habilitadas, com índice sobre o nome
+- [x] Nenhuma tabela tem coluna de tenant
+- [x] Migration aplica em banco limpo e é idempotente na subida
 
 **Testes a escrever:**
 - *Integration:* subir banco em container, aplicar migration, verificar esquema
@@ -350,7 +350,7 @@ Sem identificador de tenant em tabela alguma — a ADR-009 é explícita e a aus
 
 #### T-07 — Autenticação do usuário único
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Média
 - **Depende de:** T-05
 - **Implementa:** RN-57, RN-58, RN-59, RN-60
@@ -367,12 +367,12 @@ Identity configurado apenas para armazenar a credencial, com hash de senha e blo
 Sem tela de registro, sem convite, sem fluxo de recuperação — as três ausências são regra, não omissão *(RN-57, RN-59)*.
 
 **Critério de aceite (testável):**
-- [ ] Acesso anônimo a qualquer rota do painel é redirecionado ao login *(CA-26)*
-- [ ] Rota pública permanece acessível sem autenticação
-- [ ] Credencial incorreta exibe mensagem genérica, sem indicar qual campo falhou
-- [ ] Tentativas sucessivas malsucedidas bloqueiam temporariamente *(CA-27)*
-- [ ] Não existe rota de registro nem de recuperação de senha
-- [ ] A tela informa que a redefinição exige acesso ao servidor *(RN-59)*
+- [x] Acesso anônimo a qualquer rota do painel é redirecionado ao login *(CA-26)*
+- [x] Rota pública permanece acessível sem autenticação
+- [x] Credencial incorreta exibe mensagem genérica, sem indicar qual campo falhou
+- [x] Tentativas sucessivas malsucedidas bloqueiam temporariamente *(CA-27)*
+- [x] Não existe rota de registro nem de recuperação de senha
+- [x] A tela informa que a redefinição exige acesso ao servidor *(RN-59)*
 
 **Testes a escrever:**
 - *Integration:* requisição anônima a rota do painel resulta em redirecionamento *(CA-26)*
@@ -1346,4 +1346,7 @@ Tarefas em que quem executa **deve parar e pedir confirmação** antes de seguir
 |--------|--------|--------------|--------|------------|
 | T-01 | Concluído | 2026-09-22 | bc89134 | Supabase e Render criados. Bucket privado verificado por requisição anônima (`NoSuchBucket` sem credencial). Endereço inicial no subdomínio do Render; domínio próprio adiado. Primeiro build falhou por ausência de `Dockerfile` — esperado, é escopo de T-02 |
 | T-02 | Concluído | 2026-09-22 | bb39508 | Aplicação mínima descartável publicada em `catalogo-virtual-7wpy.onrender.com` — escopo ampliado além do declarado (`src/Catalogo/`), aprovado pelo usuário, pois T-02 exige publicar uma aplicação que só existe em T-05. `/health` responde `{"status":"healthy","database":"17.6","query":1}`. Circuito interativo confirmado no navegador: **a ADR-010 se sustenta no Render**. Conexão exigiu o Transaction pooler (`aws-0-us-west-2`, porta 6543, usuário com project ref) — a conexão direta é IPv6-only e o Render gratuito não tem IPv6 |
-| T-03 | Concluído | 2026-09-22 | — | Spike descartável em `spike/`, medições em `spike/MEDICOES.md`. **A ADR-012 se sustenta sem ressalva**: grade de três colunas, fluxo contínuo de categorias, célula indivisível (`ShowEntire`), cabeçalho e rodapé repetidos com numeração. 36 produtos → **472 KB e 650 ms**, contra 7.134 KB do catálogo do cliente. Fotos reais extraídas do próprio gabarito. Célula comporta **160 caracteres** em 4 linhas — insumo para RN-03. Achado extra: nenhuma ADR escolhe biblioteca de imagem; o spike usou SkiaSharp por licença BSD |
+| T-03 | Concluído | 2026-09-22 | c418c42 | Spike descartável em `spike/`, medições em `spike/MEDICOES.md`. **A ADR-012 se sustenta sem ressalva**: grade de três colunas, fluxo contínuo de categorias, célula indivisível (`ShowEntire`), cabeçalho e rodapé repetidos com numeração. 36 produtos → **472 KB e 650 ms**, contra 7.134 KB do catálogo do cliente. Fotos reais extraídas do próprio gabarito. Célula comporta **160 caracteres** em 4 linhas — insumo para RN-03. Achado extra: nenhuma ADR escolhe biblioteca de imagem; o spike usou SkiaSharp por licença BSD |
+| T-05 | Concluído | 2026-09-23 | — | `Catalogo.sln` criado com `src/Catalogo` e `tests/Catalogo.Tests`. Aplicação reorganizada por funcionalidade (ADR-003): as seis pastas de `Features/` mais `Features/Panel/` para a casca do painel — folder adicional, mesma justificativa da `Features/Account/` já prevista em T-07. Modo de renderização por área confirmado (ADR-010): `/` é estática — sem o marcador `"type":"server"` no HTML — e `/painel` é interativa de servidor. Três testes de integração cobrindo os critérios, todos verdes. **Pendência:** a inspeção da aba de rede pedida no ponto de atenção não foi feita — o Chrome não alcançou o servidor local nesta sessão (`ERR` de rede em `localhost` e `127.0.0.1`, enquanto `curl` responde 200). T-04 segue pendente: a dependência declarada não foi satisfeita, por decisão do usuário |
+| T-06 | Concluído | 2026-09-23 | — | `CatalogDbContext` em `Data/`, entidades em `Features/Categories/` e `Features/Products/` — o plano dizia `Features/Catalog/Category`, mas as pastas da ADR-003 e de T-05 são `Categories`/`Products`; seguiu-se a ADR. Migration `InitialSchema` habilita `unaccent` e `pg_trgm`, cria índice GIN `gin_trgm_ops` sobre o nome do produto e é aplicada na subida de forma idempotente. Foto modelada como bloco de colunas do próprio produto (`OwnsOne`), sem tabela de imagens (RN-09). Limite do resumo em **160** caracteres, valor do spike de T-03 — continua provisório até T-04. Sete testes de integração contra PostgreSQL em container (Testcontainers), suíte total 10/10. **Pendências:** o ponto de validação humana "Após T-06" segue aberto — o SQL foi gerado e revisado em sessão, mas não aplicado no Supabase; `DatabaseConnectionString.Normalize` passou a ser usado também pelo EF Core, com o defeito de R-02 (REVIEW-T-02-2026-09-22) ainda em aberto |
+| T-07 | Concluído | 2026-09-23 | — | Identity mínimo sobre `OwnerAccount`, cookie `HttpOnly`/`Secure`/`SameSite=Strict` e bloqueio em **5 tentativas por 5 minutos** (RN-60). O gate do painel é middleware por prefixo de caminho, não atributo por componente — uma tela nova não nasce desprotegida por esquecimento (RN-58, CA-26). Tela UI-03 em `/painel/entrar` com os quatro estados, mensagem genérica de erro e a nota de redefinição no lugar do link de recuperação. Credencial semeada a partir da seção `Owner` da configuração; `render.yaml` ganhou `Owner__UserName` e `Owner__Password` com `sync: false` — arquivo fora do escopo declarado, sem o qual o painel é inacessível em produção. Migration `OwnerAccount` acrescenta as tabelas do Identity. Suíte 19/19. **Pendências:** `MustChangePassword` é persistido mas ainda não é cobrado — a troca obrigatória da ADR-006 só fecha com a tela de T-31 (RN-66); o teste de fumaça do painel de T-05 migrou para a suíte autenticada, porque `/painel` deixou de ser anônimo |

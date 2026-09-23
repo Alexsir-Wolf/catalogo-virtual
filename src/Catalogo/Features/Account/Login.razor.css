@@ -1,0 +1,89 @@
+/* Tokens do protótipo (SPEC-UI seção 2). Tema único — não há tema escuro. */
+
+.acesso {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 100vh;
+    background: #f3efe6;
+    color: #0d1b2a;
+}
+
+.acesso__marca {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 3rem;
+    background: #0c2a4a;
+    color: #fbf9f4;
+}
+
+.acesso__formulario {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 3rem;
+    max-width: 26rem;
+}
+
+.acesso__formulario label {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: #6b6759;
+}
+
+.acesso__formulario input {
+    padding: 0.6rem 0.7rem;
+    border: 1px solid #d8d2c5;
+    border-radius: 4px;
+    background: #fbf9f4;
+    font: inherit;
+}
+
+.acesso__formulario input[aria-invalid="true"] {
+    border-color: oklch(0.55 0.18 25);
+}
+
+.acesso__formulario button {
+    margin-top: 1.25rem;
+    padding: 0.7rem 1rem;
+    border: none;
+    border-radius: 4px;
+    background: oklch(0.62 0.16 38);
+    color: #fbf9f4;
+    font: inherit;
+    cursor: pointer;
+}
+
+.acesso__formulario button:disabled,
+.acesso__formulario input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.acesso__aviso {
+    padding: 0.6rem 0.75rem;
+    border-radius: 4px;
+    border: 1px solid oklch(0.55 0.18 25);
+    color: oklch(0.55 0.18 25);
+    background: #f7f3ea;
+}
+
+/* Ocupa exatamente o lugar onde estaria o link de recuperação (UI-03). */
+.acesso__nota {
+    margin-top: 1.5rem;
+    font-size: 0.8125rem;
+    color: #6b6759;
+}
+
+@media (max-width: 720px) {
+    .acesso {
+        grid-template-columns: 1fr;
+    }
+
+    /* O painel de apresentação some no celular (UI-03). */
+    .acesso__marca {
+        display: none;
+    }
+}
