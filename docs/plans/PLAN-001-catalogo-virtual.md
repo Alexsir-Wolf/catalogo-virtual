@@ -185,7 +185,7 @@ Configurar dois buckets com políticas distintas: um **público**, para as três
 
 #### T-02 — Publicar a aplicação vazia
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Média
 - **Depende de:** T-01
 - **Implementa:** —
@@ -199,11 +199,11 @@ Configurar dois buckets com políticas distintas: um **público**, para as três
 Provar o caminho de publicação antes de existir funcionalidade: um projeto mínimo que sobe pelo repositório, responde em HTTPS no domínio e **conecta no banco do Supabase**. Variáveis de ambiente configuradas na plataforma, nunca no código.
 
 **Critério de aceite (testável):**
-- [ ] Um push no repositório dispara a publicação
-- [ ] A aplicação responde em HTTPS no domínio, com certificado válido
-- [ ] A aplicação conecta no banco do Supabase e uma consulta trivial funciona
-- [ ] Credenciais vêm de variáveis de ambiente da plataforma
-- [ ] Nenhum segredo está versionado
+- [x] Um push no repositório dispara a publicação
+- [x] A aplicação responde em HTTPS no domínio, com certificado válido
+- [x] A aplicação conecta no banco do Supabase e uma consulta trivial funciona
+- [x] Credenciais vêm de variáveis de ambiente da plataforma
+- [x] Nenhum segredo está versionado
 
 **Testes a escrever:** *Não aplicável* — validação por inspeção.
 
@@ -1335,10 +1335,13 @@ Tarefas em que quem executa **deve parar e pedir confirmação** antes de seguir
 - [ ] PDF de capa, com exatamente uma página — *responsável: cliente* — *bloqueia: T-32*
 - [ ] Derivadas órfãs após troca de foto: limpar ou acumular? — *responsável: decidir em T-13*
 - [ ] Domínio próprio a registrar e apontar para o serviço — *decidido em T-01 usar o subdomínio do Render como endereço inicial* — *bloqueia: divulgação da vitrine, não bloqueia nenhuma tarefa*
+- [ ] Tempo real de retomada após adormecimento — *medir e registrar; a arquitetura estima cerca de um minuto* — *não bloqueia nenhuma tarefa*
+- [ ] Conexão por requisição estoura o limite do pooler gratuito (`TimeoutException` intermitente medido em T-02) — *resolver em T-06 com `NpgsqlDataSource` compartilhado e `MaxPoolSize` calibrado* — *bloqueia: T-06*
 - [ ] Cinco estados de UI-05 e UI-06 sem validação visual *(lacuna 6 da SPEC-UI)* — *responsável: validar durante a execução das tarefas correspondentes*
 
 ## 11. Histórico de execução
 
 | Tarefa | Status | Concluída em | Commit | Observação |
 |--------|--------|--------------|--------|------------|
-| T-01 | Concluído | 2026-09-22 | — | Supabase e Render criados. Bucket privado verificado por requisição anônima (`NoSuchBucket` sem credencial). Endereço inicial no subdomínio do Render; domínio próprio adiado. Primeiro build falhou por ausência de `Dockerfile` — esperado, é escopo de T-02 |
+| T-01 | Concluído | 2026-09-22 | bc89134 | Supabase e Render criados. Bucket privado verificado por requisição anônima (`NoSuchBucket` sem credencial). Endereço inicial no subdomínio do Render; domínio próprio adiado. Primeiro build falhou por ausência de `Dockerfile` — esperado, é escopo de T-02 |
+| T-02 | Concluído | 2026-09-22 | bb39508 | Aplicação mínima descartável publicada em `catalogo-virtual-7wpy.onrender.com` — escopo ampliado além do declarado (`src/Catalogo/`), aprovado pelo usuário, pois T-02 exige publicar uma aplicação que só existe em T-05. `/health` responde `{"status":"healthy","database":"17.6","query":1}`. Circuito interativo confirmado no navegador: **a ADR-010 se sustenta no Render**. Conexão exigiu o Transaction pooler (`aws-0-us-west-2`, porta 6543, usuário com project ref) — a conexão direta é IPv6-only e o Render gratuito não tem IPv6 |
