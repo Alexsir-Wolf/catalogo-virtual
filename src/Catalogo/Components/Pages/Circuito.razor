@@ -1,0 +1,21 @@
+@page "/painel/circuito"
+@rendermode InteractiveServer
+
+<PageTitle>Circuito</PageTitle>
+
+<h1>Prova do circuito persistente</h1>
+
+<p>
+    Esta página existe para verificar a premissa da ADR-010 na plataforma de
+    hospedagem: se o contador avança, o circuito interativo de servidor está ativo.
+</p>
+
+<p role="status">Cliques: @clickCount</p>
+
+<button @onclick="IncrementCount">Clique</button>
+
+@code {
+    private int clickCount;
+
+    private void IncrementCount() => clickCount++;
+}

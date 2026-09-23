@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: catalogo-virtual
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__Default
+        sync: false
+      - key: Supabase__Url
+        sync: false
+      - key: Supabase__ServiceKey
+        sync: false
