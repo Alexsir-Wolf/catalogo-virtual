@@ -1,0 +1,210 @@
+<title>Acesso ao Painel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  color-scheme:light;
+  --ground:#f3efe6; --surface:#fbf9f4; --surface-2:#f7f3ea; --sunken:#ece7da;
+  --ink:#0d1b2a; --ink-2:#1a2638; --muted:#6b6759; --faint:#8b8576;
+  --line:#d8d2c5; --line-soft:#e6e0d2; --line-strong:#b6ad97;
+  --navy:#0c2a4a; --on-navy:#ffffff;
+  --cta:#c25f37; --cta-ink:#ffffff; --cta-hover:#a94e2a;
+  --danger:#a8412f; --danger-soft:#f9e5e1; --danger-line:#e0aea4;
+  --warn:#8d6414; --warn-soft:#faedd3; --warn-line:#ddbe83;
+  --note:#4a4483; --note-soft:#ebe9f7; --note-line:#bab5e4;
+  --shadow:0 1px 2px rgba(13,27,42,.06), 0 4px 14px rgba(13,27,42,.05);
+  --shadow-lift:0 2px 6px rgba(13,27,42,.10), 0 18px 40px rgba(13,27,42,.13);
+  --r:6px;
+  --ui:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--sunken);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2{font-family:var(--ui);margin:0;text-wrap:balance;letter-spacing:-.015em}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:3px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.spacer{margin-left:auto}
+
+/* harness */
+.harness{max-width:1100px;margin:0 auto;padding:18px 20px 60px;display:flex;flex-direction:column;gap:14px}
+.hbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.hbar__l{font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 12px;cursor:pointer;font-family:var(--ui);font-size:12.5px;font-weight:500;color:var(--muted);border-right:1px solid var(--line-strong)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--navy);color:var(--on-navy);font-weight:600}
+.toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-family:var(--ui);font-size:12.5px;font-weight:500;color:var(--muted);border:1px solid var(--line-strong);background:var(--surface);padding:6px 11px;border-radius:99px}
+.toggle__sw{width:26px;height:15px;border-radius:99px;background:var(--line-strong);position:relative;transition:background .18s;flex:none}
+.toggle__sw::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:var(--surface);transition:transform .18s}
+body.notes .toggle{background:var(--note-soft);border-color:var(--note-line);color:var(--note)}
+body.notes .toggle__sw{background:var(--note)}
+body.notes .toggle__sw::after{transform:translateX(11px)}
+.note{display:none;gap:9px;padding:9px 12px;border-radius:var(--r);background:var(--note-soft);border:1px solid var(--note-line);color:var(--note);font-size:12px;line-height:1.5;align-items:flex-start}
+body.notes .note{display:flex}
+.note__k{font-family:var(--mono);font-size:10.5px;font-weight:600;flex:none;padding-top:1px}
+
+/* device */
+.stage{display:flex;justify-content:center}
+.device{background:var(--ground);border:1px solid var(--line-strong);border-radius:10px;overflow:hidden;width:100%;box-shadow:var(--shadow);transition:max-width .25s ease}
+body[data-dev="desk"] .device{max-width:100%}
+body[data-dev="fone"] .device{max-width:412px;border-radius:22px}
+
+/* ---------- tela de acesso ---------- */
+.scene{min-height:560px;display:grid;grid-template-columns:1fr 420px}
+body[data-dev="fone"] .scene{grid-template-columns:1fr;min-height:0}
+.aside{background:var(--navy);color:#fff;padding:44px 40px;display:flex;flex-direction:column;gap:18px}
+body[data-dev="fone"] .aside{padding:24px 20px;gap:12px}
+.aside__mark{width:40px;height:40px;border-radius:7px;background:#fbf9f4;color:var(--navy);display:grid;place-items:center;font-family:var(--ui);font-weight:700;font-size:14px}
+.aside h2{font-size:23px;font-weight:600;line-height:1.25;max-width:17ch}
+body[data-dev="fone"] .aside h2{font-size:18px}
+.aside p{margin:0;color:rgba(255,255,255,.72);font-size:13.5px;max-width:42ch}
+.aside__list{margin-top:auto;display:flex;flex-direction:column;gap:9px;padding-top:20px;border-top:1px solid rgba(255,255,255,.16)}
+body[data-dev="fone"] .aside__list{display:none}
+.aside__item{display:flex;gap:10px;font-size:12.5px;color:rgba(255,255,255,.78);align-items:flex-start}
+.aside__item b{font-family:var(--mono);font-size:10.5px;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:3px;padding:1px 6px;flex:none}
+
+.panelside{background:var(--surface);padding:44px 40px;display:flex;flex-direction:column;justify-content:center;gap:20px}
+body[data-dev="fone"] .panelside{padding:26px 20px}
+.form{display:flex;flex-direction:column;gap:16px;max-width:340px;width:100%}
+.form h1{font-size:19px;font-weight:600}
+.form__sub{font-size:13px;color:var(--muted);margin-top:3px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field__l{font-family:var(--ui);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.field input{background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);padding:9px 11px;width:100%}
+.field input:focus{border-color:var(--navy);outline:none;box-shadow:0 0 0 3px rgba(12,42,74,.12)}
+.field input[disabled]{background:var(--surface-2);color:var(--faint);cursor:not-allowed}
+.field--erro input{border-color:var(--danger);box-shadow:0 0 0 3px var(--danger-soft)}
+.entrar{background:var(--cta);border:1px solid var(--cta);color:var(--cta-ink);border-radius:var(--r);padding:11px 16px;font-family:var(--ui);font-weight:600;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px}
+.entrar:hover{background:var(--cta-hover);border-color:var(--cta-hover)}
+.entrar[disabled]{opacity:.5;cursor:not-allowed}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:sp .7s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+.alert{display:flex;gap:10px;padding:11px 13px;border-radius:var(--r);border:1px solid;font-size:12.5px;line-height:1.45;align-items:flex-start}
+.alert--erro{background:var(--danger-soft);border-color:var(--danger-line);color:var(--danger)}
+.alert--bloq{background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
+.alert__i{font-family:var(--mono);font-weight:600;flex:none}
+.alert b{font-weight:600}
+.hint{font-size:12px;color:var(--faint);line-height:1.5;padding-top:14px;border-top:1px solid var(--line-soft);max-width:340px}
+.hint b{color:var(--muted);font-weight:600}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}*{transition:none!important}}
+</style>
+
+<div class="harness">
+  <div class="hbar">
+    <span class="hbar__l">Estado</span>
+    <div class="seg" id="pick"></div>
+    <span class="spacer"></span>
+    <div class="seg" id="dev">
+      <button data-dev="desk" aria-pressed="true">Desktop</button>
+      <button data-dev="fone" aria-pressed="false">Telefone</button>
+    </div>
+    <button class="toggle" id="noteBtn" aria-pressed="false">
+      <span class="toggle__sw"></span> Notas
+    </button>
+  </div>
+
+  <div class="note" id="noteTop"></div>
+  <div class="stage"><div class="device" id="dv"></div></div>
+  <div class="note">
+    <span class="note__k">ADR-006</span>
+    <span>Um único usuário, autenticado por cookie de sessão. Sem registro público, sem convite, sem papéis
+    e <b>sem recuperação de senha pelo sistema</b> — redefinir exige acesso ao servidor <b>(RN-57, RN-59)</b>.</span>
+  </div>
+</div>
+
+<script>
+const ESTADOS = [
+  {k:"default",  rot:"Padrão"},
+  {k:"erro",     rot:"Credencial inválida"},
+  {k:"bloqueado",rot:"Bloqueado por tentativas"},
+  {k:"enviando", rot:"Verificando"}
+];
+
+const NOTAS = {
+  default:   '<span class="note__k">UI-03.default</span><span>Porta do painel. Note o que <b>não</b> existe: criar conta, esqueci minha senha, entrar com outra conta.</span>',
+  erro:      '<span class="note__k">UI-03.erroCredencial</span><span>A mensagem é <b>genérica de propósito</b> — não diz se errou o usuário ou a senha. Revelar qual campo falhou entrega meio caminho a quem tenta adivinhar.</span>',
+  bloqueado: '<span class="note__k">UI-03.bloqueado</span><span>Bloqueio temporário após tentativas sucessivas <b>(RN-60)</b>. Campos e botão desabilitados; o tempo restante é informado para não parecer defeito.</span>',
+  enviando:  '<span class="note__k">UI-03.enviando</span><span>Campos travados durante a verificação, evitando envio duplicado.</span>'
+};
+
+let estado = "default";
+const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function render(){
+  const erro = estado === "erro";
+  const bloq = estado === "bloqueado";
+  const env  = estado === "enviando";
+  const travado = bloq || env;
+
+  let aviso = "";
+  if (erro) aviso = '<div class="alert alert--erro"><span class="alert__i">!</span>'
+    + '<span><b>Usuário ou senha incorretos.</b> Confira os dados e tente novamente.</span></div>';
+  if (bloq) aviso = '<div class="alert alert--bloq"><span class="alert__i">!</span>'
+    + '<span><b>Acesso bloqueado temporariamente</b> após várias tentativas sem sucesso. '
+    + 'Tente de novo em <b class="mono">4 min</b>.</span></div>';
+
+  document.getElementById("dv").innerHTML =
+      '<div class="scene">'
+    + '<aside class="aside">'
+    +   '<div class="aside__mark">CT</div>'
+    +   '<h2>Painel do Catálogo</h2>'
+    +   '<p>Onde o acervo é mantido e os catálogos em PDF são gerados. '
+    +   'A vitrine pública não exige acesso — este painel sim.</p>'
+    +   '<div class="aside__list">'
+    +     '<div class="aside__item"><b>1</b><span>Cadastre produtos e defina a ordem de exibição</span></div>'
+    +     '<div class="aside__item"><b>2</b><span>Monte catálogos escolhendo categorias</span></div>'
+    +     '<div class="aside__item"><b>3</b><span>Gere o PDF e envie do seu jeito</span></div>'
+    +   '</div>'
+    + '</aside>'
+    + '<div class="panelside"><div class="form">'
+    +   '<div><h1>Entrar no painel</h1>'
+    +   '<div class="form__sub">Acesso restrito ao responsável pelo catálogo.</div></div>'
+    +   aviso
+    +   '<div class="field'+(erro?" field--erro":"")+'">'
+    +     '<label class="field__l" for="u">Usuário</label>'
+    +     '<input type="text" id="u" value="'+(erro||env?"admin":"")+'" placeholder="seu usuário" '
+    +     'autocomplete="username" '+(travado?"disabled":"")+'>'
+    +   '</div>'
+    +   '<div class="field'+(erro?" field--erro":"")+'">'
+    +     '<label class="field__l" for="s">Senha</label>'
+    +     '<input type="password" id="s" value="'+(erro||env?"........":"")+'" placeholder="sua senha" '
+    +     'autocomplete="current-password" '+(travado?"disabled":"")+'>'
+    +   '</div>'
+    +   '<button class="entrar" '+(travado?"disabled":"")+'>'
+    +     (env ? '<span class="spin"></span> Verificando...' : 'Entrar')
+    +   '</button>'
+    +   '<div class="hint"><b>Esqueceu a senha?</b> Não há redefinição pela tela. '
+    +   'A troca é feita com acesso ao servidor — procure quem administra a instalação.</div>'
+    + '</div></div></div>';
+
+  document.getElementById("noteTop").innerHTML = NOTAS[estado];
+}
+
+function pick(){
+  document.getElementById("pick").innerHTML = ESTADOS.map(s =>
+    '<button data-estado="'+s.k+'" aria-pressed="'+(s.k===estado)+'">'+esc(s.rot)+'</button>').join("");
+}
+
+document.addEventListener("click", e => {
+  const es = e.target.closest("[data-estado]");
+  if (es){ estado = es.dataset.estado; pick(); render(); return; }
+  const dv = e.target.closest("[data-dev]");
+  if (dv){
+    document.body.dataset.dev = dv.dataset.dev;
+    document.querySelectorAll("#dev button").forEach(x =>
+      x.setAttribute("aria-pressed", x === dv ? "true" : "false"));
+  }
+});
+
+document.getElementById("noteBtn").addEventListener("click", function(){
+  const on = document.body.classList.toggle("notes");
+  this.setAttribute("aria-pressed", on ? "true" : "false");
+});
+
+document.body.dataset.dev = "desk";
+pick(); render();
+</script>

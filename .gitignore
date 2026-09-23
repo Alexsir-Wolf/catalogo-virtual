@@ -1,0 +1,30 @@
+# Ferramentas locais de desenvolvimento — não pertencem ao projeto
+CLAUDE.md
+**/CLAUDE.md
+.claude/
+.cursor/
+.aider*
+.github/copilot-instructions.md
+
+# Build .NET
+bin/
+obj/
+*.user
+artifacts/
+
+# Ambiente
+.env
+*.local.json
+appsettings.Development.json
+appsettings.Local.json
+
+# Dados e mídia de execução
+uploads/
+media/
+backups/
+*.pdf.tmp
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini

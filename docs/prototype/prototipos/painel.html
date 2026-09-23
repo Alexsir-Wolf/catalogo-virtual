@@ -1,0 +1,645 @@
+<title>Painel do Catálogo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  color-scheme:light;
+  --ground:#f3efe6; --surface:#fbf9f4; --surface-2:#f7f3ea; --sunken:#ece7da;
+  --ink:#0d1b2a; --ink-2:#1a2638; --muted:#6b6759; --faint:#8b8576;
+  --line:#d8d2c5; --line-soft:#e6e0d2; --line-strong:#b6ad97;
+  --accent:#0c2a4a; --accent-ink:#ffffff; --accent-soft:#e2e9f1; --accent-line:#a6bad2;
+  --cta:#c25f37; --cta-ink:#ffffff; --cta-hover:#a94e2a; --cta-soft:#f7e3d2; --cta-line:#dfa887;
+  --ok:#3d7d52; --ok-soft:#e0f0e4; --ok-line:#a8ccb3;
+  --warn:#8d6414; --warn-soft:#faedd3; --warn-line:#ddbe83;
+  --danger:#a8412f; --danger-soft:#f9e5e1; --danger-line:#e0aea4;
+  --note:#4a4483; --note-soft:#ebe9f7; --note-line:#bab5e4;
+  --shadow:0 1px 2px rgba(13,27,42,.06), 0 4px 14px rgba(13,27,42,.05);
+  --shadow-lift:0 2px 6px rgba(13,27,42,.10), 0 14px 32px rgba(13,27,42,.12);
+  --r:6px;
+  --ui:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--ui);margin:0;text-wrap:balance;letter-spacing:-.01em}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.rail{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:22px;padding:20px 14px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px}
+.brand__mark{width:32px;height:32px;border-radius:6px;background:var(--accent);color:var(--accent-ink);font-family:var(--ui);font-weight:700;font-size:13px;display:grid;place-items:center;letter-spacing:.02em}
+.brand__name{font-family:var(--ui);font-weight:600;font-size:14px;line-height:1.2}
+.brand__sub{font-size:11px;color:var(--muted);line-height:1.2}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav__label{font-family:var(--ui);font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);padding:0 8px 6px}
+.nav button{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:var(--r);color:var(--ink-2);cursor:pointer;font-family:var(--ui);font-weight:500;font-size:13.5px}
+.nav button:hover{background:var(--surface-2);color:var(--ink)}
+.nav button[aria-current="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.nav .tally{font-family:var(--mono);font-size:11px;color:var(--faint);font-weight:400}
+.nav button[aria-current="true"] .tally{color:var(--accent)}
+.rail__foot{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding:0 6px}
+.who{display:flex;align-items:center;gap:9px;padding-top:12px;border-top:1px solid var(--line)}
+.who__av{width:28px;height:28px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line-strong);display:grid;place-items:center;font-family:var(--ui);font-size:11px;font-weight:600;color:var(--ink-2)}
+.who__n{font-size:12.5px;font-weight:500;line-height:1.25}
+.who__r{font-size:11px;color:var(--muted);line-height:1.25}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:16px;padding:16px 26px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:20}
+.topbar h1{font-size:17px;font-weight:600}
+.topbar__sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+.topbar__right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.sheet{padding:22px 26px 60px;display:flex;flex-direction:column;gap:18px;max-width:1180px}
+/* ---------- controls ---------- */
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);padding:7px 13px;border-radius:var(--r);cursor:pointer;font-family:var(--ui);font-weight:500;font-size:13px;white-space:nowrap}
+.btn:hover{background:var(--surface-2);border-color:var(--faint)}
+.btn--primary{background:var(--cta);border-color:var(--cta);color:var(--cta-ink);font-weight:600}
+.btn--primary:hover{background:var(--cta-hover);border-color:var(--cta-hover)}
+.btn--ghost{border-color:transparent;background:none;color:var(--muted)}
+.btn--ghost:hover{background:var(--surface-2);color:var(--ink)}
+.btn--sm{padding:4px 9px;font-size:12px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.field{display:flex;flex-direction:column;gap:5px}
+.field__l{font-family:var(--ui);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.field__h{font-size:12px;color:var(--faint)}
+input[type=text],input[type=search],input[type=number],select,textarea{background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);padding:7px 10px;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.check{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--r);cursor:pointer;font-size:13.5px}
+.check:hover{background:var(--surface-2)}
+.check input{accent-color:var(--accent);width:15px;height:15px;margin:0;flex:none}
+.check .tally{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+
+/* ---------- pills ---------- */
+.pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2.5px 8px;border-radius:99px;border:1px solid}
+.pill--live{background:var(--ok-soft);border-color:var(--ok-line);color:var(--ok)}
+.pill--draft{background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
+.pill--gap{background:var(--danger-soft);border-color:var(--danger-line);color:var(--danger)}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
+
+/* ---------- panel ---------- */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.panel__hd{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.panel__hd h2{font-size:13.5px;font-weight:600}
+.panel__hd .sub{font-size:12px;color:var(--muted)}
+.panel__bd{padding:16px}
+.panel__ft{padding:12px 16px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;background:var(--surface-2);border-radius:0 0 10px 10px}
+.spacer{margin-left:auto}
+/* ---------- product rows ---------- */
+.rows{display:flex;flex-direction:column}
+.catbar{display:flex;align-items:center;gap:10px;padding:9px 16px;background:var(--sunken);border-bottom:1px solid var(--line);position:sticky;top:57px;z-index:5}
+.catbar__n{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-line);padding:1px 6px;border-radius:4px}
+.catbar__t{font-family:var(--ui);font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+.catbar__c{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.row{display:grid;grid-template-columns:34px 46px 1fr 130px 104px 92px;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--surface-2)}
+.row--draft{background:linear-gradient(90deg,var(--warn-soft),transparent 55%)}
+.row--draft:hover{background:var(--warn-soft)}
+.ord{display:flex;flex-direction:column;gap:1px}
+.ord button{width:22px;height:15px;display:grid;place-items:center;border:1px solid var(--line-strong);background:var(--surface);border-radius:3px;cursor:pointer;color:var(--muted);font-size:8px;line-height:1;padding:0}
+.ord button:hover{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)}
+.ord button[disabled]{opacity:.3;cursor:not-allowed}
+.thumb{width:42px;height:42px;border-radius:5px;border:1px solid var(--line);overflow:hidden;position:relative;background:var(--surface-2)}
+.thumb svg{position:absolute;inset:0;width:100%;height:100%}
+.thumb--none{display:grid;place-items:center;background:var(--danger-soft);border-color:var(--danger-line);border-style:dashed;color:var(--danger);font-family:var(--mono);font-size:8.5px;font-weight:600;text-align:center;line-height:1.1}
+.pname{min-width:0}
+.pname b{display:block;font-weight:600;font-size:13.5px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pname i{display:block;font-style:normal;font-size:12px;line-height:1.3;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pname .pname--empty{color:var(--faint);font-style:italic}
+.pname span{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.price{text-align:right}
+.price b{font-family:var(--mono);font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;display:block}
+.price span{font-family:var(--ui);font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.acts{display:flex;gap:4px;justify-content:flex-end;opacity:0}
+.row:hover .acts,.row:focus-within .acts{opacity:1}
+/* ---------- catalog builder ---------- */
+.two{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
+.count{display:flex;align-items:baseline;gap:9px;padding:14px 16px;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:10px}
+.count b{font-family:var(--mono);font-size:30px;font-weight:600;color:var(--accent);line-height:1}
+.count span{font-size:13px;color:var(--accent)}
+.count .pg{margin-left:auto;text-align:right;font-size:11.5px;color:var(--accent);opacity:.85;line-height:1.35}
+.prev{display:flex;flex-direction:column;gap:3px;padding:12px 16px;max-height:430px;overflow-y:auto}
+.prevcat{display:flex;align-items:center;gap:8px;margin:12px 0 5px}
+.prevcat:first-child{margin-top:0}
+.prevcat b{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--accent)}
+.prevcat span{font-family:var(--ui);font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+.prevcat i{flex:1;height:1px;background:var(--line);font-style:normal}
+.previt{display:grid;grid-template-columns:1fr auto;gap:10px;padding:4px 0;font-size:13px;border-bottom:1px dotted var(--line)}
+.previt em{font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2);min-width:0}
+.previt .pv-n{font-weight:600;color:var(--ink)}
+.previt .pv-d{color:var(--muted);font-size:12px}
+.previt b{font-family:var(--mono);font-size:12.5px;font-weight:500;color:var(--ink)}
+.previt--new em{color:var(--warn);font-weight:500}
+.alert{display:flex;gap:10px;padding:11px 13px;border-radius:var(--r);border:1px solid;font-size:12.5px;line-height:1.45;align-items:flex-start}
+.alert--warn{background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
+.alert--info{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
+.alert b{font-weight:600}
+.alert__i{font-family:var(--mono);font-weight:600;flex:none}
+.bar{height:5px;border-radius:99px;background:var(--sunken);overflow:hidden;border:1px solid var(--line)}
+.bar>i{display:block;height:100%;background:var(--cta);transition:width .25s ease}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px}
+.ccard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:15px;display:flex;flex-direction:column;gap:11px;cursor:pointer;box-shadow:var(--shadow)}
+.ccard:hover{border-color:var(--accent-line);box-shadow:var(--shadow-lift)}
+.ccard h3{font-size:14.5px;font-weight:600}
+.ccard__crit{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);padding:2px 7px;border-radius:4px}
+.ccard__ft{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:11px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+/* ---------- spec notes ---------- */
+.note{display:none;gap:9px;padding:9px 12px;border-radius:var(--r);background:var(--note-soft);border:1px solid var(--note-line);color:var(--note);font-size:12px;line-height:1.5;align-items:flex-start}
+body.notes .note{display:flex}
+.note__k{font-family:var(--mono);font-size:10.5px;font-weight:600;flex:none;padding-top:1px}
+.note a{color:inherit}
+.toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-family:var(--ui);font-size:12.5px;font-weight:500;color:var(--muted);border:1px solid var(--line-strong);background:var(--surface);padding:6px 11px;border-radius:99px}
+.toggle:hover{color:var(--ink)}
+body.notes .toggle{background:var(--note-soft);border-color:var(--note-line);color:var(--note)}
+.toggle__sw{width:26px;height:15px;border-radius:99px;background:var(--line-strong);position:relative;transition:background .18s;flex:none}
+.toggle__sw::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:var(--surface);transition:transform .18s}
+body.notes .toggle__sw{background:var(--note)}
+body.notes .toggle__sw::after{transform:translateX(11px)}
+
+/* ---------- form drawer ---------- */
+.scrim{position:fixed;inset:0;background:rgba(10,18,16,.42);display:none;z-index:40}
+.scrim.on{display:block}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow-lift);z-index:41;display:none;flex-direction:column}
+.drawer.on{display:flex}
+.drawer__hd{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.drawer__bd{padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;flex:1}
+.drawer__ft{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:9px;align-items:center;background:var(--surface-2)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.drop{border:1px dashed var(--line-strong);border-radius:var(--r);padding:16px;display:flex;gap:14px;align-items:center;background:var(--sunken)}
+.deriv{display:flex;flex-wrap:wrap;gap:6px}
+.deriv span{font-family:var(--mono);font-size:10.5px;background:var(--surface);border:1px solid var(--line);padding:2px 7px;border-radius:4px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--r);overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:6px 13px;cursor:pointer;font-family:var(--ui);font-size:12.5px;font-weight:500;color:var(--muted);border-right:1px solid var(--line-strong)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+.view{display:none;flex-direction:column;gap:18px}
+.view.on{display:flex}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:920px){
+  .app{grid-template-columns:1fr}
+  .rail{position:static;height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--line)}
+  .rail__foot{margin-top:0}
+  .nav{flex-direction:row;flex-wrap:wrap}
+  .nav__label,.who__n,.who__r{display:none}
+  .two{grid-template-columns:1fr}
+  .row{grid-template-columns:30px 40px 1fr 92px;gap:9px}
+  .row>.cat-cell{display:none}
+  .acts{opacity:1}
+  .sheet{padding:16px}
+}
+</style>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand__mark">CT</div>
+      <div>
+        <div class="brand__name">Painel do Catálogo</div>
+        <div class="brand__sub">Suprimentos &amp; Informática</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav__label">Acervo</div>
+      <button data-go="produtos" aria-current="true">Produtos <span class="tally" id="tProd">36</span></button>
+      <button data-go="categorias">Categorias <span class="tally">7</span></button>
+      <div class="nav__label" style="padding-top:14px">Publicação</div>
+      <button data-go="catalogos">Catálogos em PDF <span class="tally">3</span></button>
+      <button data-go="montar">Montar catálogo</button>
+    </nav>
+
+    <div class="rail__foot">
+      <div class="note" style="margin-bottom:4px">
+        <span class="note__k">ADR-006</span>
+        <span>Um único login. Sem convite, sem papéis, sem tela de registro.</span>
+      </div>
+      <div class="who">
+        <div class="who__av">AD</div>
+        <div>
+          <div class="who__n">Administrador</div>
+          <div class="who__r">Dono do catálogo</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="ttl">Produtos</h1>
+        <div class="topbar__sub" id="sub">36 itens em 7 categorias &middot; a ordem aqui é a ordem no PDF e na vitrine</div>
+      </div>
+      <div class="topbar__right">
+        <button class="toggle" id="noteBtn" aria-pressed="false">
+          <span class="toggle__sw"></span> Notas da arquitetura
+        </button>
+      </div>
+    </header>
+    <div class="sheet" id="sheet"></div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer"></aside>
+
+<script>
+const CATS = [
+  {id:"imp", nome:"Impressoras",                tint:"#dbe6f0"},
+  {id:"ene", nome:"Energia & Proteção",         tint:"#d8d4cb"},
+  {id:"tin", nome:"Tintas & Suprimentos",       tint:"#e6e1d4"},
+  {id:"sof", nome:"Softwares & Licenças",       tint:"#dee2e6"},
+  {id:"com", nome:"Computadores & Componentes", tint:"#ccd5e0"},
+  {id:"red", nome:"Redes & Cabeamento",         tint:"#dfd6c2"},
+  {id:"per", nome:"Periféricos & Acessórios",   tint:"#e8e3d5"}
+];
+
+// [cat, nome, resumo (PDF + card), descrição (só detalhe), preço, rótulo, publicado]
+const P = [
+  ["imp","Impressora EPSON L3250","Multifuncional","Multifuncional tanque de tinta com impressão, cópia e digitalização. Conexão Wi-Fi Direct e painel LCD. Ideal para escritórios com volume médio de impressão, com custo por página muito abaixo do cartucho tradicional.",1470.00,"PREÇO",1],
+  ["imp","Impressora HP Smart Tank 584","","",1275.00,"PREÇO",1],
+  ["imp","Impressora HP Smart Tank 210","","",1050.00,"PREÇO",1],
+  ["imp","Canon G3110 Mega Tank","Wi-Fi, jato de tinta, bivolt","",1125.00,"PREÇO",1],
+  ["ene","Nobreak SMS Pro 1500CA","8 tomadas, bivolt","Nobreak senoidal por aproximação com 1500VA de potência e 8 tomadas no padrão brasileiro. Entrada bivolt automática e saída 115V. Protege equipamentos contra queda de energia, surtos e variações da rede.",1650.00,"PREÇO",1],
+  ["ene","Nobreak JBR 600VA 220V","PC/Game/TV/Net/CFTV","",432.00,"PREÇO",1],
+  ["tin","Kit HP Garrafa de Tinta GT52/GT53","9F3N4AL colorido","",290.00,"PREÇO",1],
+  ["tin","Refil de Tinta EPSON 544","Original","",55.00,"PREÇO/UND",1],
+  ["tin","Refil de Tinta p/ EPSON","Conjunto 4 cores","",60.00,"PREÇO",1],
+  ["tin","Tinta EPSON","1 litro","",99.00,"PREÇO",1],
+  ["sof","Licença Windows 11 Pro","Licenciamento e atualização de SO","",699.00,"PREÇO",1],
+  ["sof","Microsoft Defender Education Edition","Antivírus empresarial","",79.00,"PREÇO",1],
+  ["com","Notebook Positivo Vision R15M","Ryzen 3, 8GB, SSD 256GB, 15\"","Notebook com processador AMD Ryzen 3-7330U, 8GB de memória e SSD de 256GB. Tela de 15 polegadas IPS, Wi-Fi 6 e sistema Linux pré-instalado. Acabamento em preto. Indicado para uso administrativo e navegação.",3100.00,"PREÇO",1],
+  ["com","Notebook VAIO FE16","Core i5, 16GB, SSD 512GB, 16\"","Notebook VAIO FE16 com processador Intel Core i5-1335U de 13ª geração, 16GB de memória e SSD NVMe de 512GB. Tela de 16 polegadas IPS WUXGA com tratamento antirreflexo. Sistema Linux, acabamento em cinza. Indicado para quem precisa de desempenho em planilhas pesadas e múltiplas janelas.",4750.00,"PREÇO",1],
+  ["com","Mini PC PCYES ONE B500","i5 3470, 8GB, SSD 256GB, Win 10 Pro","",2070.00,"PREÇO",1],
+  ["com","Placa-Mãe Gigabyte A520M K V2","AM4 DDR4","",600.00,"PREÇO",1],
+  ["com","Processador Intel Core i3-2110","3.1 GHz, LGA 1155","",105.00,"PREÇO",1],
+  ["com","SSD CeaMere 120GB","SATA III 2.5\"","",210.00,"PREÇO",1],
+  ["com","SSD ALLTEK 256GB","SATA III 2.5\"","",420.00,"PREÇO",1],
+  ["com","SSD ALLTEK 512GB","SATA III 2.5\"","",660.00,"PREÇO",0],
+  ["red","Cabo de Rede CAT6","Caixa 305 metros","",490.00,"PREÇO",1],
+  ["red","Cabo de Rede CAT6","Bobina 100 metros, homologado Anatel","",217.00,"PREÇO",1],
+  ["red","Testador de Cabo de Rede","RJ45/RJ11 Exbom","",40.00,"PREÇO",1],
+  ["red","Conector EZ-RJ45 Exbom","Caixa c/ 100 unidades","",29.90,"PREÇO",1],
+  ["red","Alicate de Crimpar RJ45/RJ11/RJ12","C/ descascador e lâmina","",37.00,"PREÇO",1],
+  ["per","Monitor VXPro 19\" WXGA+","75Hz, painel HVA - VX190X","",307.00,"PREÇO",1],
+  ["per","Fragmentadora Yamax 6 folhas","Abertura 220mm, cesto 8L","",270.00,"PREÇO",1],
+  ["per","Fragmentadora de Papel Portátil de Mesa","Corte em tiras","",179.00,"PREÇO",1],
+  ["per","Headset HP DHH-1601","Drive 40mm, omnidirecional","",54.00,"PREÇO",1],
+  ["per","Caixa de Som p/ PC HP DHS-2111","USB/P2","",41.00,"PREÇO",1],
+  ["per","Teclado Kross Elegance","ABNT2","",22.00,"PREÇO",1],
+  ["per","Mouse Kross Elegance","USB","",11.50,"PREÇO",1],
+  ["per","Apresentador de Slides s/ fio","C/ laser","",33.00,"PREÇO",1],
+  ["per","Mouse Pad c/ Apoio Ergonômico","Em gel","",12.00,"PREÇO",1],
+  ["per","Mouse Pad","23x18cm","",9.00,"PREÇO",1],
+  ["per","Cabo HDMI Ugreen","2.0","",8.00,"PREÇO",0]
+];
+
+let PRODS = P.map((r,i)=>({
+  id:"P"+String(i+1).padStart(3,"0"),
+  cat:r[0], nome:r[1], resumo:r[2], desc:r[3], preco:r[4], rotulo:r[5],
+  publicado:!!r[6],
+  semFoto:(r[1]==="Cabo HDMI Ugreen"),
+  novo:(r[1]==="SSD ALLTEK 512GB")
+}));
+
+const CATALOGOS = [
+  {nome:"Catálogo completo", cats:CATS.map(c=>c.id), ger:"12/09/2026"},
+  {nome:"Informática", cats:["com","imp"], ger:"03/09/2026"},
+  {nome:"Consumíveis e cabeamento", cats:["tin","red"], ger:null}
+];
+
+const brl = n => n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const cat = id => CATS.find(c=>c.id===id);
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function swatch(p){
+  if(p.semFoto) return '<div class="thumb thumb--none">SEM<br>FOTO</div>';
+  const t = cat(p.cat).tint, gid = "g"+p.id;
+  return '<div class="thumb"><svg viewBox="0 0 40 40" preserveAspectRatio="none" aria-hidden="true">'
+    + '<defs><pattern id="'+gid+'" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+    + '<line x1="0" y1="0" x2="0" y2="5" stroke="'+t+'" stroke-width="2.4"/></pattern></defs>'
+    + '<rect width="40" height="40" fill="'+t+'" opacity=".38"/>'
+    + '<rect width="40" height="40" fill="url(#'+gid+')" opacity=".75"/></svg></div>';
+}
+
+function note(k,txt){
+  return '<div class="note"><span class="note__k">'+k+'</span><span>'+txt+'</span></div>';
+}
+
+/* ---------------- Produtos ---------------- */
+function viewProdutos(){
+  let h = note("ADR-015","A ordem definida aqui é a mesma no PDF e na vitrine. Não existe ordem por catálogo — mover um item o move em todos os recortes onde ele aparece.");
+  h += '<div class="panel"><div class="panel__hd">'
+     + '<h2>Acervo</h2><span class="sub" id="acSub"></span>'
+     + '<div class="spacer"></div>'
+     + '<div class="seg"><button aria-pressed="true">Todos</button><button aria-pressed="false">Publicados</button><button aria-pressed="false">Rascunhos</button></div>'
+     + '<button class="btn btn--primary" data-new="1">+ Novo produto</button>'
+     + '</div><div class="rows" id="rows"></div></div>';
+  return h;
+}
+
+function renderRows(){
+  const el = document.getElementById("rows"); if(!el) return;
+  let h = "";
+  CATS.forEach((c,ci)=>{
+    const its = PRODS.filter(p=>p.cat===c.id);
+    h += '<div class="catbar"><span class="catbar__n">'+String(ci+1).padStart(2,"0")+'</span>'
+       + '<span class="catbar__t">'+esc(c.nome)+'</span>'
+       + '<span class="catbar__c">'+its.length+' itens</span></div>';
+    its.forEach((p,i)=>{
+      h += '<div class="row'+(p.publicado?"":" row--draft")+'">'
+        + '<div class="ord">'
+        + '<button data-mv="'+p.id+'" data-d="-1" '+(i===0?"disabled":"")+' aria-label="Subir">&#9650;</button>'
+        + '<button data-mv="'+p.id+'" data-d="1" '+(i===its.length-1?"disabled":"")+' aria-label="Descer">&#9660;</button>'
+        + '</div>'
+        + swatch(p)
+        + '<div class="pname"><b title="'+esc(p.nome)+'">'+esc(p.nome)+'</b>'+(p.resumo?'<i>'+esc(p.resumo)+'</i>':'<i class="pname--empty">sem resumo</i>')+'</div>'
+        + '<div class="cat-cell">'+(p.publicado
+            ? '<span class="pill pill--live"><i class="dot"></i>No ar</span>'
+            : '<span class="pill pill--draft"><i class="dot"></i>Rascunho</span>')
+          + (p.semFoto?' <span class="pill pill--gap">sem foto</span>':'')+'</div>'
+        + '<div class="price"><b>R$ '+brl(p.preco)+'</b><span>'+p.rotulo+'</span></div>'
+        + '<div class="acts"><button class="btn btn--sm" data-edit="'+p.id+'">Editar</button></div>'
+        + '</div>';
+    });
+  });
+  el.innerHTML = h;
+  const n = PRODS.filter(p=>p.publicado).length;
+  const s = document.getElementById("acSub");
+  if(s) s.textContent = n+" no ar \u00b7 "+(PRODS.length-n)+" em rascunho";
+}
+
+/* ---------------- Categorias ---------------- */
+function viewCategorias(){
+  let h = note("ADR-015","A numeração 01..07 é posicional: ela vale para o catálogo completo. Num recorte com duas categorias, elas saem como 01 e 02.");
+  h += '<div class="panel"><div class="panel__hd"><h2>Categorias</h2>'
+     + '<span class="sub">a ordem define a numeração impressa</span>'
+     + '<div class="spacer"></div><button class="btn">+ Nova categoria</button></div><div class="rows">';
+  CATS.forEach((c,i)=>{
+    const n = PRODS.filter(p=>p.cat===c.id).length;
+    h += '<div class="row" style="grid-template-columns:34px 46px 1fr 130px 92px">'
+      + '<div class="ord"><button '+(i===0?"disabled":"")+' aria-label="Subir">&#9650;</button>'
+      + '<button '+(i===CATS.length-1?"disabled":"")+' aria-label="Descer">&#9660;</button></div>'
+      + '<div class="catbar__n" style="justify-self:start">'+String(i+1).padStart(2,"0")+'</div>'
+      + '<div class="pname"><b>'+esc(c.nome)+'</b></div>'
+      + '<div class="mono" style="color:var(--muted);font-size:12px">'+n+' produtos</div>'
+      + '<div class="acts"><button class="btn btn--sm">Editar</button></div></div>';
+  });
+  return h + '</div></div>';
+}
+
+/* ---------------- Catálogos salvos ---------------- */
+function viewCatalogos(){
+  let h = note("ADR-014","Cada cartão guarda um <b>filtro</b>, não uma lista de produtos. Cadastrar um item novo o insere automaticamente em todo catálogo cujo critério ele atende.");
+  h += '<div class="cards">';
+  CATALOGOS.forEach((c,i)=>{
+    const itens = resolver(c);
+    h += '<article class="ccard" data-open="'+i+'"><h3>'+esc(c.nome)+'</h3>'
+      + '<div class="ccard__crit">'
+      + (c.cats.length===CATS.length
+          ? '<span class="tag">todas as categorias</span>'
+          : c.cats.map(id=>'<span class="tag">'+esc(cat(id).nome)+'</span>').join(""))
+      + '</div>'
+      + '<div class="ccard__ft"><b class="mono" style="color:var(--ink);font-size:14px">'+itens.length+'</b> itens hoje'
+      + '<span class="spacer"></span>'
+      + (c.ger?'gerado '+c.ger:'<span style="color:var(--warn)">nunca gerado</span>')
+      + '</div></article>';
+  });
+  h += '<article class="ccard" data-open="new" style="border-style:dashed;align-items:center;justify-content:center;color:var(--muted);min-height:150px">'
+     + '<div style="text-align:center"><div style="font-size:22px;line-height:1">+</div>'
+     + '<div style="font-family:var(--ui);font-weight:500;margin-top:6px">Novo catálogo</div></div></article>';
+  return h + '</div>';
+}
+
+function resolver(c){
+  return PRODS.filter(p => p.publicado && c.cats.indexOf(p.cat) >= 0);
+}
+
+/* ---------------- Montar catálogo ---------------- */
+let F = {nome:"Informática", cats:["com","imp"]};
+
+function viewMontar(){
+  return '<div class="two">'
+    + '<div style="display:flex;flex-direction:column;gap:14px">'
+    +   note("ADR-014","O que é salvo é este painel de critérios. A lista da direita não é guardada em lugar nenhum — ela é recalculada a cada geração.")
+    +   '<div class="panel"><div class="panel__hd"><h2>Critério</h2></div><div class="panel__bd" style="display:flex;flex-direction:column;gap:16px">'
+    +     '<div class="field"><label class="field__l" for="fn">Nome do catálogo</label>'
+    +       '<input type="text" id="fn" value="'+esc(F.nome)+'"></div>'
+    +     '<div class="field"><span class="field__l">Categorias <b style="color:var(--cta)">*</b></span><div id="fcats"></div><span class="field__h">Ao menos uma. É o único critério possível.</span></div>'
+    +   '</div><div class="panel__ft"><button class="btn btn--primary">Salvar critério</button>'
+    +     '<button class="btn btn--ghost">Descartar</button></div></div>'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:14px" id="right"></div></div>';
+}
+
+function renderFiltro(){
+  const el = document.getElementById("fcats"); if(!el) return;
+  el.innerHTML = CATS.map(c=>{
+    const n = PRODS.filter(p=>p.cat===c.id&&p.publicado).length;
+    const on = F.cats.indexOf(c.id)>=0;
+    return '<label class="check"><input type="checkbox" data-fc="'+c.id+'"'+(on?" checked":"")+'>'
+      + '<span>'+esc(c.nome)+'</span><span class="tally">'+n+'</span></label>';
+  }).join("");
+}
+
+function renderPrevia(){
+  const el = document.getElementById("right"); if(!el) return;
+  const itens = resolver(F);
+  const cats = CATS.filter(c=>itens.some(p=>p.cat===c.id));
+  const pgs = Math.max(1, Math.ceil(itens.length/9)) + 1;
+  const fora = PRODS.filter(p=>!p.publicado && F.cats.indexOf(p.cat)>=0).length;
+  const novos = itens.filter(p=>p.novo).length;
+
+  let h = '<div class="count"><b>'+itens.length+'</b><span>produtos entram neste catálogo</span>'
+        + '<span class="pg">'+pgs+' páginas<br>'+cats.length+' categorias</span></div>';
+
+  if(novos) h += '<div class="alert alert--warn"><span class="alert__i">!</span><span>'
+    + '<b>'+novos+' produto entrou desde a última geração</b> por atender ao critério. '
+    + 'Confira antes de gerar — ninguém o adicionou a este catálogo de propósito.</span></div>';
+
+  if(fora) h += '<div class="alert alert--info"><span class="alert__i">i</span><span>'
+    + '<b>'+fora+' item em rascunho</b> atende ao critério mas ficou de fora. Rascunho não entra em catálogo nem na vitrine.</span></div>';
+
+  h += '<div class="panel"><div class="panel__hd"><h2>Prévia do PDF</h2>'
+     + '<span class="sub">na ordem em que será impresso</span></div><div class="prev">';
+  cats.forEach((c,ci)=>{
+    h += '<div class="prevcat"><b>'+String(ci+1).padStart(2,"0")+'</b>'
+       + '<span>'+esc(c.nome)+'</span><i></i></div>';
+    itens.filter(p=>p.cat===c.id).forEach(p=>{
+      h += '<div class="previt'+(p.novo?" previt--new":"")+'">'
+         + '<em>'+(p.novo?"&#9679; ":"")+'<b class="pv-n">'+esc(p.nome)+'</b>'+(p.resumo?' <span class="pv-d">'+esc(p.resumo)+'</span>':'')+'</em>'
+         + '<b>R$ '+brl(p.preco)+'</b></div>';
+    });
+  });
+  h += '</div><div class="panel__ft"><button class="btn btn--primary" id="gerar">Gerar PDF</button>'
+     + '<span class="spacer"></span><span style="font-size:12px;color:var(--muted)">O arquivo não fica salvo no sistema.</span>'
+     + '</div></div>';
+  h += note("ADR-013","A geração é síncrona, com progresso pelo circuito do painel. Um teto de itens impede que um recorte grande demais atrapalhe a vitrine.");
+  el.innerHTML = h;
+}
+
+function gerar(){
+  const el = document.getElementById("right");
+  const itens = resolver(F);
+  const box = document.createElement("div");
+  box.className = "panel";
+  box.innerHTML = '<div class="panel__bd" style="display:flex;flex-direction:column;gap:11px">'
+    + '<div style="display:flex;align-items:center;gap:10px"><b style="font-family:var(--ui);font-size:13.5px">Compondo o documento</b>'
+    + '<span class="spacer"></span><span class="mono" id="gp" style="font-size:12px;color:var(--muted)">0 / '+itens.length+'</span></div>'
+    + '<div class="bar"><i id="gb" style="width:0%"></i></div>'
+    + '<div id="gs" style="font-size:12px;color:var(--muted)">Lendo preços atuais...</div></div>';
+  el.insertBefore(box, el.firstChild);
+  let i = 0;
+  const passos = ["Lendo preços atuais...","Montando a capa e o índice...","Inserindo produtos...","Numerando as páginas..."];
+  const t = setInterval(()=>{
+    i++;
+    const pct = Math.round(i/itens.length*100);
+    document.getElementById("gb").style.width = pct+"%";
+    document.getElementById("gp").textContent = i+" / "+itens.length;
+    document.getElementById("gs").textContent = passos[Math.min(3,Math.floor(i/itens.length*4))];
+    if(i>=itens.length){
+      clearInterval(t);
+      box.innerHTML = '<div class="panel__bd" style="display:flex;align-items:center;gap:12px">'
+        + '<span class="pill pill--live"><i class="dot"></i>Pronto</span>'
+        + '<b style="font-family:var(--ui);font-size:13.5px">catalogo-'+new Date().toISOString().slice(0,10)+'.pdf</b>'
+        + '<span class="mono" style="font-size:12px;color:var(--muted)">2,1 MB</span>'
+        + '<span class="spacer"></span><button class="btn btn--primary">Baixar</button></div>';
+    }
+  }, 55);
+}
+
+/* ---------------- Drawer do produto ---------------- */
+function abrirProduto(id){
+  const p = PRODS.find(x=>x.id===id) || {id:"novo",nome:"",resumo:"",desc:"",preco:0,rotulo:"PREÇO",cat:"per",publicado:false,semFoto:true};
+  const novo = p.id==="novo";
+  document.getElementById("drawer").innerHTML =
+      '<div class="drawer__hd"><h2 style="font-size:15px;font-weight:600">'+(novo?"Novo produto":"Editar produto")+'</h2>'
+    + '<span class="spacer"></span><button class="btn btn--ghost" data-close="1">Fechar</button></div>'
+    + '<div class="drawer__bd">'
+    + '<div class="field"><label class="field__l" for="pn">Nome <b style="color:var(--cta)">*</b></label>'
+    +   '<input type="text" id="pn" value="'+esc(p.nome)+'" placeholder="Impressora EPSON L3250">'
+    +   '<span class="field__h">Em destaque nos três lugares: PDF, listagem e página do produto.</span></div>'
+    + '<div class="field"><label class="field__l" for="pr2">Resumo</label>'
+    +   '<input type="text" id="pr2" value="'+esc(p.resumo||"")+'" placeholder="Multifuncional, jato de tinta, bivolt" maxlength="90">'
+    +   '<span class="field__h">Curto. É o texto da célula do PDF e do card da listagem. '
+    +   'Vazio: sai só o nome e o preço.</span></div>'
+    + '<div class="field"><label class="field__l" for="pd">Descrição</label>'
+    +   '<textarea id="pd" rows="4" placeholder="Texto completo do produto, sem limite de tamanho.">'+esc(p.desc||"")+'</textarea>'
+    +   '<span class="field__h">Livre, pode ser um parágrafo inteiro. Aparece <b>só</b> na página do produto — '
+    +   'nunca no PDF nem na listagem.</span></div>'
+    + note("ADR-016","Três campos com destino declarado. Nada é truncado automaticamente em lugar nenhum: o resumo existe justamente para você escolher o que cabe na célula.")
+    + '<div class="grid2">'
+    +   '<div class="field"><label class="field__l" for="pp">Preço</label>'
+    +     '<input type="text" id="pp" value="'+brl(p.preco)+'"></div>'
+    +   '<div class="field"><label class="field__l" for="pr">Rótulo impresso</label>'
+    +     '<select id="pr"><option>PREÇO</option><option'+(p.rotulo==="PREÇO/UND"?" selected":"")+'>PREÇO/UND</option></select></div>'
+    + '</div>'
+    + '<div class="field"><label class="field__l" for="pc">Categoria</label><select id="pc">'
+    +   CATS.map(c=>'<option value="'+c.id+'"'+(c.id===p.cat?" selected":"")+'>'+esc(c.nome)+'</option>').join("")
+    + '</select></div>'
+    + '<div class="field"><span class="field__l">Foto do produto</span>'
+    +   '<div class="drop">'+(p.semFoto
+        ? '<div class="thumb thumb--none">SEM<br>FOTO</div>'
+        : swatch(p))
+    +   '<div style="display:flex;flex-direction:column;gap:7px">'
+    +     '<button class="btn btn--sm">'+(p.semFoto?"Escolher arquivo":"Trocar foto")+'</button>'
+    +     '<span class="field__h">Uma foto por produto. Trocar substitui a atual.</span>'
+    +     '<div class="deriv"><span>miniatura</span><span>cartão</span><span>ampliada</span><span>impressão 800px</span></div>'
+    +   '</div></div></div>'
+    + note("ADR-005","Uma foto por produto. O upload gera quatro versões dela: três em WebP para a tela e uma em JPEG para o papel, que nunca é exposta na vitrine.")
+    + '<div class="field"><span class="field__l">Situação</span>'
+    +   '<div class="seg"><button aria-pressed="'+(!p.publicado)+'">Rascunho</button>'
+    +   '<button aria-pressed="'+(p.publicado)+'" '+(p.semFoto?"disabled":"")+'>No ar</button></div>'
+    +   (p.semFoto
+        ? '<span class="field__h" style="color:var(--danger)">Não é possível publicar sem foto.</span>'
+        : '<span class="field__h">Rascunho fica fora da vitrine e de todos os catálogos.</span>')
+    + '</div>'
+    + note("ADR-014","Publicar insere este produto, na hora, em todo catálogo salvo cujo critério ele atenda. Não há um passo de \u201cadicionar ao catálogo\u201d.")
+    + '</div>'
+    + '<div class="drawer__ft"><button class="btn btn--primary">Salvar</button>'
+    + '<button class="btn btn--ghost" data-close="1">Cancelar</button>'
+    + '<span class="spacer"></span>'+(novo?"":'<button class="btn btn--ghost" style="color:var(--danger)">Excluir</button>')+'</div>';
+  document.getElementById("drawer").classList.add("on");
+  document.getElementById("scrim").classList.add("on");
+}
+function fechar(){
+  document.getElementById("drawer").classList.remove("on");
+  document.getElementById("scrim").classList.remove("on");
+}
+
+/* ---------------- Roteamento ---------------- */
+const VIEWS = {
+  produtos:  {t:"Produtos",          s:"36 itens em 7 categorias \u00b7 a ordem aqui é a ordem no PDF e na vitrine", f:viewProdutos,  after:renderRows},
+  categorias:{t:"Categorias",        s:"a ordem define a numeração impressa no catálogo", f:viewCategorias},
+  catalogos: {t:"Catálogos em PDF",  s:"cada catálogo é um filtro salvo, resolvido no momento de gerar", f:viewCatalogos},
+  montar:    {t:"Montar catálogo",   s:"escolha as categorias à esquerda e confira o resultado à direita", f:viewMontar,
+              after:()=>{renderFiltro();renderPrevia();}}
+};
+
+let atual = "produtos";
+function ir(nome){
+  atual = nome;
+  const v = VIEWS[nome];
+  document.getElementById("ttl").textContent = v.t;
+  document.getElementById("sub").innerHTML = v.s;
+  document.getElementById("sheet").innerHTML = v.f();
+  if(v.after) v.after();
+  document.querySelectorAll(".nav button").forEach(b=>
+    b.setAttribute("aria-current", b.dataset.go===nome ? "true" : "false"));
+  window.scrollTo(0,0);
+}
+
+document.addEventListener("click", e=>{
+  const t = e.target;
+  const go = t.closest("[data-go]");        if(go){ ir(go.dataset.go); return; }
+  const cl = t.closest("[data-close]");     if(cl){ fechar(); return; }
+  const ed = t.closest("[data-edit]");      if(ed){ abrirProduto(ed.dataset.edit); return; }
+  const nv = t.closest("[data-new]");       if(nv){ abrirProduto("novo"); return; }
+  const op = t.closest("[data-open]");      if(op){
+    const i = op.dataset.open;
+    if(i!=="new"){ const c = CATALOGOS[+i]; F = {nome:c.nome,cats:c.cats.slice()}; }
+    else { F = {nome:"",cats:[]}; }
+    ir("montar"); return;
+  }
+  const mv = t.closest("[data-mv]");        if(mv){ mover(mv.dataset.mv, +mv.dataset.d); return; }
+  if(t.id==="gerar"){ gerar(); return; }
+  if(t.id==="scrim"){ fechar(); return; }
+  const sg = t.closest(".seg button");
+  if(sg){ sg.parentElement.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed","false"));
+          sg.setAttribute("aria-pressed","true"); return; }
+});
+
+document.addEventListener("change", e=>{
+  const fc = e.target.closest("[data-fc]");
+  if(fc){
+    const id = fc.dataset.fc;
+    if(fc.checked){ if(F.cats.indexOf(id)<0) F.cats.push(id); }
+    else F.cats = F.cats.filter(x=>x!==id);
+    renderPrevia();
+  }
+});
+
+function mover(id,d){
+  const p = PRODS.find(x=>x.id===id);
+  const irmaos = PRODS.filter(x=>x.cat===p.cat);
+  const i = irmaos.indexOf(p), j = i+d;
+  if(j<0 || j>=irmaos.length) return;
+  const a = PRODS.indexOf(irmaos[i]), b = PRODS.indexOf(irmaos[j]);
+  PRODS[a] = irmaos[j]; PRODS[b] = irmaos[i];
+  renderRows();
+}
+
+document.getElementById("noteBtn").addEventListener("click", function(){
+  const on = document.body.classList.toggle("notes");
+  this.setAttribute("aria-pressed", on ? "true" : "false");
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") fechar(); });
+
+ir("produtos");
+</script>

@@ -1,0 +1,486 @@
+<title>Vitrine — Listagem e Produto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  color-scheme:light;
+  --ground:#f3efe6; --surface:#fbf9f4; --surface-2:#f7f3ea; --sunken:#ece7da;
+  --ink:#0d1b2a; --ink-2:#1a2638; --muted:#6b6759; --faint:#8b8576;
+  --line:#d8d2c5; --line-soft:#e6e0d2; --line-strong:#b6ad97;
+  --navy:#0c2a4a; --navy-2:#143258; --on-navy:#ffffff;
+  --cta:#c25f37; --cta-ink:#ffffff; --cta-hover:#a94e2a; --cta-soft:#f7e3d2;
+  --wa:#1f7a4d; --wa-hover:#186340;
+  --danger:#a8412f; --danger-soft:#f9e5e1; --danger-line:#e0aea4;
+  --note:#4a4483; --note-soft:#ebe9f7; --note-line:#bab5e4;
+  --shadow:0 1px 2px rgba(13,27,42,.06), 0 4px 14px rgba(13,27,42,.05);
+  --r:6px;
+  --ui:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--sunken);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--ui);margin:0;text-wrap:balance;letter-spacing:-.015em}
+button,input,select{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:3px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- harness ---------- */
+.harness{max-width:1240px;margin:0 auto;padding:18px 20px 60px;display:flex;flex-direction:column;gap:14px}
+.hbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.hbar__l{font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 12px;cursor:pointer;font-family:var(--ui);font-size:12.5px;font-weight:500;color:var(--muted);border-right:1px solid var(--line-strong)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--navy);color:var(--on-navy);font-weight:600}
+.toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-family:var(--ui);font-size:12.5px;font-weight:500;color:var(--muted);border:1px solid var(--line-strong);background:var(--surface);padding:6px 11px;border-radius:99px}
+.toggle__sw{width:26px;height:15px;border-radius:99px;background:var(--line-strong);position:relative;transition:background .18s;flex:none}
+.toggle__sw::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:var(--surface);transition:transform .18s}
+body.notes .toggle{background:var(--note-soft);border-color:var(--note-line);color:var(--note)}
+body.notes .toggle__sw{background:var(--note)}
+body.notes .toggle__sw::after{transform:translateX(11px)}
+.note{display:none;gap:9px;padding:9px 12px;border-radius:var(--r);background:var(--note-soft);border:1px solid var(--note-line);color:var(--note);font-size:12px;line-height:1.5;align-items:flex-start}
+body.notes .note{display:flex}
+.note__k{font-family:var(--mono);font-size:10.5px;font-weight:600;flex:none;padding-top:1px}
+.spacer{margin-left:auto}
+/* ---------- device frame ---------- */
+.stage{display:flex;justify-content:center}
+.device{background:var(--ground);border:1px solid var(--line-strong);border-radius:10px;overflow:hidden;width:100%;box-shadow:var(--shadow);transition:max-width .25s ease}
+body[data-dev="desk"] .device{max-width:100%}
+body[data-dev="fone"] .device{max-width:412px;border-radius:22px}
+
+/* ---------- site chrome ---------- */
+.util{background:var(--ink);color:rgba(255,255,255,.78);font-size:11.5px}
+.util__in{padding:7px 22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.util__pill{border:1px solid rgba(255,255,255,.22);border-radius:2px;color:#fff;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px}
+.util a{color:rgba(255,255,255,.85);text-decoration:none}
+.head{background:var(--surface);border-bottom:1px solid var(--line)}
+.head__in{padding:14px 22px;display:flex;align-items:center;gap:16px}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;flex:none}
+.logo__m{width:30px;height:30px;border-radius:5px;background:var(--navy);color:#fff;display:grid;place-items:center;font-family:var(--ui);font-weight:700;font-size:11.5px}
+.logo__t{font-family:var(--ui);font-weight:700;font-size:14px;letter-spacing:.04em;line-height:1.1}
+.logo__s{font-size:10.5px;color:var(--muted);line-height:1.1}
+.search{flex:1;display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:7px 11px;min-width:0}
+.search input{border:0;background:none;outline:none;width:100%;font-size:13px}
+.search span{color:var(--faint);flex:none}
+body[data-dev="fone"] .head__in{flex-wrap:wrap}
+body[data-dev="fone"] .search{order:3;flex-basis:100%}
+
+/* ---------- breadcrumb ---------- */
+.crumb{padding:10px 22px;font-size:12px;color:var(--muted);display:flex;gap:7px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line-soft)}
+.crumb a{text-decoration:none;color:var(--muted)}
+.crumb a:hover{color:var(--navy);text-decoration:underline}
+.crumb b{color:var(--ink);font-weight:500}
+
+/* ---------- product ---------- */
+.prod{padding:22px;display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:34px;align-items:start}
+body[data-dev="fone"] .prod{grid-template-columns:1fr;gap:18px;padding:16px}
+.shot{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative;aspect-ratio:1/1}
+.shot svg{position:absolute;inset:0;width:100%;height:100%}
+.shot__tag{position:absolute;left:12px;top:12px;font-family:var(--mono);font-size:10.5px;background:rgba(251,249,244,.92);border:1px solid var(--line);padding:3px 8px;border-radius:4px;color:var(--muted)}
+.shot--none{display:grid;place-items:center;background:var(--danger-soft);border-color:var(--danger-line);border-style:dashed;color:var(--danger);text-align:center;font-family:var(--ui);font-weight:600;font-size:13px;padding:24px}
+.eyebrow{font-family:var(--ui);font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--navy);margin-bottom:8px;display:block}
+.prod h1{font-size:27px;line-height:1.2;font-weight:700}
+body[data-dev="fone"] .prod h1{font-size:21px}
+.desc{margin-top:12px;font-size:15px;color:var(--ink-2);max-width:62ch}
+.desc--empty{color:var(--faint);font-style:italic;font-size:14px}
+.priceblk{margin-top:22px;padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.priceblk__l{font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);display:block}
+.priceblk__v{font-family:var(--mono);font-size:32px;font-weight:600;line-height:1.1;display:block;margin-top:3px;font-variant-numeric:tabular-nums}
+body[data-dev="fone"] .priceblk__v{font-size:27px}
+.priceblk__n{font-size:12px;color:var(--muted);margin-top:7px}
+.cta{margin-top:16px;display:flex;flex-direction:column;gap:9px}
+.bwa{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--wa);color:#fff;border:0;border-radius:var(--r);padding:13px 18px;font-family:var(--ui);font-weight:600;font-size:14.5px;cursor:pointer;text-decoration:none}
+.bwa:hover{background:var(--wa-hover)}
+.bwa small{font-weight:400;opacity:.85;font-size:12px}
+.blines{display:flex;flex-wrap:wrap;gap:8px}
+.bline{flex:1;min-width:150px;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);padding:9px 12px;text-decoration:none}
+.bline:hover{border-color:var(--navy)}
+.bline__i{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--navy);background:var(--surface-2);border:1px solid var(--line);padding:2px 5px;border-radius:3px;flex:none}
+.bline b{display:block;font-size:13px;font-weight:600;line-height:1.25}
+.bline em{display:block;font-style:normal;font-size:11px;color:var(--muted);line-height:1.25}
+.meta{margin-top:20px;border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:7px}
+.meta div{display:flex;gap:12px;font-size:13px}
+.meta dt{color:var(--muted);min-width:96px;flex:none}
+.meta dd{margin:0;font-weight:500}
+
+/* ---------- related ---------- */
+.more{padding:0 22px 30px}
+body[data-dev="fone"] .more{padding:0 16px 30px}
+.more h2{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:9px}
+.more h2 i{flex:1;height:1px;background:var(--line);font-style:normal}
+.mgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+body[data-dev="fone"] .mgrid{grid-template-columns:repeat(2,1fr)}
+.mcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column}
+.mcard:hover{border-color:var(--navy)}
+.mcard__s{aspect-ratio:1/1;position:relative;border-bottom:1px solid var(--line-soft)}
+.mcard__s svg{position:absolute;inset:0;width:100%;height:100%}
+.mcard__b{padding:9px 10px;display:flex;flex-direction:column;gap:3px;flex:1}
+.mcard__n{font-size:12.5px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mcard__d{font-size:11px;color:var(--muted);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcard__p{font-family:var(--mono);font-size:13px;font-weight:600;margin-top:auto;padding-top:5px}
+
+/* ---------- foot ---------- */
+.foot{background:var(--ink);color:rgba(255,255,255,.72);padding:22px;font-size:12.5px;display:flex;flex-wrap:wrap;gap:18px}
+.foot b{color:#fff;display:block;font-family:var(--ui);font-size:12.5px}
+.foot em{font-style:normal;font-size:11.5px;color:rgba(255,255,255,.55)}
+.foot__c{display:flex;flex-direction:column;gap:3px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* ---------- listagem (UI-01) ---------- */
+.list{display:grid;grid-template-columns:212px minmax(0,1fr);gap:24px;padding:20px 22px 30px;align-items:start}
+body[data-dev="fone"] .list{grid-template-columns:1fr;gap:14px;padding:14px}
+.side{display:flex;flex-direction:column;gap:6px;position:sticky;top:12px}
+body[data-dev="fone"] .side{position:static;flex-direction:row;overflow-x:auto;gap:7px;padding-bottom:4px}
+.side__h{font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);padding:0 4px 4px}
+body[data-dev="fone"] .side__h{display:none}
+.catlink{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--r);text-decoration:none;font-size:13px;color:var(--ink-2);border:1px solid transparent;white-space:nowrap}
+.catlink:hover{background:var(--surface-2)}
+.catlink[aria-current="true"]{background:var(--navy);color:#fff;font-weight:600}
+.catlink .n{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+body[data-dev="fone"] .catlink{background:var(--surface);border-color:var(--line);flex:none}
+.catlink[aria-current="true"] .n{color:rgba(255,255,255,.8)}
+.resbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:12.5px;color:var(--muted)}
+.resbar b{font-family:var(--mono);color:var(--ink);font-weight:600}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line-strong);border-radius:99px;padding:3px 10px;font-size:12px}
+.chip button{border:0;background:none;cursor:pointer;color:var(--muted);padding:0;font-size:14px;line-height:1}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+body[data-dev="fone"] .grid{grid-template-columns:repeat(2,1fr);gap:10px}
+.gcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;text-decoration:none;color:inherit}
+.gcard:hover{border-color:var(--navy);box-shadow:var(--shadow)}
+.gcard__s{aspect-ratio:1/1;position:relative;border-bottom:1px solid var(--line-soft)}
+.gcard__s svg{position:absolute;inset:0;width:100%;height:100%}
+.gcard__b{padding:10px 11px 12px;display:flex;flex-direction:column;gap:4px;flex:1}
+.gcard__c{font-family:var(--ui);font-size:9.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--navy)}
+.gcard__n{font-size:13px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gcard__r{font-size:11.5px;color:var(--muted);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:1.3em}
+.gcard__p{margin-top:auto;padding-top:7px;display:flex;align-items:baseline;gap:5px}
+.gcard__p b{font-family:var(--mono);font-size:14px;font-weight:600}
+.gcard__p span{font-family:var(--ui);font-size:8.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.pager{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:20px}
+.pager button{border:1px solid var(--line-strong);background:var(--surface);border-radius:var(--r);padding:5px 10px;cursor:pointer;font-family:var(--mono);font-size:12.5px;color:var(--ink-2)}
+.pager button[aria-current="true"]{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:600}
+.pager button[disabled]{opacity:.4;cursor:not-allowed}
+.empty{padding:50px 22px;text-align:center;display:flex;flex-direction:column;gap:9px;align-items:center}
+.empty h3{font-size:16px;font-weight:600}
+.empty p{margin:0;color:var(--muted);font-size:13.5px;max-width:44ch}
+.empty__m{width:46px;height:46px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;color:var(--faint);font-size:19px}
+</style>
+
+<div class="harness">
+  <div class="hbar">
+    <span class="hbar__l">Tela</span>
+    <div class="seg" id="tela">
+      <button data-tela="lista" aria-pressed="true">Listagem</button>
+      <button data-tela="prod" aria-pressed="false">Detalhe do produto</button>
+    </div>
+    <span class="hbar__l" id="labEstado">Estado</span>
+    <div class="seg" id="pick"></div>
+    <span class="spacer"></span>
+    <div class="seg" id="dev">
+      <button data-dev="desk" aria-pressed="true">Desktop</button>
+      <button data-dev="fone" aria-pressed="false">Telefone</button>
+    </div>
+    <button class="toggle" id="noteBtn" aria-pressed="false">
+      <span class="toggle__sw"></span> Notas
+    </button>
+  </div>
+
+  <div class="note" id="noteTop"></div>
+  <div class="stage"><div class="device" id="dv"></div></div>
+  <div class="note">
+    <span class="note__k">ADR-010</span>
+    <span>Vitrine renderizada no servidor, servida do cache. Buscar, filtrar e paginar são navegações — o estado vive na URL <b>(RN-56)</b>, não no cliente. Por isso não há estado de carregamento aqui.</span>
+  </div>
+</div>
+
+<script>
+const CATS = [
+  {id:"imp", n:"Impressoras",                  t:"#dbe6f0"},
+  {id:"ene", n:"Energia & Proteção",           t:"#d8d4cb"},
+  {id:"tin", n:"Tintas & Suprimentos",         t:"#e6e1d4"},
+  {id:"sof", n:"Softwares & Licenças",         t:"#dee2e6"},
+  {id:"com", n:"Computadores & Componentes",   t:"#ccd5e0"},
+  {id:"red", n:"Redes & Cabeamento",           t:"#dfd6c2"},
+  {id:"per", n:"Periféricos & Acessórios",     t:"#e8e3d5"}
+];
+
+// [cat, nome, resumo, preço, rótulo]
+const D = [
+  ["imp","Impressora EPSON L3250","Multifuncional",1470.00,"PREÇO"],
+  ["imp","Impressora HP Smart Tank 584","",1275.00,"PREÇO"],
+  ["imp","Impressora HP Smart Tank 210","",1050.00,"PREÇO"],
+  ["imp","Canon G3110 Mega Tank","Wi-Fi, jato de tinta, bivolt",1125.00,"PREÇO"],
+  ["ene","Nobreak SMS Pro 1500CA","8 tomadas, bivolt",1650.00,"PREÇO"],
+  ["ene","Nobreak JBR 600VA 220V","PC/Game/TV/Net/CFTV",432.00,"PREÇO"],
+  ["tin","Kit HP Garrafa de Tinta GT52/GT53","9F3N4AL colorido",290.00,"PREÇO"],
+  ["tin","Refil de Tinta EPSON 544","Original",55.00,"PREÇO/UND"],
+  ["tin","Refil de Tinta p/ EPSON","Conjunto 4 cores",60.00,"PREÇO"],
+  ["tin","Tinta EPSON","1 litro",99.00,"PREÇO"],
+  ["sof","Licença Windows 11 Pro","Licenciamento e atualização de SO",699.00,"PREÇO"],
+  ["sof","Microsoft Defender Education Edition","Antivírus empresarial",79.00,"PREÇO"],
+  ["com","Notebook Positivo Vision R15M","Ryzen 3, 8GB, SSD 256GB, 15\"",3100.00,"PREÇO"],
+  ["com","Notebook VAIO FE16","Core i5, 16GB, SSD 512GB, 16\"",4750.00,"PREÇO"],
+  ["com","Mini PC PCYES ONE B500","i5 3470, 8GB, SSD 256GB, Win 10 Pro",2070.00,"PREÇO"],
+  ["com","Placa-Mãe Gigabyte A520M K V2","AM4 DDR4",600.00,"PREÇO"],
+  ["com","Processador Intel Core i3-2110","3.1 GHz, LGA 1155",105.00,"PREÇO"],
+  ["com","SSD CeaMere 120GB","SATA III 2.5\"",210.00,"PREÇO"],
+  ["com","SSD ALLTEK 256GB","SATA III 2.5\"",420.00,"PREÇO"],
+  ["red","Cabo de Rede CAT6","Caixa 305 metros",490.00,"PREÇO"],
+  ["red","Cabo de Rede CAT6","Bobina 100 metros, homologado Anatel",217.00,"PREÇO"],
+  ["red","Testador de Cabo de Rede","RJ45/RJ11 Exbom",40.00,"PREÇO"],
+  ["red","Conector EZ-RJ45 Exbom","Caixa c/ 100 unidades",29.90,"PREÇO"],
+  ["red","Alicate de Crimpar RJ45/RJ11/RJ12","C/ descascador e lâmina",37.00,"PREÇO"],
+  ["per","Monitor VXPro 19\" WXGA+","75Hz, painel HVA - VX190X",307.00,"PREÇO"],
+  ["per","Fragmentadora Yamax 6 folhas","Abertura 220mm, cesto 8L",270.00,"PREÇO"],
+  ["per","Fragmentadora de Papel Portátil de Mesa","Corte em tiras",179.00,"PREÇO"],
+  ["per","Headset HP DHH-1601","Drive 40mm, omnidirecional",54.00,"PREÇO"],
+  ["per","Caixa de Som p/ PC HP DHS-2111","USB/P2",41.00,"PREÇO"],
+  ["per","Teclado Kross Elegance","ABNT2",22.00,"PREÇO"],
+  ["per","Mouse Kross Elegance","USB",11.50,"PREÇO"],
+  ["per","Apresentador de Slides s/ fio","C/ laser",33.00,"PREÇO"],
+  ["per","Mouse Pad c/ Apoio Ergonômico","Em gel",12.00,"PREÇO"],
+  ["per","Mouse Pad","23x18cm",9.00,"PREÇO"]
+];
+
+const TODOS = D.map((r,i)=>({
+  id:"P"+String(i+1).padStart(3,"0"),
+  cat:r[0], nome:r[1], resumo:r[2], preco:r[3], rotulo:r[4]
+}));
+
+const DETALHES = [
+  {id:"P014", cat:"com", nome:"Notebook VAIO FE16", resumo:"Core i5, 16GB, SSD 512GB, 16\"",
+   desc:"Notebook VAIO FE16 com processador Intel Core i5-1335U de 13ª geração, 16GB de memória e SSD NVMe de 512GB. Tela de 16 polegadas IPS WUXGA com tratamento antirreflexo. Sistema Linux, acabamento em cinza. Indicado para quem precisa de desempenho em planilhas pesadas e múltiplas janelas abertas ao mesmo tempo.",
+   preco:4750.00, rotulo:"PREÇO", caso:"descrição longa"},
+  {id:"P002", cat:"imp", nome:"Impressora HP Smart Tank 584", resumo:"", desc:"",
+   preco:1275.00, rotulo:"PREÇO", caso:"sem resumo nem descrição"},
+  {id:"P008", cat:"tin", nome:"Refil de Tinta EPSON 544", resumo:"Original", desc:"",
+   preco:55.00, rotulo:"PREÇO/UND", caso:"preço por unidade"},
+  {id:"P036", cat:"per", nome:"Cabo HDMI Ugreen", resumo:"2.0", desc:"",
+   preco:8.00, rotulo:"PREÇO", semFoto:true, caso:"sem foto"}
+];
+
+const ESTADOS = [
+  {k:"default",   rot:"Padrão"},
+  {k:"filtrado",  rot:"Filtrado por categoria"},
+  {k:"semResult", rot:"Busca sem resultado"},
+  {k:"vazio",     rot:"Catálogo vazio"}
+];
+
+const brl = n => n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const cat = id => CATS.find(c=>c.id===id) || CATS[6];
+
+let tela = "lista", estado = "default", atual = 0;
+
+function sw(catId, key){
+  const t = cat(catId).t, g = "g" + key;
+  return '<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'
+    + '<defs><pattern id="'+g+'" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+    + '<line x1="0" y1="0" x2="0" y2="6" stroke="'+t+'" stroke-width="2.6"/></pattern></defs>'
+    + '<rect width="100" height="100" fill="'+t+'" opacity=".34"/>'
+    + '<rect width="100" height="100" fill="url(#'+g+')" opacity=".8"/></svg>';
+}
+
+function chrome(busca){
+  return '<div class="util"><div class="util__in">'
+    +   '<span class="util__pill">Catálogo</span>'
+    +   '<span>Atendimento Seg&ndash;Sex 08h&ndash;18h</span>'
+    +   '<span class="spacer"></span><a href="#">Falar com o vendedor</a>'
+    + '</div></div>'
+    + '<div class="head"><div class="head__in">'
+    +   '<a class="logo" href="#"><span class="logo__m">CT</span>'
+    +   '<span><span class="logo__t">CAT&Aacute;LOGO</span>'
+    +   '<span class="logo__s">Suprimentos &amp; Inform&aacute;tica</span></span></a>'
+    +   '<div class="search"><span>&#9906;</span>'
+    +   '<input type="text" placeholder="Buscar produto ou marca" value="'+esc(busca||"")+'" aria-label="Buscar"></div>'
+    + '</div></div>';
+}
+
+function rodape(){
+  return '<div class="foot">'
+    +   '<div class="foot__c"><b>Suprimentos &amp; Inform&aacute;tica</b>'
+    +   '<em>Atendimento &middot; (88) 99654-1931</em></div>'
+    +   '<div class="foot__c"><b>Como comprar</b><em>Fale pelo WhatsApp ou telefone</em></div>'
+    + '</div>';
+}
+
+function gcard(p){
+  return '<a class="gcard" href="#" data-goprod="'+p.id+'">'
+    + '<div class="gcard__s">'+sw(p.cat,p.id)+'</div>'
+    + '<div class="gcard__b">'
+    +   '<span class="gcard__c">'+esc(cat(p.cat).n)+'</span>'
+    +   '<span class="gcard__n">'+esc(p.nome)+'</span>'
+    +   '<span class="gcard__r">'+esc(p.resumo)+'</span>'
+    +   '<span class="gcard__p"><b>R$ '+brl(p.preco)+'</b><span>'+esc(p.rotulo)+'</span></span>'
+    + '</div></a>';
+}
+
+/* ---------------- UI-01 — listagem ---------------- */
+function renderLista(){
+  const filtrado = estado === "filtrado";
+  const catAtiva = filtrado ? "per" : null;
+  const busca = estado === "semResult" ? "impressora a laser" : "";
+
+  let itens = TODOS.slice();
+  if (estado === "vazio" || estado === "semResult") itens = [];
+  else if (filtrado) itens = itens.filter(p => p.cat === catAtiva);
+
+  const porPagina = 12;
+  const pagina = itens.slice(0, porPagina);
+  const paginas = Math.max(1, Math.ceil(itens.length / porPagina));
+
+  let corpo = "";
+
+  if (estado === "vazio") {
+    corpo = '<div class="empty"><div class="empty__m">&#9633;</div>'
+      + '<h3>O catálogo ainda está sendo montado</h3>'
+      + '<p>Assim que os produtos forem publicados eles aparecem aqui. '
+      + 'Enquanto isso, fale com a gente pelo WhatsApp.</p></div>';
+  } else if (estado === "semResult") {
+    corpo = '<div class="empty"><div class="empty__m">&#9906;</div>'
+      + '<h3>Nenhum produto encontrado para <b>&ldquo;'+esc(busca)+'&rdquo;</b></h3>'
+      + '<p>Confira a escrita ou veja o catálogo completo.</p>'
+      + '<button class="bline" style="flex:none;min-width:0" data-estado="default">Ver catálogo completo</button></div>';
+  } else {
+    corpo = '<div class="list">'
+      + '<aside class="side"><div class="side__h">Categorias</div>'
+      +   '<a class="catlink" href="#" data-estado="default" aria-current="'+(!filtrado)+'">'
+      +   '<span>Todos</span><span class="n">'+TODOS.length+'</span></a>'
+      +   CATS.map(c=>{
+            const n = TODOS.filter(p=>p.cat===c.id).length;
+            const on = filtrado && c.id===catAtiva;
+            return '<a class="catlink" href="#" data-estado="filtrado" aria-current="'+on+'">'
+              + '<span>'+esc(c.n)+'</span><span class="n">'+n+'</span></a>';
+          }).join("")
+      + '</aside>'
+      + '<div>'
+      +   '<div class="resbar"><b>'+itens.length+'</b> produtos'
+      +   (filtrado ? ' <span class="chip">'+esc(cat(catAtiva).n)+' <button data-estado="default" aria-label="Remover filtro">&times;</button></span>' : '')
+      +   '<span class="spacer"></span>página <b>1</b> de <b>'+paginas+'</b></div>'
+      +   '<div class="grid">'+pagina.map(gcard).join("")+'</div>'
+      +   (paginas > 1
+        ? '<div class="pager"><button disabled>&larr;</button>'
+          + Array.from({length:paginas},(_,i)=>'<button aria-current="'+(i===0)+'">'+(i+1)+'</button>').join("")
+          + '<button>&rarr;</button></div>'
+        : '')
+      + '</div></div>';
+  }
+
+  return chrome(busca) + corpo + rodape();
+}
+
+/* ---------------- UI-02 — detalhe ---------------- */
+function renderProd(){
+  const p = DETALHES[atual];
+  const c = cat(p.cat);
+  const vizinhos = TODOS.filter(x => x.cat === p.cat && x.nome !== p.nome).slice(0,4);
+
+  const shot = p.semFoto
+    ? '<div class="shot shot--none">Produto sem foto<br><span style="font-weight:400;font-size:12px">decisão em aberto — lacuna 2</span></div>'
+    : '<div class="shot">'+sw(p.cat,p.id)+'<span class="shot__tag">'+p.id+'</span></div>';
+
+  const texto = p.desc
+    ? '<p class="desc">'+esc(p.desc)+'</p>'
+    : (p.resumo
+      ? '<p class="desc">'+esc(p.resumo)+'</p>'
+      : '<p class="desc desc--empty">Este produto ainda não tem descrição cadastrada.</p>');
+
+  return chrome("")
+    + '<nav class="crumb"><a href="#" data-gotela="lista">Catálogo</a><span>&rsaquo;</span>'
+    +   '<a href="#" data-gotela="lista">'+esc(c.n)+'</a><span>&rsaquo;</span><b>'+esc(p.nome)+'</b></nav>'
+    + '<div class="prod"><div>'+shot+'</div><div>'
+    +   '<span class="eyebrow">'+esc(c.n)+'</span>'
+    +   '<h1>'+esc(p.nome)+'</h1>'
+    +   texto
+    +   '<div class="priceblk">'
+    +     '<span class="priceblk__l">'+esc(p.rotulo)+'</span>'
+    +     '<span class="priceblk__v">R$ '+brl(p.preco)+'</span>'
+    +     '<div class="priceblk__n">Preço atualizado em 14/09/2026. Consulte condições para compra em quantidade.</div>'
+    +   '</div>'
+    +   '<div class="cta">'
+    +     '<a class="bwa" href="#"><span>Perguntar no WhatsApp</span><small>(88) 99654-1931</small></a>'
+    +     '<div class="blines">'
+    +       '<a class="bline" href="#"><span class="bline__i">TEL</span>'
+    +       '<span><b>(88) 99654-1931</b><em>Seg&ndash;Sex 08h&ndash;18h</em></span></a>'
+    +       '<a class="bline" href="#"><span class="bline__i">@</span>'
+    +       '<span><b>Enviar e-mail</b><em>orçamentos e pedidos</em></span></a>'
+    +     '</div>'
+    +   '</div>'
+    +   '<dl class="meta">'
+    +     '<div><dt>Categoria</dt><dd>'+esc(c.n)+'</dd></div>'
+    +     '<div><dt>Código</dt><dd class="mono">'+p.id+'</dd></div>'
+    +     '<div><dt>Vendedor</dt><dd>Suprimentos &amp; Informática</dd></div>'
+    +   '</dl>'
+    + '</div></div>'
+    + (vizinhos.length
+      ? '<div class="more"><h2>Outros itens em '+esc(c.n)+' <i></i></h2>'
+        + '<div class="mgrid">'+vizinhos.map(v=>
+            '<article class="mcard"><div class="mcard__s">'+sw(v.cat,"v"+v.id)+'</div>'
+            + '<div class="mcard__b"><span class="mcard__n">'+esc(v.nome)+'</span>'
+            + '<span class="mcard__d">'+esc(v.resumo)+'</span>'
+            + '<span class="mcard__p">R$ '+brl(v.preco)+'</span></div></article>').join("")
+        + '</div></div>'
+      : '')
+    + rodape();
+}
+
+/* ---------------- controles ---------------- */
+const NOTAS = {
+  lista: '<span class="note__k">UI-01</span><span>Listagem da vitrine, alinhada ao PRD. '
+       + 'Sem carrinho, sem estoque, sem NCM e sem dispensa de licitação — o protótipo original trazia tudo isso, '
+       + 'e está fora do escopo <b>(PRD 4.2)</b>. A ordem dos produtos é a curadoria do dono <b>(RN-51)</b>.</span>',
+  prod:  '<span class="note__k">UI-02</span><span>Detalhe do produto. É o <b>único</b> lugar do sistema onde a descrição longa aparece '
+       + '<b>(RN-05)</b>; o PDF e o card usam o resumo. Tudo converge para o contato <b>(RN-54, RN-55)</b>.</span>'
+};
+
+function pick(){
+  const el = document.getElementById("pick");
+  if (tela === "lista") {
+    document.getElementById("labEstado").textContent = "Estado";
+    el.innerHTML = ESTADOS.map(s =>
+      '<button data-estado="'+s.k+'" aria-pressed="'+(s.k===estado)+'">'+s.rot+'</button>').join("");
+  } else {
+    document.getElementById("labEstado").textContent = "Caso";
+    el.innerHTML = DETALHES.map((p,i) =>
+      '<button data-p="'+i+'" aria-pressed="'+(i===atual)+'">'+esc(p.caso)+'</button>').join("");
+  }
+}
+
+function render(){
+  document.getElementById("dv").innerHTML = tela === "lista" ? renderLista() : renderProd();
+  document.getElementById("noteTop").innerHTML = NOTAS[tela];
+  document.querySelectorAll("#tela button").forEach(b =>
+    b.setAttribute("aria-pressed", b.dataset.tela === tela ? "true" : "false"));
+}
+
+document.addEventListener("click", e => {
+  const t = e.target;
+  const gp = t.closest("[data-goprod]");
+  if (gp){ e.preventDefault(); tela = "prod"; atual = 0; pick(); render(); return; }
+  const gt = t.closest("[data-gotela]");
+  if (gt){ e.preventDefault(); tela = "lista"; estado = "default"; pick(); render(); return; }
+  const tl = t.closest("[data-tela]");
+  if (tl){ tela = tl.dataset.tela; pick(); render(); return; }
+  const es = t.closest("[data-estado]");
+  if (es){ e.preventDefault(); estado = es.dataset.estado; tela = "lista"; pick(); render(); return; }
+  const pp = t.closest("[data-p]");
+  if (pp){ atual = +pp.dataset.p; pick(); render(); return; }
+  const dv = t.closest("[data-dev]");
+  if (dv){
+    document.body.dataset.dev = dv.dataset.dev;
+    document.querySelectorAll("#dev button").forEach(x =>
+      x.setAttribute("aria-pressed", x === dv ? "true" : "false"));
+  }
+});
+
+document.getElementById("noteBtn").addEventListener("click", function(){
+  const on = document.body.classList.toggle("notes");
+  this.setAttribute("aria-pressed", on ? "true" : "false");
+});
+
+document.body.dataset.dev = "desk";
+pick(); render();
+</script>
