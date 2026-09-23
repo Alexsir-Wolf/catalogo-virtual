@@ -73,7 +73,7 @@ app.MapGet("/health", async (
             failure = exception.GetType().Name,
             cause = exception.InnerException?.GetType().Name,
             sqlState = (exception as PostgresException)?.SqlState,
-            detail = exception is ArgumentException ? exception.Message : null,
+            detail = exception is ArgumentException or PostgresException ? exception.Message : null,
             shape = DatabaseConnectionStringShape.Describe(configured)
         }, statusCode: 503);
     }
