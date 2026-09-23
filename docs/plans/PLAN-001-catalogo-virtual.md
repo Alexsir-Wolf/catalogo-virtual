@@ -215,7 +215,7 @@ Provar o caminho de publicação antes de existir funcionalidade: um projeto mí
 
 #### T-03 — Spike: da foto ao PDF impresso
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Alta
 - **Depende de:** T-02
 - **Implementa:** —
@@ -230,10 +230,10 @@ Programa mínimo que recebe um punhado de fotos reais de produto, gera a derivad
 O que este spike responde: a biblioteca de composição dá conta do layout do gabarito? Quanto pesa o arquivo final? Quanto tempo leva por produto? Quantos caracteres de resumo cabem na célula sem quebrar?
 
 **Critério de aceite (testável):**
-- [ ] PDF gerado com ao menos 12 produtos na grade de três colunas
-- [ ] Nenhuma célula partida entre páginas
-- [ ] Cabeçalho e rodapé repetidos, com numeração de página
-- [ ] Tamanho do arquivo e tempo de geração registrados
+- [x] PDF gerado com ao menos 12 produtos na grade de três colunas
+- [x] Nenhuma célula partida entre páginas
+- [x] Cabeçalho e rodapé repetidos, com numeração de página
+- [x] Tamanho do arquivo e tempo de geração registrados
 
 **Testes a escrever:** *Não aplicável* — spike descartável, validado por inspeção do artefato.
 
@@ -1337,6 +1337,7 @@ Tarefas em que quem executa **deve parar e pedir confirmação** antes de seguir
 - [ ] Domínio próprio a registrar e apontar para o serviço — *decidido em T-01 usar o subdomínio do Render como endereço inicial* — *bloqueia: divulgação da vitrine, não bloqueia nenhuma tarefa*
 - [ ] Tempo real de retomada após adormecimento — *medir e registrar; a arquitetura estima cerca de um minuto* — *não bloqueia nenhuma tarefa*
 - [ ] Conexão por requisição estoura o limite do pooler gratuito (`TimeoutException` intermitente medido em T-02) — *resolver em T-06 com `NpgsqlDataSource` compartilhado e `MaxPoolSize` calibrado* — *bloqueia: T-06*
+- [ ] Biblioteca de processamento de imagem sem ADR — *spike usou SkiaSharp (BSD, sem teto de faturamento); ImageSharp concentraria duas dependências no mesmo gatilho de licença da ADR-012* — *decidir antes de T-08*
 - [ ] Cinco estados de UI-05 e UI-06 sem validação visual *(lacuna 6 da SPEC-UI)* — *responsável: validar durante a execução das tarefas correspondentes*
 
 ## 11. Histórico de execução
@@ -1345,3 +1346,4 @@ Tarefas em que quem executa **deve parar e pedir confirmação** antes de seguir
 |--------|--------|--------------|--------|------------|
 | T-01 | Concluído | 2026-09-22 | bc89134 | Supabase e Render criados. Bucket privado verificado por requisição anônima (`NoSuchBucket` sem credencial). Endereço inicial no subdomínio do Render; domínio próprio adiado. Primeiro build falhou por ausência de `Dockerfile` — esperado, é escopo de T-02 |
 | T-02 | Concluído | 2026-09-22 | bb39508 | Aplicação mínima descartável publicada em `catalogo-virtual-7wpy.onrender.com` — escopo ampliado além do declarado (`src/Catalogo/`), aprovado pelo usuário, pois T-02 exige publicar uma aplicação que só existe em T-05. `/health` responde `{"status":"healthy","database":"17.6","query":1}`. Circuito interativo confirmado no navegador: **a ADR-010 se sustenta no Render**. Conexão exigiu o Transaction pooler (`aws-0-us-west-2`, porta 6543, usuário com project ref) — a conexão direta é IPv6-only e o Render gratuito não tem IPv6 |
+| T-03 | Concluído | 2026-09-22 | — | Spike descartável em `spike/`, medições em `spike/MEDICOES.md`. **A ADR-012 se sustenta sem ressalva**: grade de três colunas, fluxo contínuo de categorias, célula indivisível (`ShowEntire`), cabeçalho e rodapé repetidos com numeração. 36 produtos → **472 KB e 650 ms**, contra 7.134 KB do catálogo do cliente. Fotos reais extraídas do próprio gabarito. Célula comporta **160 caracteres** em 4 linhas — insumo para RN-03. Achado extra: nenhuma ADR escolhe biblioteca de imagem; o spike usou SkiaSharp por licença BSD |

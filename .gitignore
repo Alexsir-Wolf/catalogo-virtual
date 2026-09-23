@@ -28,3 +28,8 @@ backups/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Saida do spike (regenerável) — o PDF é versionado por ser evidência de T-04
+spike/saida/fotos/
+spike/saida/impressao/
+spike/saida/paginas/
