@@ -18,10 +18,10 @@ artifacts/
 appsettings.Development.json
 appsettings.Local.json
 
-# Dados e mídia de execução
-uploads/
-media/
-backups/
+# Dados e mídia de execução — diretórios na raiz, não código de funcionalidade
+/uploads/
+/media/
+/backups/
 *.pdf.tmp
 
 # Sistema operacional

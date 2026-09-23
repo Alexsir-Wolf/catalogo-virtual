@@ -2,6 +2,7 @@ using Catalogo;
 using Catalogo.Components;
 using Catalogo.Data;
 using Catalogo.Features.Account;
+using Catalogo.Features.Media;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -14,6 +15,12 @@ builder.Services.AddRazorComponents()
 builder.Services.AddDbContext<CatalogDbContext>(options =>
     options.UseNpgsql(DatabaseConnectionString.Normalize(
         builder.Configuration.GetConnectionString("Default") ?? string.Empty)));
+
+builder.Services.Configure<ObjectStorageOptions>(
+    builder.Configuration.GetSection(ObjectStorageOptions.SectionName));
+builder.Services.AddSingleton<ImageProcessor>();
+builder.Services.AddHttpClient<IObjectStorage, SupabaseObjectStorage>();
+builder.Services.AddScoped<ProductPhotoService>();
 
 builder.Services.AddPanelAuthentication(builder.Configuration);
 builder.Services.AddCascadingAuthenticationState();
