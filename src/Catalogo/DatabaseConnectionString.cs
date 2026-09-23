@@ -29,3 +29,40 @@ public static class DatabaseConnectionString
             "SSL Mode=Require");
     }
 }
+
+/// <summary>
+/// Descreve a forma da string de conexão — nunca os valores — para permitir
+/// diagnosticar um erro de sintaxe sem expor credencial.
+/// </summary>
+public static class DatabaseConnectionStringShape
+{
+    private const string Redacted = "…";
+
+    public static object Describe(string value)
+    {
+        if (value.Contains("://", StringComparison.Ordinal))
+        {
+            var scheme = value[..value.IndexOf("://", StringComparison.Ordinal)];
+            return new { format = "uri", scheme, host = HostFromUri(value) };
+        }
+
+        var keys = value
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(pair => pair.Contains('=') ? pair[..pair.IndexOf('=')].Trim() : $"{Redacted}{pair.Length}")
+            .ToArray();
+
+        return new { format = "keywords", keys };
+    }
+
+    private static string HostFromUri(string value)
+    {
+        try
+        {
+            return new Uri(value).Host;
+        }
+        catch (UriFormatException)
+        {
+            return Redacted;
+        }
+    }
+}
