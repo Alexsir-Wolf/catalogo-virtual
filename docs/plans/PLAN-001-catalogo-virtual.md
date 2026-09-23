@@ -152,7 +152,7 @@ A folga real do plano está entre **T-18 e T-22**: vitrine e catálogos partem d
 
 #### T-01 — Criar os projetos nas plataformas
 
-- **Status:** Em andamento
+- **Status:** Concluído
 - **Complexidade:** Baixa
 - **Depende de:** nenhuma
 - **Implementa:** —
@@ -167,12 +167,12 @@ Criar o projeto no Supabase — banco e bucket de armazenamento — e o serviço
 Configurar dois buckets com políticas distintas: um **público**, para as três derivadas de tela, e um **privado**, para a derivada de impressão e a capa do PDF *(RN-12)*.
 
 **Critério de aceite (testável):**
-- [ ] Projeto do Supabase criado, com string de conexão em mãos
-- [ ] Extensões `unaccent` e `pg_trgm` habilitadas
-- [ ] Bucket público criado e acessível por URL
-- [ ] Bucket privado criado e **comprovadamente inacessível** sem credencial
-- [ ] Serviço criado no Render, ligado ao repositório
-- [ ] Domínio apontado, com TLS válido
+- [x] Projeto do Supabase criado, com string de conexão em mãos
+- [x] Extensões `unaccent` e `pg_trgm` habilitadas
+- [x] Bucket público criado e acessível por URL
+- [x] Bucket privado criado e **comprovadamente inacessível** sem credencial
+- [x] Serviço criado no Render, ligado ao repositório
+- [x] TLS válido no endereço público do serviço — **subdomínio `*.onrender.com` adotado como endereço inicial** *(decidido em T-01)*; domínio próprio adiado, ver seção 10
 
 **Testes a escrever:** *Não aplicável* — tarefa de infraestrutura.
 
@@ -1334,10 +1334,11 @@ Tarefas em que quem executa **deve parar e pedir confirmação** antes de seguir
 - [ ] Medidas tipográficas e de espaçamento do documento *(lacuna 3 da SPEC-UI)* — *responsável: extrair do PDF original* — *bloqueia: T-24*
 - [ ] PDF de capa, com exatamente uma página — *responsável: cliente* — *bloqueia: T-32*
 - [ ] Derivadas órfãs após troca de foto: limpar ou acumular? — *responsável: decidir em T-13*
+- [ ] Domínio próprio a registrar e apontar para o serviço — *decidido em T-01 usar o subdomínio do Render como endereço inicial* — *bloqueia: divulgação da vitrine, não bloqueia nenhuma tarefa*
 - [ ] Cinco estados de UI-05 e UI-06 sem validação visual *(lacuna 6 da SPEC-UI)* — *responsável: validar durante a execução das tarefas correspondentes*
 
 ## 11. Histórico de execução
 
 | Tarefa | Status | Concluída em | Commit | Observação |
 |--------|--------|--------------|--------|------------|
-| — | — | — | — | Nenhuma tarefa iniciada |
+| T-01 | Concluído | 2026-09-22 | — | Supabase e Render criados. Bucket privado verificado por requisição anônima (`NoSuchBucket` sem credencial). Endereço inicial no subdomínio do Render; domínio próprio adiado. Primeiro build falhou por ausência de `Dockerfile` — esperado, é escopo de T-02 |
