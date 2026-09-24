@@ -1,0 +1,206 @@
+@page "/painel/produtos/novo"
+@page "/painel/produtos/{Id:int}"
+@rendermode InteractiveServer
+@inject ProductMaintenance Maintenance
+@inject NavigationManager Navigation
+
+<PageTitle>@(Id is null ? "Novo produto" : "Editar produto")</PageTitle>
+
+<div class="painel">
+    <h1>@(Id is null ? "Novo produto" : "Editar produto")</h1>
+    <div class="painel__sub">
+        O que é cadastrado aqui alimenta a vitrine e os catálogos em PDF.
+    </div>
+
+    <div class="painel__folha" data-estado="@(Id is null ? "novo" : "edicao")">
+        @if (notFound)
+        {
+            <div class="painel-bloco">
+                <div class="painel-bloco__bd">
+                    <p>Produto não encontrado. Ele pode ter sido excluído.</p>
+                    <a class="btn" href="/painel">Voltar ao painel</a>
+                </div>
+            </div>
+        }
+        else if (categories is null)
+        {
+            <p>Carregando…</p>
+        }
+        else if (categories.Count == 0)
+        {
+            <div class="painel-bloco">
+                <div class="painel-bloco__bd">
+                    <h2>Nenhuma categoria cadastrada</h2>
+                    <p>
+                        Todo produto pertence a exatamente uma categoria, então a categoria
+                        vem antes. Crie a primeira para poder cadastrar produtos.
+                    </p>
+                    <a class="btn btn--primario" href="/painel/categorias">Ir para categorias</a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="painel-bloco">
+                <div class="painel-bloco__hd">
+                    <h2>Dados do produto</h2>
+                    <span class="selo selo--rascunho">
+                        <span class="selo__ponto"></span>Rascunho
+                    </span>
+                </div>
+
+                <div class="painel-bloco__bd produto__campos">
+                    <div class="campo @(ErrorClass(ProductField.Name))">
+                        <label class="campo__rotulo" for="nome">
+                            Nome <span class="campo__obrigatorio">*</span>
+                        </label>
+                        <input id="nome" type="text" @bind="draft.Name" @bind:event="oninput"
+                               maxlength="@Product.NameMaxLength" placeholder="Como o produto se chama" />
+                        <span class="campo__ajuda">
+                            Aparece na vitrine, na página de detalhe e na célula do PDF.
+                        </span>
+                        @if (ErrorFor(ProductField.Name) is { } nameError)
+                        {
+                            <span class="campo__erro" role="alert">@nameError</span>
+                        }
+                    </div>
+
+                    <div class="campo @(ErrorClass(ProductField.Summary))">
+                        <label class="campo__rotulo" for="resumo">Resumo</label>
+                        <input id="resumo" type="text" @bind="draft.Summary" @bind:event="oninput"
+                               placeholder="Uma linha com o essencial" />
+                        <span class="campo__ajuda">
+                            Aparece na <b>célula do PDF</b> e no card da listagem — não na
+                            página de detalhe. Deixe vazio e a célula mostra só nome e preço.
+                        </span>
+                        <span class="campo__contador @(SummaryOverflow ? "campo__contador--estourado" : null)">
+                            @SummaryLength / @Product.SummaryMaxLength
+                        </span>
+                        @if (ErrorFor(ProductField.Summary) is { } summaryError)
+                        {
+                            <span class="campo__erro" role="alert">@summaryError</span>
+                        }
+                    </div>
+
+                    <div class="campo">
+                        <label class="campo__rotulo" for="descricao">Descrição</label>
+                        <textarea id="descricao" @bind="draft.Description" @bind:event="oninput"
+                                  placeholder="A especificação completa, sem limite de tamanho"></textarea>
+                        <span class="campo__ajuda">
+                            Aparece <b>apenas na página de detalhe</b> da vitrine. Não entra
+                            no PDF nem na listagem.
+                        </span>
+                    </div>
+
+                    <div class="produto__linha">
+                        <div class="campo @(ErrorClass(ProductField.Price))">
+                            <label class="campo__rotulo" for="preco">
+                                Preço <span class="campo__obrigatorio">*</span>
+                            </label>
+                            <input id="preco" type="number" step="0.01" min="0"
+                                   @bind="draft.Price" @bind:event="oninput" placeholder="0,00" />
+                            @if (ErrorFor(ProductField.Price) is { } priceError)
+                            {
+                                <span class="campo__erro" role="alert">@priceError</span>
+                            }
+                        </div>
+
+                        <div class="campo">
+                            <label class="campo__rotulo" for="rotulo">Rótulo</label>
+                            <select id="rotulo" @bind="draft.PriceLabel">
+                                <option value="@PriceLabel.Price">PREÇO</option>
+                                <option value="@PriceLabel.PricePerUnit">PREÇO/UND</option>
+                            </select>
+                            <span class="campo__ajuda">Impresso acima do valor no PDF.</span>
+                        </div>
+                    </div>
+
+                    <div class="campo @(ErrorClass(ProductField.Category))">
+                        <label class="campo__rotulo" for="categoria">
+                            Categoria <span class="campo__obrigatorio">*</span>
+                        </label>
+                        <select id="categoria" @bind="draft.CategoryId">
+                            <option value="">Escolha uma categoria</option>
+                            @foreach (var category in categories)
+                            {
+                                <option value="@category.Id">@category.Name</option>
+                            }
+                        </select>
+                        @if (ErrorFor(ProductField.Category) is { } categoryError)
+                        {
+                            <span class="campo__erro" role="alert">@categoryError</span>
+                        }
+                    </div>
+                </div>
+
+                <div class="painel-bloco__ft">
+                    <button type="button" class="btn btn--primario" @onclick="SaveAsync">Salvar</button>
+                    <a class="btn btn--fantasma" href="/painel">Cancelar</a>
+
+                    @if (saved)
+                    {
+                        <span class="produto__salvo" role="status">Produto salvo.</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private ProductDraft draft = new();
+    private IReadOnlyList<Category>? categories;
+    private IReadOnlyDictionary<ProductField, string> errors =
+        new Dictionary<ProductField, string>();
+
+    private bool notFound;
+    private bool saved;
+
+    private int SummaryLength => draft.Summary?.Trim().Length ?? 0;
+    private bool SummaryOverflow => SummaryLength > Product.SummaryMaxLength;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        categories = await Maintenance.ListCategoriesAsync();
+
+        if (Id is null)
+        {
+            draft = new ProductDraft();
+            notFound = false;
+            return;
+        }
+
+        var existing = await Maintenance.FindAsync(Id.Value);
+        notFound = existing is null;
+        draft = existing ?? new ProductDraft();
+    }
+
+    private async Task SaveAsync()
+    {
+        saved = false;
+
+        var outcome = await Maintenance.SaveAsync(draft);
+        errors = outcome.Errors;
+
+        if (!outcome.Succeeded)
+        {
+            return;
+        }
+
+        saved = true;
+
+        if (Id is null)
+        {
+            Navigation.NavigateTo($"/painel/produtos/{outcome.Id}");
+        }
+    }
+
+    private string? ErrorFor(ProductField field) =>
+        errors.TryGetValue(field, out var message) ? message : null;
+
+    private string? ErrorClass(ProductField field) =>
+        errors.ContainsKey(field) ? "campo--erro" : null;
+}

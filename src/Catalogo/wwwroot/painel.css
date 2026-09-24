@@ -1,0 +1,312 @@
+/* Sistema de design do painel, extraído de docs/prototype/prototipos/painel.html.
+   Fica global, e não em CSS isolado de componente, porque é o vocabulário comum de
+   todas as telas do painel — duplicá-lo por tela era o caminho para elas divergirem. */
+
+:root {
+    --ground: #f3efe6;
+    --surface: #fbf9f4;
+    --surface-2: #f7f3ea;
+    --sunken: #ece7da;
+    --ink: #0d1b2a;
+    --ink-2: #1a2638;
+    --muted: #6b6759;
+    --faint: #8b8576;
+    --line: #d8d2c5;
+    --line-soft: #e6e0d2;
+    --line-strong: #b6ad97;
+    --accent: #0c2a4a;
+    --accent-ink: #fff;
+    --accent-soft: #e2e9f1;
+    --accent-line: #a6bad2;
+    --cta: #c25f37;
+    --cta-ink: #fff;
+    --cta-hover: #a94e2a;
+    --ok: #3d7d52;
+    --ok-soft: #e0f0e4;
+    --ok-line: #a8ccb3;
+    --warn: #8d6414;
+    --warn-soft: #faedd3;
+    --warn-line: #ddbe83;
+    --danger: #a8412f;
+    --danger-soft: #f9e5e1;
+    --danger-line: #e0aea4;
+    --shadow: 0 1px 2px rgba(13, 27, 42, .06), 0 4px 14px rgba(13, 27, 42, .05);
+    --r: 6px;
+    --ui: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+}
+
+.painel {
+    min-height: 100vh;
+    padding: 22px 26px 60px;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+.painel h1,
+.painel h2 {
+    margin: 0;
+    font-family: var(--ui);
+    letter-spacing: -.015em;
+}
+
+.painel h1 {
+    font-size: 19px;
+    font-weight: 600;
+}
+
+.painel__sub {
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--muted);
+}
+
+.painel__folha {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-width: 1180px;
+    margin-top: 18px;
+}
+
+/* ---------- painéis ---------- */
+
+.painel-bloco {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.painel-bloco__hd {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.painel-bloco__hd h2 {
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.painel-bloco__bd {
+    padding: 16px;
+}
+
+.painel-bloco__ft {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--line);
+    border-radius: 0 0 10px 10px;
+    background: var(--surface-2);
+}
+
+/* ---------- campos ---------- */
+
+.campo {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.campo__rotulo {
+    font-family: var(--ui);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+/* Onde o texto aparece. É a informação que evita o erro de uso mais provável do
+   sistema — escrever a especificação inteira no resumo (ADR-016, UI-05). */
+.campo__ajuda {
+    font-size: 12px;
+    color: var(--faint);
+}
+
+.campo__obrigatorio {
+    color: var(--cta);
+}
+
+.painel input[type=text],
+.painel input[type=search],
+.painel input[type=number],
+.painel select,
+.painel textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: #fff;
+    box-shadow: inset 0 1px 2px rgba(13, 27, 42, .05);
+    font: inherit;
+    color: inherit;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.painel textarea {
+    min-height: 92px;
+    resize: vertical;
+}
+
+.painel input::placeholder,
+.painel textarea::placeholder {
+    color: var(--faint);
+}
+
+.painel input:hover:not(:disabled):not(:focus),
+.painel select:hover:not(:disabled):not(:focus),
+.painel textarea:hover:not(:disabled):not(:focus) {
+    border-color: var(--line-strong);
+}
+
+.painel input:focus,
+.painel select:focus,
+.painel textarea:focus {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.campo--erro input,
+.campo--erro select,
+.campo--erro textarea {
+    border-color: var(--danger);
+    box-shadow: inset 0 1px 2px rgba(13, 27, 42, .05), 0 0 0 3px var(--danger-soft);
+}
+
+/* Erro junto ao campo, nunca em faixa no topo (UI-05). */
+.campo__erro {
+    font-size: 12px;
+    color: var(--danger);
+}
+
+.campo__contador {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
+    color: var(--faint);
+}
+
+.campo__contador--estourado {
+    color: var(--danger);
+}
+
+/* ---------- botões ---------- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, box-shadow .15s;
+}
+
+.btn:hover {
+    background: var(--surface-2);
+    border-color: var(--faint);
+}
+
+.btn--primario {
+    border-color: var(--cta);
+    background: var(--cta);
+    box-shadow: 0 1px 2px rgba(13, 27, 42, .10);
+    color: var(--cta-ink);
+    font-weight: 600;
+}
+
+.btn--primario:hover {
+    background: var(--cta-hover);
+    border-color: var(--cta-hover);
+    box-shadow: 0 2px 6px rgba(13, 27, 42, .16);
+}
+
+.btn--fantasma {
+    border-color: transparent;
+    background: none;
+    color: var(--muted);
+}
+
+.btn--fantasma:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+}
+
+.btn--pequeno {
+    padding: 4px 9px;
+    font-size: 12px;
+}
+
+.btn[disabled] {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+/* ---------- selos de situação ---------- */
+
+.selo {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2.5px 8px;
+    border: 1px solid;
+    border-radius: 99px;
+    font-family: var(--ui);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.selo--no-ar {
+    border-color: var(--ok-line);
+    background: var(--ok-soft);
+    color: var(--ok);
+}
+
+.selo--rascunho {
+    border-color: var(--warn-line);
+    background: var(--warn-soft);
+    color: var(--warn);
+}
+
+.selo__ponto {
+    flex: none;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.mono {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+}
+
+.visualmente-oculto {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}

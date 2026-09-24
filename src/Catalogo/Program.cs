@@ -4,6 +4,7 @@ using Catalogo.Data;
 using Catalogo.Features.Account;
 using Catalogo.Features.Categories;
 using Catalogo.Features.Media;
+using Catalogo.Features.Products;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -30,6 +31,7 @@ builder.Services.AddSingleton<ImageProcessor>();
 builder.Services.AddHttpClient<IObjectStorage, SupabaseObjectStorage>();
 builder.Services.AddScoped<ProductPhotoService>();
 builder.Services.AddScoped<CategoryMaintenance>();
+builder.Services.AddScoped<ProductMaintenance>();
 
 builder.Services.AddPanelAuthentication(builder.Configuration);
 builder.Services.AddCascadingAuthenticationState();
