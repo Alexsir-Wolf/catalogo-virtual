@@ -29,7 +29,13 @@
             </p>
         }
 
-        <EditForm Model="Input" FormName="acesso" OnValidSubmit="AuthenticateAsync" method="post">
+        @* Estado UI-03.enviando. A tela é estática por decisão (ADR-010): torná-la
+           interativa abriria circuito persistente para visitante anônimo na única rota
+           anônima do painel. O estado é resolvido no cliente, sem cadeia de build e sem
+           arquivo de script — a exceção à ADR-001 é esta, e cabe em cinco linhas.
+           Sem ele, um duplo clique gasta duas das tentativas do bloqueio (RN-60). *@
+        <EditForm Model="Input" FormName="acesso" OnValidSubmit="AuthenticateAsync" method="post"
+                  data-estado-enviando="acesso">
             <DataAnnotationsValidator />
 
             <label for="usuario">Usuário</label>
@@ -49,6 +55,22 @@
         </p>
     </div>
 </section>
+
+<script>
+    document.querySelector('[data-estado-enviando="acesso"]')?.addEventListener('submit', event => {
+        const form = event.currentTarget;
+
+        // Segundo envio enquanto o primeiro está em voo: barra antes de sair.
+        if (form.dataset.enviando) { event.preventDefault(); return; }
+
+        form.dataset.enviando = 'true';
+
+        // Campo desabilitado não é enviado no POST — daí `readOnly` nos campos e
+        // `disabled` apenas no botão, que não carrega valor.
+        form.querySelectorAll('input').forEach(field => field.readOnly = true);
+        form.querySelectorAll('button').forEach(button => button.disabled = true);
+    });
+</script>
 
 @code {
     [SupplyParameterFromForm]

@@ -58,11 +58,13 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
-app.UseAntiforgery();
-
 app.UseAuthentication();
 app.UseAuthorization();
 app.UsePanelAuthorization();
+
+// Depois da autenticação: é o que permite ao antiforgery vincular o token à identidade
+// do usuário. Antes dela, `HttpContext.User` ainda é anônimo e a vinculação não ocorre.
+app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

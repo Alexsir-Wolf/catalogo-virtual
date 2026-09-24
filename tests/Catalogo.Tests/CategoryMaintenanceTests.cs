@@ -53,6 +53,39 @@ public sealed class CategoryMaintenanceTests(PostgresFixture postgres)
         Assert.Equal(CategoryFailure.NameAlreadyInUse, outcome.Failure);
     }
 
+    /// <summary>
+    /// A categoria organiza o PDF e o filtro da vitrine. Duas que o dono lê como a mesma
+    /// virariam duas seções numeradas no impresso — por isso "único" da RN-23 não pode
+    /// distinguir maiúsculas.
+    /// </summary>
+    [Fact]
+    public async Task RN_23_nome_que_difere_apenas_na_caixa_e_recusado()
+    {
+        var maintenance = CreateMaintenance();
+        var name = UniqueName("Tintas");
+
+        await maintenance.CreateAsync(name);
+        var outcome = await maintenance.CreateAsync(name.ToUpperInvariant());
+
+        Assert.Equal(CategoryFailure.NameAlreadyInUse, outcome.Failure);
+    }
+
+    [Fact]
+    public async Task Renomear_para_nome_que_difere_apenas_na_caixa_e_recusado()
+    {
+        var maintenance = CreateMaintenance();
+        var existing = UniqueName("Cimento");
+        var other = UniqueName("Argamassa");
+
+        await maintenance.CreateAsync(existing);
+        await maintenance.CreateAsync(other);
+
+        var target = (await maintenance.ListAsync()).Single(category => category.Name == other);
+        var outcome = await maintenance.RenameAsync(target.Id, existing.ToUpperInvariant());
+
+        Assert.Equal(CategoryFailure.NameAlreadyInUse, outcome.Failure);
+    }
+
     [Fact]
     public async Task Renomear_para_nome_ja_existente_e_recusado()
     {

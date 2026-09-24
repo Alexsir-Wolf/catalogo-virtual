@@ -87,3 +87,9 @@
         display: none;
     }
 }
+
+/* Estado UI-03.enviando — aplicado pelo script ao primeiro envio. */
+.acesso__formulario input:read-only {
+    background: #f7f3ea;
+    color: #6b6759;
+}

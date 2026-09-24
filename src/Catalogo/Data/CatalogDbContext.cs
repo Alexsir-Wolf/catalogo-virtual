@@ -16,6 +16,8 @@ namespace Catalogo.Data;
 public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
     : IdentityDbContext<OwnerAccount>(options)
 {
+    private const string CaseInsensitiveCollation = "nome_sem_caixa";
+
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Product> Products => Set<Product>();
@@ -27,10 +29,20 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
         modelBuilder.HasPostgresExtension("unaccent");
         modelBuilder.HasPostgresExtension("pg_trgm");
 
+        // Collation não determinística: comparação ignora maiúsculas e minúsculas. É o
+        // que faz a unicidade da RN-23 valer de verdade — sem isso o banco aceita
+        // "Tintas" e "tintas" como categorias distintas, e o PDF imprime duas seções.
+        modelBuilder.HasCollation(
+            CaseInsensitiveCollation,
+            locale: "und-u-ks-level2",
+            provider: "icu",
+            deterministic: false);
+
         modelBuilder.Entity<Category>(category =>
         {
             category.Property(entity => entity.Name)
                 .HasMaxLength(Category.NameMaxLength)
+                .UseCollation(CaseInsensitiveCollation)
                 .IsRequired();
 
             category.HasIndex(entity => entity.Name).IsUnique();
