@@ -12,10 +12,12 @@ public class Product
     public const int NameMaxLength = 120;
 
     /// <summary>
-    /// Medido no spike de T-03 como o que cabe em quatro linhas da célula do gabarito.
-    /// Continua provisório até T-04 fixar o número contra o papel impresso (RN-03).
+    /// Fixado em T-04 (RN-03). O texto de produto do gabarito está em 11,2 pt, o que
+    /// acomoda ~34 caracteres por linha na coluna de ~51 mm; em quatro linhas o bloco
+    /// comporta ~136 caracteres, dos quais o nome consome ~40. Os 160 do spike de T-03
+    /// pressupunham 7,5 pt — letra menor que a do catálogo do cliente.
     /// </summary>
-    public const int SummaryMaxLength = 160;
+    public const int SummaryMaxLength = 120;
 
     public int Id { get; set; }
 

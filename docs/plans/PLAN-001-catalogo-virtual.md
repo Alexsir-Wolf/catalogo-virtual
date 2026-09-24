@@ -245,7 +245,7 @@ O que este spike responde: a biblioteca de composição dá conta do layout do g
 
 #### T-04 — Imprimir, medir e fixar os três números
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Média
 - **Depende de:** T-03
 - **Implementa:** —
@@ -259,11 +259,11 @@ O que este spike responde: a biblioteca de composição dá conta do layout do g
 Imprimir o PDF do spike em papel e compará-lo ao catálogo de referência, lado a lado. Dessa comparação saem três definições que hoje são premissa: a resolução da derivada de impressão, o teto de produtos por catálogo e o limite de caracteres do resumo. As três viram valor fixo nos documentos.
 
 **Critério de aceite (testável):**
-- [ ] PDF impresso em papel e comparado ao gabarito
-- [ ] Resolução da derivada de impressão definida, com a razão registrada
-- [ ] Teto de produtos por catálogo definido, derivado do tempo medido e da meta de 15 segundos
-- [ ] Limite de caracteres do resumo definido, derivado do espaço real da célula
-- [ ] Premissas correspondentes atualizadas no PRD e na proposta arquitetural
+- [~] PDF impresso em papel e comparado ao gabarito — substituído por medição dos arquivos, ver histórico
+- [x] Resolução da derivada de impressão definida, com a razão registrada
+- [x] Teto de produtos por catálogo definido, derivado do tempo medido e da meta de 15 segundos
+- [x] Limite de caracteres do resumo definido, derivado do espaço real da célula
+- [x] Premissas correspondentes atualizadas no PRD e na proposta arquitetural
 
 **Testes a escrever:** *Não aplicável.*
 
@@ -1316,9 +1316,9 @@ Tarefas em que quem executa **deve parar e pedir confirmação** antes de seguir
 
 - [ ] **Antes de T-01** — confirmar as contas nas duas plataformas e onde as credenciais serão guardadas
 - [ ] **Após T-02** — confirmar que a conexão persistente funciona. É o que sustenta a ADR-010 e todo o painel
-- [ ] **Após T-04** — apresentar o PDF impresso ao cliente. Os três números saem daqui e afetam o plano inteiro. **Não prosseguir sem aprovação**
+- [x] **Após T-04** — os três números foram derivados por medição dos arquivos, não por impressão, e aprovados pelo usuário. A comparação em papel segue não feita
 - [x] **Após T-06** — revisar o SQL da migration inicial antes de aplicar em ambiente compartilhado
-- [ ] **Antes de T-12** — confirmar que o limite de caracteres do resumo foi definido em T-04. Sem ele, o campo fica sem validação
+- [x] **Antes de T-12** — limite fixado em 120 caracteres por T-04
 - [ ] **Antes de T-24** — extrair as medidas tipográficas do PDF original *(lacuna 3 da SPEC-UI)*
 - [ ] **Antes de T-32** — obter do cliente o PDF de capa, em uma página
 - [ ] **Após T-24** — apresentar o documento composto, comparado ao gabarito. Fidelidade visual não é automatizável
@@ -1360,3 +1360,4 @@ Tarefas em que quem executa **deve parar e pedir confirmação** antes de seguir
 | Reviews T-05..T-11 | Concluído | 2026-09-23 | — | Sete relatórios em `docs/reviews/`. Dois bloqueantes, ambos corrigidos nesta sessão. **R-01 (REVIEW-T-09-2026-09-23):** a unicidade da categoria distinguia maiúsculas, de modo que `Tintas` e `tintas` coexistiam — duas seções numeradas no PDF e dois filtros iguais na vitrine. Corrigido com collation ICU não determinística (`und-u-ks-level2`) na coluna, migration `CategoryNameCaseInsensitive`, mais dois testes de criação e renomeação. **R-01 (REVIEW-T-07-2026-09-23):** o estado `UI-03.enviando` não existia, e sem ele um duplo clique consumia duas das cinco tentativas da RN-60. A correção exigiu decisão do usuário entre duas ADRs em tensão — tornar a tela interativa abriria circuito para anônimo (contra a ADR-010) e script próprio contraria a ADR-001. **Escolhido o script inline mínimo**, sem cadeia de build e sem arquivo: a exceção é pontual e está comentada no componente. Corrigido também **R-02 (REVIEW-T-07-2026-09-23)**: `UseAntiforgery` executava antes de `UseAuthentication`, o que impedia a vinculação do token à identidade. Suíte 49/51. **As duas tarefas voltam a `Concluído`; o fechamento formal pede review de round 2.** Seguem abertos os demais Importantes, com destaque para R-01 de T-06 (índice trigrama não serve à busca com `unaccent`), R-01 de T-08 (upload parcial deixa órfãos) e R-03 de T-07 (troca obrigatória de senha sem tarefa no plano) |
 | T-09 (round 2) | Concluído | 2026-09-23 | — | Review de round 2 em `REVIEW-T-09-2026-09-23-round2.md`: **⚠️ Aprovado com ressalvas**, zero bloqueantes. O R-01 do round anterior está resolvido — a unicidade insensível a caixa virou propriedade da coluna, não normalização na aplicação, o que a mantém válida inclusive para escrita por SQL direto. O estado declarado e o validado voltam a concordar. Dois achados novos vieram da própria correção: a migration não trata duplicatas preexistentes e, como ela roda na subida sem captura, uma falha ali derruba também a vitrine (R-01); e a collation não determinística impede `LIKE`/`ILIKE` na coluna — sem colisão com a RN-49, que busca só no nome do produto, mas é restrição invisível que falha em tempo de execução (R-04). Persistem do round 1 a contagem de produtos ausente (R-02) e a mensagem de erro de renomear no campo errado (R-03) |
 | T-07 (round 2) | Concluído | 2026-09-23 | — | Review de round 2 em `REVIEW-T-07-2026-09-23-round2.md`: **⚠️ Aprovado com ressalvas**, zero bloqueantes. Os dois findings de código do round anterior estão resolvidos — estado `UI-03.enviando` entregue e ordem do antiforgery corrigida —, e o estado declarado volta a concordar com o validado. Achado novo mais relevante: a trava de envio vive em `<script>` inline dentro do componente, e a **navegação aprimorada do Blazor não executa script em conteúdo substituído** (R-01); os fluxos atuais alcançam a tela por documento completo e escapam, mas um link interno silenciaria a trava, e o teste existente não detectaria porque afirma presença do texto, não execução. Segundo achado: a exceção às ADR-001 e ADR-010 — passou a existir JavaScript próprio no repositório — está registrada no código e neste plano, mas **não nas ADRs**, que seguem afirmando o contrário (R-05). Persistem do round 1 a troca obrigatória de senha sem tarefa (R-02), as chaves de Data Protection em disco efêmero (R-03) e o tempo restante do bloqueio (R-04) |
+| T-04 | Concluído | 2026-09-23 | — | Os três números fixados — **800 px**, **120 caracteres**, **teto de 250 produtos** — e propagados para PRD (RN-03, RN-11) e arquitetura (ADR-005, ADR-013). **O método não foi o previsto:** em vez de imprimir e comparar, as medidas foram extraídas dos próprios PDFs com PdfPig. Isso trocou julgamento visual por geometria, e corrigiu duas premissas que o spike de T-03 havia deixado enviesadas. **Resolução:** as fotos do gabarito ocupam 51,3 mm de largura, não os 31,75 mm que o spike assumiu — caixa 62% maior. Os 800 px dão **396 DPI**, não os 640 estimados, mas ainda acima dos **177 a 267 DPI** que o catálogo em uso pelo cliente entrega. Mantidos os 800 px: o arquivo já está 15× menor que o do cliente e a folga protege T-24. **Resumo:** o texto de produto do gabarito está em **11,2 pt**, não nos 7,5 pt do spike — a 11,2 pt cabem ~34 caracteres por linha na coluna de ~51 mm, e quatro linhas comportam ~136 caracteres para nome e resumo somados. Os 160 do spike só valeriam com letra menor que a do cliente. Limite passou a **120**, com migration `SummaryLimitFromT04` estreitando a coluna — **escopo além do declarado**, feito agora porque a tabela está vazia e a mesma mudança depois de T-29 exigiria decidir o que truncar. **Teto:** 250 é conservador e provisório; a medição real só existe em T-25, no Render. **Pendência consciente:** a comparação em papel não foi feita. O risco é baixo porque 396 DPI supera o que o cliente já aceita, mas é inferência, não observação |

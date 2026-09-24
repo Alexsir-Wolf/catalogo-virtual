@@ -157,7 +157,7 @@ A foto é condição de publicação porque a grade de três colunas — tanto n
 
 - **RN-01:** O produto tem os campos: nome, resumo, descrição, preço, rótulo de preço, categoria, foto, posição e situação.
 - **RN-02:** O **nome** é obrigatório e aparece em destaque na vitrine, na página de detalhe e na célula do PDF.
-- **RN-03:** O **resumo** é opcional, tem limite de comprimento e é o texto exibido na célula do PDF e no card da listagem *(ADR-016)*.
+- **RN-03:** O **resumo** é opcional, tem limite de **120 caracteres** e é o texto exibido na célula do PDF e no card da listagem *(ADR-016)*. O limite foi fixado em T-04 a partir da medição do gabarito: o texto de produto do catálogo do cliente está em **11,2 pt**, o que acomoda cerca de 34 caracteres por linha na coluna de ~51 mm; em quatro linhas — o máximo observado —, o bloco inteiro comporta ~136 caracteres, dos quais um nome típico consome ~40.
 - **RN-04:** Quando o resumo está vazio, a célula do PDF e o card exibem apenas nome e preço. Nada é herdado da descrição nem truncado automaticamente *(ADR-016)*.
 - **RN-05:** A **descrição** é opcional, sem limite de comprimento, e é exibida **exclusivamente na página de detalhe** da vitrine. Não aparece no PDF nem na listagem *(ADR-016)*.
 - **RN-06:** O **preço** é obrigatório, maior que zero, em reais, com duas casas decimais.
@@ -168,7 +168,7 @@ A foto é condição de publicação porque a grade de três colunas — tanto n
 
 - **RN-09:** Cada produto tem **uma única foto**. Não há galeria. Enviar uma nova foto substitui a anterior *(ADR-005)*.
 - **RN-10:** No envio da foto, o sistema valida o **tipo real do arquivo** (não a extensão), o tamanho e as dimensões, rejeitando o que não for imagem válida.
-- **RN-11:** A partir da foto enviada o sistema gera quatro derivadas: três em WebP para a tela (miniatura, cartão e ampliada) e uma em JPEG de aproximadamente 800 px para impressão *(ADR-005)*.
+- **RN-11:** A partir da foto enviada o sistema gera quatro derivadas: três em WebP para a tela (miniatura, cartão e ampliada) e uma em JPEG de **800 px** no lado maior para impressão *(ADR-005)*. O valor deixou de ser premissa em T-04: as fotos do gabarito ocupam **51,3 mm** de largura impressa, onde 800 px resultam em **396 DPI** — acima dos **177 a 267 DPI** que o catálogo em uso pelo cliente entrega hoje.
 - **RN-12:** A derivada de impressão é consumida apenas pela geração do PDF e **nunca é exposta publicamente** *(ADR-005)*.
 - **RN-13:** As derivadas recebem nomes imutáveis. Substituir a foto gera nomes novos, sem sobrescrever os anteriores *(ADR-005)*.
 
