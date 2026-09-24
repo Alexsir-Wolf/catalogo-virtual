@@ -4,6 +4,12 @@ using Npgsql;
 
 namespace Catalogo.Features.Categories;
 
+public enum MoveDirection
+{
+    Up,
+    Down
+}
+
 public enum CategoryFailure
 {
     None,
@@ -81,6 +87,48 @@ public sealed class CategoryMaintenance(IDbContextFactory<CatalogDbContext> cont
         category.Name = trimmed;
 
         return await SaveAsync(context, cancellationToken);
+    }
+
+    /// <summary>
+    /// Troca a categoria de lugar com a vizinha na direção pedida. A posição é inteiro
+    /// sequencial e a troca renumera apenas as duas envolvidas — com a ordem de grandeza
+    /// de categorias deste catálogo, renumerar é mais simples do que manter lacunas
+    /// (ADR-015). Mover a primeira para cima ou a última para baixo não faz nada.
+    /// </summary>
+    public async Task MoveAsync(
+        int id,
+        MoveDirection direction,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var ordered = await context.Categories
+            .OrderBy(category => category.Position)
+            .ThenBy(category => category.Name)
+            .ToListAsync(cancellationToken);
+
+        var index = ordered.FindIndex(category => category.Id == id);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var target = direction == MoveDirection.Up ? index - 1 : index + 1;
+        if (target < 0 || target >= ordered.Count)
+        {
+            return;
+        }
+
+        // A posição gravada pode ter lacunas ou empates herdados; normalizar a lista
+        // inteira deixa a numeração exibida e a ordem persistida sempre coerentes.
+        (ordered[index], ordered[target]) = (ordered[target], ordered[index]);
+
+        for (var position = 0; position < ordered.Count; position++)
+        {
+            ordered[position].Position = position + 1;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task<CategoryOutcome> SaveAsync(

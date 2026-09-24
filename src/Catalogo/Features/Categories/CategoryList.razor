@@ -76,6 +76,10 @@ else
                         }
                         else
                         {
+                            <button type="button" @onclick="() => MoveAsync(category.Id, MoveDirection.Up)"
+                                    disabled="@(index == 0)" aria-label="Subir @category.Name">↑</button>
+                            <button type="button" @onclick="() => MoveAsync(category.Id, MoveDirection.Down)"
+                                    disabled="@(index == categories.Count - 1)" aria-label="Descer @category.Name">↓</button>
                             <button type="button" @onclick="() => StartEditing(category)">Renomear</button>
                         }
                     </td>
@@ -130,6 +134,12 @@ else
             CancelEditing();
             await ReloadAsync();
         }
+    }
+
+    private async Task MoveAsync(int id, MoveDirection direction)
+    {
+        await Maintenance.MoveAsync(id, direction);
+        await ReloadAsync();
     }
 
     private async Task ReloadAsync() => categories = await Maintenance.ListAsync();
