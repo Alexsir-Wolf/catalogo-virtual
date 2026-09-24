@@ -47,7 +47,7 @@ public sealed class AuthenticationFlowTests : IDisposable
         // própria tela de acesso, e não o painel.
         var html = await client.GetStringAsync(PanelAuthentication.PanelPathPrefix);
 
-        Assert.Contains("Não há redefinição de senha pelo sistema", html);
+        Assert.Contains("Entrar no painel", html);
     }
 
     [Fact]

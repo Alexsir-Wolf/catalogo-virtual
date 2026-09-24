@@ -4,57 +4,92 @@
 @inject SignInManager<OwnerAccount> SignInManager
 @inject NavigationManager Navigation
 
-<PageTitle>Entrar</PageTitle>
+<PageTitle>Acesso ao Painel</PageTitle>
 
-<section class="acesso">
+<div class="acesso-fundo">
+<div class="acesso">
     <aside class="acesso__marca">
-        <h1>Catálogo Virtual</h1>
-        <p>Painel de manutenção do acervo. O cadastro feito aqui alimenta a vitrine e os catálogos em PDF.</p>
+        <div class="acesso__selo">CT</div>
+
+        <h2>Painel do Catálogo</h2>
+
+        <p>
+            Onde o acervo é mantido e os catálogos em PDF são gerados.
+            A vitrine pública não exige acesso — este painel sim.
+        </p>
+
+        <div class="acesso__passos">
+            <div class="acesso__passo">
+                <b>1</b><span>Cadastre produtos e defina a ordem de exibição</span>
+            </div>
+            <div class="acesso__passo">
+                <b>2</b><span>Monte catálogos escolhendo categorias</span>
+            </div>
+            <div class="acesso__passo">
+                <b>3</b><span>Gere o PDF e envie do seu jeito</span>
+            </div>
+        </div>
     </aside>
 
-    <div class="acesso__formulario">
-        <h2>Entrar</h2>
-
-        @if (lockedOutUntilMinutes is not null)
-        {
-            <p class="acesso__aviso" role="alert" data-estado="bloqueado">
-                Acesso temporariamente bloqueado por tentativas malsucedidas.
-                Tente novamente em @lockedOutUntilMinutes minuto(s).
-            </p>
-        }
-        else if (failed)
-        {
-            <p class="acesso__aviso" role="alert" data-estado="erroCredencial">
-                Usuário ou senha incorretos.
-            </p>
-        }
-
+    <div class="acesso__lado">
         @* Estado UI-03.enviando. A tela é estática por decisão (ADR-010): torná-la
            interativa abriria circuito persistente para visitante anônimo na única rota
            anônima do painel. O estado é resolvido no cliente, sem cadeia de build e sem
-           arquivo de script — a exceção à ADR-001 é esta, e cabe em cinco linhas.
+           arquivo de script — a exceção à ADR-001 é esta, e cabe em poucas linhas.
            Sem ele, um duplo clique gasta duas das tentativas do bloqueio (RN-60). *@
         <EditForm Model="Input" FormName="acesso" OnValidSubmit="AuthenticateAsync" method="post"
-                  data-estado-enviando="acesso">
+                  class="acesso__form" data-estado-enviando="acesso">
             <DataAnnotationsValidator />
 
-            <label for="usuario">Usuário</label>
-            <InputText id="usuario" @bind-Value="Input.UserName" autocomplete="username"
-                       disabled="@isLockedOut" aria-invalid="@failed" />
+            <div>
+                <h1>Entrar no painel</h1>
+                <div class="acesso__sub">Acesso restrito ao responsável pelo catálogo.</div>
+            </div>
 
-            <label for="senha">Senha</label>
-            <InputText id="senha" type="password" @bind-Value="Input.Password"
-                       autocomplete="current-password" disabled="@isLockedOut" aria-invalid="@failed" />
+            @if (lockedOutMinutes is not null)
+            {
+                <div class="acesso__alerta acesso__alerta--bloqueio" role="alert" data-estado="bloqueado">
+                    <span class="acesso__alerta-i">!</span>
+                    <span>
+                        <b>Acesso bloqueado temporariamente</b> após várias tentativas sem
+                        sucesso. Tente de novo em <b class="acesso__mono">@lockedOutMinutes min</b>.
+                    </span>
+                </div>
+            }
+            else if (failed)
+            {
+                <div class="acesso__alerta acesso__alerta--erro" role="alert" data-estado="erroCredencial">
+                    <span class="acesso__alerta-i">!</span>
+                    <span><b>Usuário ou senha incorretos.</b> Confira os dados e tente novamente.</span>
+                </div>
+            }
 
-            <button type="submit" disabled="@isLockedOut">Entrar</button>
+            <div class="acesso__campo @(failed ? "acesso__campo--erro" : null)">
+                <label class="acesso__rotulo" for="usuario">Usuário</label>
+                <InputText id="usuario" @bind-Value="Input.UserName" placeholder="seu usuário"
+                           autocomplete="username" disabled="@isLockedOut" />
+            </div>
+
+            <div class="acesso__campo @(failed ? "acesso__campo--erro" : null)">
+                <label class="acesso__rotulo" for="senha">Senha</label>
+                <InputText id="senha" type="password" @bind-Value="Input.Password" placeholder="sua senha"
+                           autocomplete="current-password" disabled="@isLockedOut" />
+            </div>
+
+            <button type="submit" class="acesso__entrar" disabled="@isLockedOut">
+                <span class="acesso__giro" aria-hidden="true"></span>
+                <span class="acesso__entrar-ocioso">Entrar</span>
+                <span class="acesso__entrar-enviando">Verificando…</span>
+            </button>
+
+            <div class="acesso__dica">
+                <b>Esqueceu a senha?</b> Não há redefinição pela tela. A troca é feita com
+                acesso ao servidor — procure quem administra a instalação.
+            </div>
         </EditForm>
-
-        <p class="acesso__nota">
-            Não há redefinição de senha pelo sistema. Recuperar o acesso exige
-            procedimento no servidor, com quem administra a aplicação.
-        </p>
     </div>
-</section>
+</div>
+</div>
 
 <script>
     document.querySelector('[data-estado-enviando="acesso"]')?.addEventListener('submit', event => {
@@ -80,8 +115,8 @@
     private string? ReturnUrl { get; set; }
 
     private bool failed;
-    private bool isLockedOut => lockedOutUntilMinutes is not null;
-    private int? lockedOutUntilMinutes;
+    private bool isLockedOut => lockedOutMinutes is not null;
+    private int? lockedOutMinutes;
 
     private async Task AuthenticateAsync()
     {
@@ -99,7 +134,7 @@
 
         if (result.IsLockedOut)
         {
-            lockedOutUntilMinutes = (int)Math.Ceiling(PanelAuthentication.LockoutDuration.TotalMinutes);
+            lockedOutMinutes = (int)Math.Ceiling(PanelAuthentication.LockoutDuration.TotalMinutes);
             return;
         }
 

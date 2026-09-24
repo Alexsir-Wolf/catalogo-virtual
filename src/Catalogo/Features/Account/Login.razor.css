@@ -1,95 +1,353 @@
-/* Tokens do protótipo (SPEC-UI seção 2). Tema único — não há tema escuro. */
+/* UI-03 — reproduzido a partir de docs/prototype/prototipos/login.html.
+   Os tokens são os da seção 2 da SPEC-UI; os nomes seguem o protótipo. */
 
-.acesso {
+/* O protótipo compõe a cena num painel centrado sobre um fundo rebaixado, não em
+   tela cheia — é o que evita a área naval crescer sem conteúdo em monitor largo. */
+.acesso-fundo {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    place-items: center;
     min-height: 100vh;
-    background: #f3efe6;
-    color: #0d1b2a;
+    padding: 24px;
+    background: #ece7da;
 }
 
+.acesso {
+    --ground: #f3efe6;
+    --surface: #fbf9f4;
+    --surface-2: #f7f3ea;
+    --ink: #0d1b2a;
+    --muted: #6b6759;
+    --faint: #8b8576;
+    --line-soft: #e6e0d2;
+    --line-strong: #b6ad97;
+    --navy: #0c2a4a;
+    --cta: #c25f37;
+    --cta-hover: #a94e2a;
+    --danger: #a8412f;
+    --danger-soft: #f9e5e1;
+    --danger-line: #e0aea4;
+    --warn: #8d6414;
+    --warn-soft: #faedd3;
+    --warn-line: #ddbe83;
+    --r: 6px;
+    --ui: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    width: 100%;
+    max-width: 1100px;
+    min-height: 560px;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(13, 27, 42, .06), 0 4px 14px rgba(13, 27, 42, .05);
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- lado da marca ---------- */
+
+/* O protótipo compõe numa moldura de 560 px de altura. Em tela cheia, centrar
+   verticalmente preserva o agrupamento — esticar até as bordas abre um vazio no meio. */
 .acesso__marca {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 0.75rem;
-    padding: 3rem;
-    background: #0c2a4a;
-    color: #fbf9f4;
+    gap: 18px;
+    padding: 44px 40px;
+    background: var(--navy);
+    color: #fff;
 }
 
-.acesso__formulario {
+.acesso__selo {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 7px;
+    background: #fbf9f4;
+    color: var(--navy);
+    font-family: var(--ui);
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.acesso__marca h2 {
+    margin: 0;
+    max-width: 17ch;
+    font-family: var(--ui);
+    font-size: 23px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -.015em;
+}
+
+.acesso__marca p {
+    margin: 0;
+    max-width: 42ch;
+    font-size: 13.5px;
+    color: rgba(255, 255, 255, .72);
+}
+
+.acesso__passos {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    max-width: 42ch;
+    margin-top: 22px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, .16);
+}
+
+.acesso__passo {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, .78);
+}
+
+.acesso__passo b {
+    flex: none;
+    padding: 1px 6px;
+    border: 1px solid rgba(255, 255, 255, .2);
+    border-radius: 3px;
+    background: rgba(255, 255, 255, .12);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 10.5px;
+}
+
+/* ---------- lado do formulário ---------- */
+
+.acesso__lado {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 0.5rem;
-    padding: 3rem;
-    max-width: 26rem;
+    padding: 44px 40px;
+    background: var(--surface);
 }
 
-.acesso__formulario label {
-    margin-top: 0.75rem;
-    font-size: 0.875rem;
-    color: #6b6759;
+.acesso__form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 340px;
 }
 
-.acesso__formulario input {
-    padding: 0.6rem 0.7rem;
-    border: 1px solid #d8d2c5;
-    border-radius: 4px;
-    background: #fbf9f4;
+.acesso__form h1 {
+    margin: 0;
+    font-family: var(--ui);
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -.015em;
+}
+
+.acesso__sub {
+    margin-top: 3px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.acesso__campo {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.acesso__rotulo {
+    font-family: var(--ui);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.acesso__campo input {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    background: var(--surface);
     font: inherit;
+    color: inherit;
 }
 
-.acesso__formulario input[aria-invalid="true"] {
-    border-color: oklch(0.55 0.18 25);
+.acesso__campo input:focus {
+    border-color: var(--navy);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(12, 42, 74, .12);
 }
 
-.acesso__formulario button {
-    margin-top: 1.25rem;
-    padding: 0.7rem 1rem;
-    border: none;
-    border-radius: 4px;
-    background: oklch(0.62 0.16 38);
-    color: #fbf9f4;
-    font: inherit;
-    cursor: pointer;
-}
-
-.acesso__formulario button:disabled,
-.acesso__formulario input:disabled {
-    opacity: 0.6;
+.acesso__campo input[disabled],
+.acesso__campo input[readonly] {
+    background: var(--surface-2);
+    color: var(--faint);
     cursor: not-allowed;
 }
 
-.acesso__aviso {
-    padding: 0.6rem 0.75rem;
-    border-radius: 4px;
-    border: 1px solid oklch(0.55 0.18 25);
-    color: oklch(0.55 0.18 25);
-    background: #f7f3ea;
+.acesso__campo--erro input {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px var(--danger-soft);
 }
 
-/* Ocupa exatamente o lugar onde estaria o link de recuperação (UI-03). */
-.acesso__nota {
-    margin-top: 1.5rem;
-    font-size: 0.8125rem;
-    color: #6b6759;
+.acesso__entrar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 11px 16px;
+    border: 1px solid var(--cta);
+    border-radius: var(--r);
+    background: var(--cta);
+    color: #fff;
+    font-family: var(--ui);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
 }
+
+.acesso__entrar:hover {
+    background: var(--cta-hover);
+    border-color: var(--cta-hover);
+}
+
+.acesso__entrar[disabled] {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+/* Troca de rótulo do botão no estado de envio, acionada pelo atributo que o
+   script marca no formulário — sem isso o giro apareceria desde o início. */
+.acesso__giro,
+.acesso__entrar-enviando {
+    display: none;
+}
+
+.acesso__form[data-enviando] .acesso__giro,
+.acesso__form[data-enviando] .acesso__entrar-enviando {
+    display: inline-block;
+}
+
+.acesso__form[data-enviando] .acesso__entrar-ocioso {
+    display: none;
+}
+
+.acesso__giro {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, .35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: acesso-giro .7s linear infinite;
+}
+
+@keyframes acesso-giro {
+    to { transform: rotate(360deg); }
+}
+
+/* ---------- avisos ---------- */
+
+.acesso__alerta {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 11px 13px;
+    border: 1px solid;
+    border-radius: var(--r);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.acesso__alerta b {
+    font-weight: 600;
+}
+
+.acesso__alerta-i {
+    flex: none;
+    font-family: var(--mono);
+    font-weight: 600;
+}
+
+.acesso__alerta--erro {
+    border-color: var(--danger-line);
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.acesso__alerta--bloqueio {
+    border-color: var(--warn-line);
+    background: var(--warn-soft);
+    color: var(--warn);
+}
+
+.acesso__mono {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- nota de redefinição ---------- */
+
+/* Ocupa exatamente o lugar onde estaria o link de recuperação (UI-03, RN-59). */
+.acesso__dica {
+    max-width: 340px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line-soft);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--faint);
+}
+
+.acesso__dica b {
+    color: var(--muted);
+    font-weight: 600;
+}
+
+/* ---------- celular ---------- */
 
 @media (max-width: 720px) {
-    .acesso {
-        grid-template-columns: 1fr;
+    .acesso-fundo {
+        padding: 0;
     }
 
-    /* O painel de apresentação some no celular (UI-03). */
+    .acesso {
+        grid-template-columns: 1fr;
+        min-height: 100dvh;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
     .acesso__marca {
+        gap: 12px;
+        padding: 24px 20px;
+    }
+
+    .acesso__marca h2 {
+        font-size: 18px;
+    }
+
+    /* Os passos somem no celular, como no protótipo. */
+    .acesso__passos {
         display: none;
+    }
+
+    .acesso__lado {
+        padding: 26px 20px;
     }
 }
 
-/* Estado UI-03.enviando — aplicado pelo script ao primeiro envio. */
-.acesso__formulario input:read-only {
-    background: #f7f3ea;
-    color: #6b6759;
+@media (prefers-reduced-motion: reduce) {
+    .acesso__giro {
+        animation: none;
+    }
 }
