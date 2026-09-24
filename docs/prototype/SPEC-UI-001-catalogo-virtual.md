@@ -228,6 +228,7 @@ Extraídos do protótipo original do cliente e adotados nos demais.
 
 - Painel de apresentação à esquerda, com a marca e o que se faz no sistema — some no celular
 - Formulário com usuário, senha e ação de entrar
+- **Alternar a visibilidade da senha**, dentro do próprio campo *(acrescentado em 2026-09-23, a pedido do dono; não constava do protótipo original)*. O campo nasce oculto e revelar é ação deliberada; o ícone anuncia a ação disponível, não o estado atual
 - Nota fixa sobre redefinição de senha, no lugar onde normalmente ficaria o link de recuperação
 
 **Observações:** duas decisões desta tela são deliberadas e fáceis de reverter por engano na implementação.

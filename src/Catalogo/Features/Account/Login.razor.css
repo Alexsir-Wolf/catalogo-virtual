@@ -199,6 +199,65 @@
     box-shadow: 0 0 0 3px var(--danger-soft);
 }
 
+/* ---------- alternar visibilidade da senha ---------- */
+
+.acesso__senha {
+    position: relative;
+}
+
+/* Abre espaço para o botão não cobrir o texto digitado. */
+.acesso__senha input {
+    padding-right: 40px;
+}
+
+.acesso__olho {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.acesso__olho:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+}
+
+.acesso__olho[disabled] {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.acesso__olho svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* O ícone mostra a ação disponível, não o estado: com a senha oculta oferece
+   revelar; revelada, oferece ocultar. */
+.acesso__olho .acesso__olho-ocultar,
+.acesso__olho[aria-pressed="true"] .acesso__olho-mostrar {
+    display: none;
+}
+
+.acesso__olho[aria-pressed="true"] .acesso__olho-ocultar {
+    display: block;
+}
+
 .acesso__entrar {
     display: flex;
     align-items: center;

@@ -72,8 +72,25 @@
 
             <div class="acesso__campo @(failed ? "acesso__campo--erro" : null)">
                 <label class="acesso__rotulo" for="senha">Senha</label>
-                <InputText id="senha" type="password" @bind-Value="Input.Password" placeholder="sua senha"
-                           autocomplete="current-password" disabled="@isLockedOut" />
+
+                <div class="acesso__senha">
+                    <InputText id="senha" type="password" @bind-Value="Input.Password" placeholder="sua senha"
+                               autocomplete="current-password" disabled="@isLockedOut" />
+
+                    <button type="button" class="acesso__olho" data-ver-senha="senha"
+                            aria-controls="senha" aria-pressed="false" aria-label="Mostrar senha"
+                            disabled="@isLockedOut">
+                        <svg class="acesso__olho-mostrar" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M1.8 12S5.4 5.2 12 5.2 22.2 12 22.2 12 18.6 18.8 12 18.8 1.8 12 1.8 12Z" />
+                            <circle cx="12" cy="12" r="3.2" />
+                        </svg>
+                        <svg class="acesso__olho-ocultar" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M1.8 12S5.4 5.2 12 5.2c1.5 0 2.9.35 4.1.9M22.2 12s-3.6 6.8-10.2 6.8c-1.6 0-3-.4-4.3-1" />
+                            <path d="M9.9 9.9a3.2 3.2 0 0 0 4.3 4.3" />
+                            <path d="M3.5 3.5l17 17" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <button type="submit" class="acesso__entrar" disabled="@isLockedOut">
@@ -92,6 +109,25 @@
 </div>
 
 <script>
+    // Alternar a visibilidade da senha exige trocar o `type` do campo, o que nenhum
+    // modo de renderização do servidor faz sem ida e volta — e uma ida ao servidor
+    // carregando a senha em claro seria pior que o problema. Mesma exceção pontual à
+    // ADR-001 já aberta para o estado de envio.
+    document.querySelectorAll('[data-ver-senha]').forEach(botao => {
+        botao.addEventListener('click', () => {
+            const campo = document.getElementById(botao.dataset.verSenha);
+            if (!campo) { return; }
+
+            const revelando = campo.type === 'password';
+            campo.type = revelando ? 'text' : 'password';
+
+            botao.setAttribute('aria-pressed', String(revelando));
+            botao.setAttribute('aria-label', revelando ? 'Ocultar senha' : 'Mostrar senha');
+
+            campo.focus();
+        });
+    });
+
     document.querySelector('[data-estado-enviando="acesso"]')?.addEventListener('submit', event => {
         const form = event.currentTarget;
 

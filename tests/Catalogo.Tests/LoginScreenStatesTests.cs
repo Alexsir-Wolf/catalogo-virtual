@@ -37,6 +37,21 @@ public sealed class LoginScreenStatesTests : IDisposable
     }
 
     [Fact]
+    public async Task Campo_de_senha_oferece_alternar_visibilidade()
+    {
+        using var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync(PanelAuthentication.LoginPath);
+
+        Assert.Contains("data-ver-senha=\"senha\"", html);
+        Assert.Contains("aria-label=\"Mostrar senha\"", html);
+
+        // Nasce oculto: revelar é ação deliberada de quem está na frente da tela.
+        Assert.Contains("aria-pressed=\"false\"", html);
+        Assert.Contains("type=\"password\"", html);
+    }
+
+    [Fact]
     public async Task UI_03_enviando_nao_desabilita_campos_que_precisam_ser_enviados()
     {
         using var client = factory.CreateClient();
