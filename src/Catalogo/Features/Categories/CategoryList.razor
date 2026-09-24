@@ -81,6 +81,26 @@ else
                             <button type="button" @onclick="() => MoveAsync(category.Id, MoveDirection.Down)"
                                     disabled="@(index == categories.Count - 1)" aria-label="Descer @category.Name">↓</button>
                             <button type="button" @onclick="() => StartEditing(category)">Renomear</button>
+
+                            @if (pendingDeletionId == category.Id)
+                            {
+                                <button type="button" class="categorias__confirmar"
+                                        @onclick="() => DeleteAsync(category.Id)">Confirmar exclusão</button>
+                                <button type="button" @onclick="() => pendingDeletionId = null">Cancelar</button>
+                            }
+                            else
+                            {
+                                <button type="button" @onclick="() => AskDeletion(category.Id)">Excluir</button>
+                            }
+                        }
+
+                        @if (blockedId == category.Id)
+                        {
+                            <p class="categorias__erro" role="alert" data-estado="bloqueadaPorProdutos">
+                                Não dá para excluir: @blockingProducts produto(s) pertencem a esta
+                                categoria, inclusive rascunhos. Mova-os para outra categoria ou
+                                exclua-os antes.
+                            </p>
                         }
                     </td>
                 </tr>
@@ -134,6 +154,36 @@ else
             CancelEditing();
             await ReloadAsync();
         }
+    }
+
+    private int? pendingDeletionId;
+    private int? blockedId;
+    private int blockingProducts;
+
+    /// <summary>
+    /// A exclusão é definitiva, então exige um segundo clique deliberado. Nunca
+    /// confirmar em nome do usuário.
+    /// </summary>
+    private void AskDeletion(int id)
+    {
+        pendingDeletionId = id;
+        blockedId = null;
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        var outcome = await Maintenance.DeleteAsync(id);
+        pendingDeletionId = null;
+
+        if (outcome.Succeeded)
+        {
+            blockedId = null;
+            await ReloadAsync();
+            return;
+        }
+
+        blockedId = id;
+        blockingProducts = outcome.BlockingProducts;
     }
 
     private async Task MoveAsync(int id, MoveDirection direction)

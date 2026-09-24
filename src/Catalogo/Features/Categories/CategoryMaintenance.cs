@@ -14,7 +14,8 @@ public enum CategoryFailure
 {
     None,
     NameRequired,
-    NameAlreadyInUse
+    NameAlreadyInUse,
+    HasProducts
 }
 
 public sealed record CategoryOutcome(CategoryFailure Failure)
@@ -22,6 +23,18 @@ public sealed record CategoryOutcome(CategoryFailure Failure)
     public bool Succeeded => Failure == CategoryFailure.None;
 
     public static readonly CategoryOutcome Success = new(CategoryFailure.None);
+}
+
+/// <summary>
+/// Recusa de exclusão, com o número que a mensagem precisa informar (RN-25). T-26
+/// acrescenta aqui a segunda condição — catálogo que usa a categoria (RN-25.1) —, e por
+/// isso a verificação vive em um ponto só.
+/// </summary>
+public sealed record CategoryDeletionOutcome(CategoryFailure Failure, int BlockingProducts)
+{
+    public bool Succeeded => Failure == CategoryFailure.None;
+
+    public static readonly CategoryDeletionOutcome Success = new(CategoryFailure.None, 0);
 }
 
 /// <summary>
@@ -129,6 +142,38 @@ public sealed class CategoryMaintenance(IDbContextFactory<CatalogDbContext> cont
         }
 
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Exclui a categoria, salvo se houver produto associado — em qualquer situação,
+    /// Rascunho inclusive, porque um rascunho perderia a categoria sem aviso (RN-25).
+    /// </summary>
+    public async Task<CategoryDeletionOutcome> DeleteAsync(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var blockingProducts = await context.Products
+            .CountAsync(product => product.CategoryId == id, cancellationToken);
+
+        if (blockingProducts > 0)
+        {
+            return new CategoryDeletionOutcome(CategoryFailure.HasProducts, blockingProducts);
+        }
+
+        var category = await context.Categories
+            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+
+        if (category is null)
+        {
+            return CategoryDeletionOutcome.Success;
+        }
+
+        context.Categories.Remove(category);
+        await context.SaveChangesAsync(cancellationToken);
+
+        return CategoryDeletionOutcome.Success;
     }
 
     private static async Task<CategoryOutcome> SaveAsync(
