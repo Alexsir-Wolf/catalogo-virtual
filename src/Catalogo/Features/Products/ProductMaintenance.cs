@@ -42,7 +42,9 @@ public sealed record ProductOutcome(int? Id, IReadOnlyDictionary<ProductField, s
 /// deriva do outro (ADR-016); a validação do resumo existe para proteger a grade do PDF,
 /// não por capricho de formulário.
 /// </summary>
-public sealed class ProductMaintenance(IDbContextFactory<CatalogDbContext> contextFactory)
+public sealed class ProductMaintenance(
+    IDbContextFactory<CatalogDbContext> contextFactory,
+    ILogger<ProductMaintenance> logger)
 {
     public async Task<IReadOnlyList<Category>> ListCategoriesAsync(
         CancellationToken cancellationToken = default)
@@ -120,6 +122,68 @@ public sealed class ProductMaintenance(IDbContextFactory<CatalogDbContext> conte
 
         return ProductOutcome.Saved(product.Id);
     }
+
+    /// <summary>
+    /// Associa ao produto as derivadas recém-geradas. O produto tem uma foto só, então
+    /// isto substitui a referência anterior em vez de acrescentar (RN-09).
+    ///
+    /// As derivadas antigas **não são apagadas do armazenamento**: uma página da vitrine
+    /// já servida do cache ainda aponta para elas, e removê-las na hora quebraria a
+    /// imagem até a invalidação. No volume previsto o acúmulo é pequeno; os nomes
+    /// substituídos vão para o log para não ficarem sem rastro.
+    /// </summary>
+    public async Task<ProductPhoto?> AttachPhotoAsync(
+        int productId,
+        ProductPhoto photo,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var product = await context.Products
+            .SingleOrDefaultAsync(candidate => candidate.Id == productId, cancellationToken);
+
+        if (product is null)
+        {
+            return null;
+        }
+
+        var replaced = product.Photo;
+        product.Photo = photo;
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        if (replaced is not null)
+        {
+            logger.LogInformation(
+                "Foto do produto {ProductId} substituída. Derivadas sem referência: {Names}.",
+                productId,
+                string.Join(", ", ReplacedNames(replaced)));
+        }
+
+        return photo;
+    }
+
+    public async Task<ProductPhoto?> FindPhotoAsync(
+        int productId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Products
+            .AsNoTracking()
+            .Where(product => product.Id == productId)
+            .Select(product => product.Photo)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private static IEnumerable<string> ReplacedNames(ProductPhoto photo) =>
+    [
+        photo.OriginalFileName,
+        photo.ThumbnailFileName,
+        photo.CardFileName,
+        photo.LargeFileName,
+        photo.PrintFileName
+    ];
 
     private static Dictionary<ProductField, string> Validate(ProductDraft draft)
     {

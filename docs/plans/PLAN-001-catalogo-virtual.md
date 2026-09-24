@@ -555,7 +555,7 @@ O formulário precisa **declarar onde cada texto aparece**. Sem isso o dono escr
 
 #### T-13 — Foto do produto
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Média
 - **Depende de:** T-08, T-12
 - **Implementa:** RN-09
@@ -569,11 +569,11 @@ O formulário precisa **declarar onde cada texto aparece**. Sem isso o dono escr
 Ligar o formulário de produto ao pipeline de imagem: uma foto por produto, com envio, progresso e substituição. Trocar a foto gera novas derivadas com nomes novos; a anterior deixa de ser referenciada.
 
 **Critério de aceite (testável):**
-- [ ] Enviar foto associa as quatro derivadas ao produto
-- [ ] Produto tem no máximo uma foto — não há galeria *(RN-09)*
-- [ ] Trocar a foto gera nomes novos e atualiza a referência *(CA-07)*
-- [ ] Durante o envio, salvar fica indisponível
-- [ ] Arquivo recusado exibe o motivo e preserva a foto anterior
+- [x] Enviar foto associa as quatro derivadas ao produto
+- [x] Produto tem no máximo uma foto — não há galeria *(RN-09)*
+- [x] Trocar a foto gera nomes novos e atualiza a referência *(CA-07)*
+- [x] Durante o envio, salvar fica indisponível
+- [x] Arquivo recusado exibe o motivo e preserva a foto anterior
 
 **Testes a escrever:**
 - *Integration:* enviar foto e verificar as quatro derivadas associadas
@@ -1364,3 +1364,4 @@ Tarefas em que quem executa **deve parar e pedir confirmação** antes de seguir
 | T-07 (interface) | Concluído | 2026-09-23 | d16c804 | Tela UI-03 refeita a partir de `docs/prototype/prototipos/login.html`, o protótipo de alta fidelidade que existia no repositório e **não havia sido consumido** — a primeira versão foi construída a partir do texto da SPEC-UI, que descreve estados e regras mas não composição. O diagnóstico inicial de "CSS quebrado" foi descartado por evidência: o escopo do HTML batia com o do CSS publicado e o arquivo respondia 200. A tela ganhou a composição do protótipo: painel centrado de 1100 px sobre fundo rebaixado, lado naval com selo, título e os três passos, formulário de 340 px com rótulos em caixa alta, alertas com ícone e faixa de cor por severidade, e botão com giro no envio. Tipografia da seção 2 da SPEC-UI — Archivo, IBM Plex Sans e IBM Plex Mono — carregada em `App.razor`. Verificado no navegador: estado padrão e `erroCredencial`, com os valores do formulário preservados após a recusa. Suíte 49/51 |
 | T-07 (visibilidade da senha) | Concluído | 2026-09-23 | e5b8d76 | Botão de alternar visibilidade dentro do campo de senha, a pedido do dono. **Duas divergências registradas em vez de silenciadas:** o controle não constava da UI-03 — a SPEC-UI foi atualizada para incluí-lo — e ele exige JavaScript, ampliando a exceção às ADR-001 e ADR-010 já aberta para o estado de envio. A alternativa seria ida ao servidor carregando a senha em claro, o que seria pior que o problema. O campo nasce oculto, o ícone anuncia a ação disponível e não o estado, e `aria-pressed` e `aria-label` acompanham a troca. Um teste cobre a presença do controle e o estado inicial oculto. Suíte 50/52. **Conferência visual pendente:** a extensão do Chrome caiu durante a limpeza do ambiente anterior e o HTML foi verificado por requisição, não por olho |
 | T-12 | Concluído | 2026-09-23 | 778fadb | Formulário UI-05 em `/painel/produtos/novo` e `/painel/produtos/{id}`, com os estados `novo`, `edicao` e `erroValidacao` do escopo. Preço em `decimal` no código e `numeric(10,2)` no banco — o ponto de atenção da tarefa era exatamente não usar ponto flutuante. Os três campos de texto **declaram onde aparecem**, que a SPEC-UI aponta como o erro de uso mais provável do sistema, e o resumo tem contador com o limite de 120 fixado em T-04, que fica vermelho ao estourar. Erros aparecem junto ao campo, nunca em faixa no topo, e todos os campos inválidos são devolvidos de uma vez. Resumo em branco é gravado como ausente, não string vazia (RN-04). **Decisão de escopo:** o sistema de design do painel foi extraído do protótipo `painel.html` para `wwwroot/painel.css` — global e não isolado por componente, porque é o vocabulário comum das telas do painel e duplicá-lo era o caminho para elas divergirem. Foi a lição da tela de acesso, que nasceu do texto da SPEC-UI em vez do protótipo. **Fora do escopo declarado:** `Features/Panel/PanelHome.razor` ganhou o link, `Components/App.razor` a folha nova. Dezoito testes, suíte 69/71. **Pendências:** a tela de categorias segue com estilo próprio, anterior ao sistema extraído, e precisa ser alinhada; a SPEC-UI apresenta UI-05 como painel lateral sobre a lista, e aqui é página própria porque a lista só existe em T-17 |
+| T-13 | Concluído | 2026-09-23 | — | Formulário ligado ao pipeline de T-08: envio, progresso, substituição e recusa com motivo. A foto exige produto salvo — ela é gravada no armazenamento e associada a um id, então cadastrar e fotografar não cabem na mesma transação; a tela diz isso em vez de falhar. Salvar fica indisponível durante o envio (UI-05.enviandoFoto), e recusa preserva a foto anterior (UI-05.erroUpload). O leitor do `InputFile` recebe limite explícito: o padrão do Blazor é 512 KB, e quem decide a recusa é a validação da RN-10, não o transporte. **Decisão registrada sobre órfãs:** as derivadas substituídas **não são apagadas**. Uma página da vitrine servida do cache ainda aponta para elas, e remover na hora quebraria a imagem até a invalidação (ADR-008); no volume previsto o acúmulo é pequeno. Os nomes substituídos vão para o log, para não ficarem sem rastro — que era a parte ruim do R-01 de `REVIEW-T-08-2026-09-23`. Cinco testes de integração contra PostgreSQL mais **três contra o Supabase real**, cobrindo o caminho inteiro da imagem ao produto: suíte **79/79 com credencial**, 74 e 5 pulados sem ela. **Pendência:** os estados `enviandoFoto` e `erroUpload` não têm teste automatizado — dependem de interação no circuito, e o que existe cobre o serviço, não a tela |

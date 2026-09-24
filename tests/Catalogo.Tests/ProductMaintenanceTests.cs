@@ -2,6 +2,7 @@ using Catalogo.Data;
 using Catalogo.Features.Categories;
 using Catalogo.Features.Products;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Catalogo.Tests;
 
@@ -201,7 +202,7 @@ public sealed class ProductMaintenanceTests(PostgresFixture postgres)
     }
 
     private ProductMaintenance CreateMaintenance() =>
-        new(new ContextFactory(postgres.ConnectionString));
+        new(new ContextFactory(postgres.ConnectionString), NullLogger<ProductMaintenance>.Instance);
 
     private sealed class ContextFactory(string connectionString) : IDbContextFactory<CatalogDbContext>
     {

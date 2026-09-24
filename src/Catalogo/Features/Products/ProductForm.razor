@@ -1,7 +1,9 @@
 @page "/painel/produtos/novo"
 @page "/painel/produtos/{Id:int}"
 @rendermode InteractiveServer
+@using Catalogo.Features.Media
 @inject ProductMaintenance Maintenance
+@inject ProductPhotoService PhotoService
 @inject NavigationManager Navigation
 
 <PageTitle>@(Id is null ? "Novo produto" : "Editar produto")</PageTitle>
@@ -133,8 +135,62 @@
                     </div>
                 </div>
 
+                <div class="painel-bloco__bd produto__foto">
+                    <span class="campo__rotulo">Foto</span>
+
+                    @if (Id is null)
+                    {
+                        <p class="campo__ajuda">
+                            Salve o produto primeiro. A foto é enviada e processada no
+                            servidor, e precisa de um produto para se associar.
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="campo__ajuda">
+                            Uma foto por produto — enviar outra substitui a atual. Dela saem
+                            quatro versões: três para a tela e uma para a impressão.
+                        </p>
+
+                        @if (photo is not null)
+                        {
+                            <div class="produto__derivadas" data-estado="comFoto">
+                                <img src="@PublicUrl(photo.CardFileName)" alt="Foto de @draft.Name" />
+
+                                <ul class="mono">
+                                    <li>miniatura · @photo.ThumbnailFileName</li>
+                                    <li>cartão · @photo.CardFileName</li>
+                                    <li>ampliada · @photo.LargeFileName</li>
+                                    <li>impressão · @photo.PrintFileName</li>
+                                </ul>
+                            </div>
+                        }
+
+                        <label class="btn @(uploading ? "" : "btn--primario")">
+                            @(photo is null ? "Enviar foto" : "Trocar foto")
+                            <InputFile OnChange="UploadAsync" accept="image/*" disabled="@uploading"
+                                       class="visualmente-oculto" />
+                        </label>
+
+                        @if (uploading)
+                        {
+                            <p class="campo__ajuda" role="status" data-estado="enviandoFoto">
+                                Enviando e gerando as derivadas… salvar fica indisponível até terminar.
+                            </p>
+                        }
+
+                        @if (uploadError is not null)
+                        {
+                            <p class="campo__erro" role="alert" data-estado="erroUpload">
+                                @uploadError @(photo is not null ? "A foto anterior foi mantida." : null)
+                            </p>
+                        }
+                    }
+                </div>
+
                 <div class="painel-bloco__ft">
-                    <button type="button" class="btn btn--primario" @onclick="SaveAsync">Salvar</button>
+                    <button type="button" class="btn btn--primario" @onclick="SaveAsync"
+                            disabled="@uploading">Salvar</button>
                     <a class="btn btn--fantasma" href="/painel">Cancelar</a>
 
                     @if (saved)
@@ -159,6 +215,58 @@
     private bool notFound;
     private bool saved;
 
+    private ProductPhoto? photo;
+    private bool uploading;
+    private string? uploadError;
+
+    private async Task UploadAsync(InputFileChangeEventArgs change)
+    {
+        uploadError = null;
+        uploading = true;
+
+        try
+        {
+            var file = change.File;
+
+            // O limite do leitor precisa ser explícito: o padrão do Blazor é 512 KB, e
+            // o que decide a recusa é a validação do pipeline (RN-10), não o transporte.
+            await using var content = file.OpenReadStream(ImageValidation.MaxFileSizeInBytes);
+
+            var result = await PhotoService.StoreAsync(content, file.Size);
+            if (!result.Succeeded)
+            {
+                uploadError = RejectionMessage(result.Rejection);
+                return;
+            }
+
+            photo = await Maintenance.AttachPhotoAsync(Id!.Value, result.Photo!);
+        }
+        catch (IOException)
+        {
+            // O leitor estoura quando o arquivo passa do limite declarado acima.
+            uploadError = RejectionMessage(ImageRejection.TooLarge);
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private string PublicUrl(string objectName) => PhotoService.PublicUrlFor(objectName);
+
+    private static string RejectionMessage(ImageRejection rejection) => rejection switch
+    {
+        ImageRejection.NotAnImage =>
+            "O arquivo não é uma imagem válida — a extensão não basta, o conteúdo é verificado.",
+        ImageRejection.TooLarge =>
+            $"A imagem passa de {ImageValidation.MaxFileSizeInBytes / (1024 * 1024)} MB.",
+        ImageRejection.DimensionsTooLarge =>
+            $"A imagem passa de {ImageValidation.MaxDimension} px de lado.",
+        ImageRejection.DimensionsTooSmall =>
+            $"A imagem tem menos de {ImageValidation.MinDimension} px de lado e ficaria ruim impressa.",
+        _ => "Não foi possível usar este arquivo."
+    };
+
     private int SummaryLength => draft.Summary?.Trim().Length ?? 0;
     private bool SummaryOverflow => SummaryLength > Product.SummaryMaxLength;
 
@@ -176,6 +284,8 @@
         var existing = await Maintenance.FindAsync(Id.Value);
         notFound = existing is null;
         draft = existing ?? new ProductDraft();
+
+        photo = notFound ? null : await Maintenance.FindPhotoAsync(Id.Value);
     }
 
     private async Task SaveAsync()

@@ -22,3 +22,37 @@
         grid-template-columns: 1fr;
     }
 }
+
+.produto__foto {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+    max-width: 620px;
+    border-top: 1px solid #d8d2c5;
+}
+
+.produto__derivadas {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 12px;
+    border: 1px solid #d8d2c5;
+    border-radius: 6px;
+    background: #f7f3ea;
+}
+
+.produto__derivadas img {
+    width: 120px;
+    height: auto;
+    border-radius: 4px;
+}
+
+.produto__derivadas ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 11.5px;
+    color: #6b6759;
+    word-break: break-all;
+}
