@@ -2,6 +2,7 @@ using Catalogo;
 using Catalogo.Components;
 using Catalogo.Data;
 using Catalogo.Features.Account;
+using Catalogo.Features.Categories;
 using Catalogo.Features.Media;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -12,15 +13,23 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddDbContext<CatalogDbContext>(options =>
+// Fábrica em vez de instância direta: no painel interativo o componente vive enquanto o
+// circuito durar, e um DbContext de vida longa acumularia estado rastreado entre telas.
+// Cada operação abre e fecha o seu (ADR-010).
+builder.Services.AddDbContextFactory<CatalogDbContext>(options =>
     options.UseNpgsql(DatabaseConnectionString.Normalize(
         builder.Configuration.GetConnectionString("Default") ?? string.Empty)));
+
+// O Identity resolve o contexto por requisição, e é a fábrica que o produz.
+builder.Services.AddScoped(services =>
+    services.GetRequiredService<IDbContextFactory<CatalogDbContext>>().CreateDbContext());
 
 builder.Services.Configure<ObjectStorageOptions>(
     builder.Configuration.GetSection(ObjectStorageOptions.SectionName));
 builder.Services.AddSingleton<ImageProcessor>();
 builder.Services.AddHttpClient<IObjectStorage, SupabaseObjectStorage>();
 builder.Services.AddScoped<ProductPhotoService>();
+builder.Services.AddScoped<CategoryMaintenance>();
 
 builder.Services.AddPanelAuthentication(builder.Configuration);
 builder.Services.AddCascadingAuthenticationState();

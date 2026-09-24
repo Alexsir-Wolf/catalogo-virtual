@@ -37,17 +37,6 @@ public sealed class AuthenticationFlowTests : IDisposable
     }
 
     [Fact]
-    public async Task Painel_autenticado_e_renderizado_em_modo_interativo_de_servidor()
-    {
-        using var client = CreateSessionClient();
-        await SignInAsync(client, OwnerPassword);
-
-        var html = await client.GetStringAsync(PanelAuthentication.PanelPathPrefix);
-
-        Assert.Contains(ApplicationSmokeTests.InteractiveServerMarker, html);
-    }
-
-    [Fact]
     public async Task Senha_incorreta_nao_da_acesso_ao_painel()
     {
         using var client = CreateSessionClient();

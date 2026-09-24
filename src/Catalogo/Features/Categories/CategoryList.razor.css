@@ -1,0 +1,109 @@
+/* Tokens do protótipo (SPEC-UI seção 2). */
+
+h1 {
+    color: #0c2a4a;
+}
+
+.categorias__nota {
+    max-width: 48rem;
+    color: #6b6759;
+    font-size: 0.875rem;
+}
+
+.categorias__novo {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid #d8d2c5;
+    border-radius: 6px;
+    background: #fbf9f4;
+}
+
+.categorias__novo label {
+    font-size: 0.875rem;
+    color: #6b6759;
+}
+
+.categorias__novo input,
+.categorias__lista input {
+    padding: 0.5rem 0.6rem;
+    border: 1px solid #d8d2c5;
+    border-radius: 4px;
+    background: #fff;
+    font: inherit;
+}
+
+.categorias__novo input[aria-invalid="true"] {
+    border-color: oklch(0.55 0.18 25);
+}
+
+.categorias__novo button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    background: oklch(0.62 0.16 38);
+    color: #fbf9f4;
+    font: inherit;
+    cursor: pointer;
+}
+
+.categorias__erro {
+    flex-basis: 100%;
+    margin: 0;
+    color: oklch(0.55 0.18 25);
+    font-size: 0.875rem;
+}
+
+.categorias__vazio {
+    max-width: 34rem;
+    padding: 2rem;
+    border: 1px dashed #d8d2c5;
+    border-radius: 6px;
+    background: #f7f3ea;
+    text-align: center;
+}
+
+.categorias__vazio h2 {
+    margin-top: 0;
+    color: #0c2a4a;
+}
+
+.categorias__lista {
+    width: 100%;
+    max-width: 48rem;
+    border-collapse: collapse;
+}
+
+.categorias__lista th,
+.categorias__lista td {
+    padding: 0.6rem 0.5rem;
+    border-bottom: 1px solid #d8d2c5;
+    text-align: left;
+}
+
+/* Fonte de dados para a numeração, como no protótipo. */
+.categorias__numero {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    color: #6b6759;
+}
+
+.categorias__lista button {
+    padding: 0.35rem 0.7rem;
+    border: 1px solid #d8d2c5;
+    border-radius: 4px;
+    background: #fbf9f4;
+    font: inherit;
+    cursor: pointer;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}

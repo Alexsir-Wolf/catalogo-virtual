@@ -1,0 +1,149 @@
+@page "/painel/categorias"
+@rendermode InteractiveServer
+@inject CategoryMaintenance Maintenance
+
+<PageTitle>Categorias</PageTitle>
+
+<h1>Categorias</h1>
+
+<p class="categorias__nota">
+    A numeração abaixo é a global. Em um catálogo parcial ela é recalculada, então uma
+    categoria que aparece como 03 aqui pode sair como 01 no PDF.
+</p>
+
+<form class="categorias__novo" @onsubmit="CreateAsync" @onsubmit:preventDefault>
+    <label for="nova-categoria">Nova categoria</label>
+    <input id="nova-categoria" @bind="newName" @bind:event="oninput"
+           maxlength="@Category.NameMaxLength" aria-invalid="@(failure is not null)" />
+    <button type="submit">Adicionar</button>
+
+    @if (failure is not null)
+    {
+        <p class="categorias__erro" role="alert" data-estado="@StateIdFor(failure.Value)">
+            @MessageFor(failure.Value)
+        </p>
+    }
+</form>
+
+@if (categories is null)
+{
+    <p>Carregando…</p>
+}
+else if (categories.Count == 0)
+{
+    <div class="categorias__vazio" data-estado="vazio">
+        <h2>Nenhuma categoria ainda</h2>
+        <p>
+            A categoria é pré-requisito de qualquer produto — todo produto pertence a
+            exatamente uma. Crie a primeira acima para começar o acervo.
+        </p>
+    </div>
+}
+else
+{
+    <table class="categorias__lista" data-estado="default">
+        <thead>
+            <tr>
+                <th scope="col">Nº</th>
+                <th scope="col">Nome</th>
+                <th scope="col"><span class="visually-hidden">Ações</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (var index = 0; index < categories.Count; index++)
+            {
+                var category = categories[index];
+                var number = (index + 1).ToString("00");
+
+                <tr>
+                    <td class="categorias__numero">@number</td>
+                    <td>
+                        @if (editingId == category.Id)
+                        {
+                            <input @bind="editingName" @bind:event="oninput"
+                                   maxlength="@Category.NameMaxLength" aria-label="Nome da categoria" />
+                        }
+                        else
+                        {
+                            @category.Name
+                        }
+                    </td>
+                    <td>
+                        @if (editingId == category.Id)
+                        {
+                            <button type="button" @onclick="() => RenameAsync(category.Id)">Salvar</button>
+                            <button type="button" @onclick="CancelEditing">Cancelar</button>
+                        }
+                        else
+                        {
+                            <button type="button" @onclick="() => StartEditing(category)">Renomear</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<Category>? categories;
+    private string newName = string.Empty;
+    private CategoryFailure? failure;
+
+    private int? editingId;
+    private string editingName = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task CreateAsync()
+    {
+        var outcome = await Maintenance.CreateAsync(newName);
+        failure = outcome.Succeeded ? null : outcome.Failure;
+
+        if (outcome.Succeeded)
+        {
+            newName = string.Empty;
+            await ReloadAsync();
+        }
+    }
+
+    private void StartEditing(Category category)
+    {
+        editingId = category.Id;
+        editingName = category.Name;
+        failure = null;
+    }
+
+    private void CancelEditing()
+    {
+        editingId = null;
+        editingName = string.Empty;
+    }
+
+    private async Task RenameAsync(int id)
+    {
+        var outcome = await Maintenance.RenameAsync(id, editingName);
+        failure = outcome.Succeeded ? null : outcome.Failure;
+
+        if (outcome.Succeeded)
+        {
+            CancelEditing();
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAsync() => categories = await Maintenance.ListAsync();
+
+    private static string MessageFor(CategoryFailure failure) => failure switch
+    {
+        CategoryFailure.NameRequired => "Informe o nome da categoria.",
+        CategoryFailure.NameAlreadyInUse => "Já existe uma categoria com esse nome.",
+        _ => string.Empty
+    };
+
+    private static string StateIdFor(CategoryFailure failure) => failure switch
+    {
+        CategoryFailure.NameAlreadyInUse => "nomeDuplicado",
+        _ => "nomeObrigatorio"
+    };
+}
