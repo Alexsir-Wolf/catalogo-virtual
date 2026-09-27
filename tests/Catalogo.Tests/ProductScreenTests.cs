@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Catalogo.Features.Account;
+using Catalogo.Features.Categories;
 using Catalogo.Features.Products;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -13,15 +14,20 @@ public sealed class ProductScreenTests : IDisposable
     private const string OwnerPassword = "Catalogo!2026";
     private const string NewProductRoute = "/painel/produtos/novo";
 
+    private readonly PostgresFixture postgres;
     private readonly WebApplicationFactory<Program> factory;
 
-    public ProductScreenTests(PostgresFixture postgres) =>
+    public ProductScreenTests(PostgresFixture postgres)
+    {
+        this.postgres = postgres;
+
         factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("ConnectionStrings:Default", postgres.ConnectionString);
             builder.UseSetting($"{OwnerAccountOptions.SectionName}:UserName", OwnerUserName);
             builder.UseSetting($"{OwnerAccountOptions.SectionName}:Password", OwnerPassword);
         });
+    }
 
     public void Dispose() => factory.Dispose();
 
@@ -87,6 +93,55 @@ public sealed class ProductScreenTests : IDisposable
         // consegue oferecer o que o enum define. Testar contando `<option>` no HTML
         // seria frágil e provaria menos.
         Assert.Equal(2, Enum.GetValues<PriceLabel>().Length);
+    }
+
+    /// <summary>
+    /// A foto precisa de um produto para se associar, e a tela de cadastro em branco não
+    /// tem id — o aviso é a única coisa que explica isso ao dono (UI-05).
+    /// </summary>
+    [Fact]
+    public async Task UI_05_novo_explica_que_a_foto_exige_o_produto_salvo()
+    {
+        using var client = await SignedInClientAsync();
+
+        var html = await client.GetStringAsync(NewProductRoute);
+
+        Assert.Contains("Salve o produto primeiro", html);
+        Assert.DoesNotContain("Enviar foto", html);
+    }
+
+    [Fact]
+    public async Task UI_05_edicao_oferece_o_envio_da_foto_e_declara_a_substituicao()
+    {
+        using var client = await SignedInClientAsync();
+        var productId = await CreateProductAsync();
+
+        var html = await client.GetStringAsync($"/painel/produtos/{productId}");
+
+        Assert.Contains("Enviar foto", html);
+        Assert.Contains("enviar outra substitui a atual", html);
+    }
+
+    private async Task<int> CreateProductAsync()
+    {
+        await using var context = postgres.CreateContext();
+
+        var category = new Category { Name = $"Categoria {Guid.NewGuid():N}", Position = 1 };
+        context.Categories.Add(category);
+
+        var product = new Product
+        {
+            Name = "Monitor VXPro 19",
+            Price = 599.90m,
+            Category = category,
+            Status = ProductStatus.Draft,
+            Position = 1
+        };
+
+        context.Products.Add(product);
+        await context.SaveChangesAsync();
+
+        return product.Id;
     }
 
     private async Task<HttpClient> SignedInClientAsync()

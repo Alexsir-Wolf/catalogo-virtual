@@ -4,6 +4,8 @@
 @using Catalogo.Features.Media
 @inject ProductMaintenance Maintenance
 @inject ProductPhotoService PhotoService
+@inject ProductPhotoUpload Upload
+@inject ILogger<ProductForm> Logger
 @inject NavigationManager Navigation
 
 <PageTitle>@(Id is null ? "Novo produto" : "Editar produto")</PageTitle>
@@ -232,19 +234,20 @@
             // o que decide a recusa é a validação do pipeline (RN-10), não o transporte.
             await using var content = file.OpenReadStream(ImageValidation.MaxFileSizeInBytes);
 
-            var result = await PhotoService.StoreAsync(content, file.Size);
-            if (!result.Succeeded)
-            {
-                uploadError = RejectionMessage(result.Rejection);
-                return;
-            }
+            var outcome = await Upload.StoreAsync(Id!.Value, content, file.Size);
 
-            photo = await Maintenance.AttachPhotoAsync(Id!.Value, result.Photo!);
+            uploadError = outcome.Error;
+
+            // Sem foto nova, a anterior continua na tela — é o que a UI-05 exige do
+            // estado de erro, junto da preservação do que já estava digitado.
+            photo = outcome.Photo ?? photo;
         }
-        catch (IOException)
+        catch (Exception exception)
         {
-            // O leitor estoura quando o arquivo passa do limite declarado acima.
-            uploadError = RejectionMessage(ImageRejection.TooLarge);
+            // Último limite antes do circuito: exceção que escape daqui encerra a sessão
+            // do painel e leva o formulário inteiro com ela (ADR-010).
+            Logger.LogError(exception, "Falha inesperada no envio da foto do produto {ProductId}.", Id);
+            uploadError = ProductPhotoUpload.StorageUnavailableMessage;
         }
         finally
         {
@@ -253,19 +256,6 @@
     }
 
     private string PublicUrl(string objectName) => PhotoService.PublicUrlFor(objectName);
-
-    private static string RejectionMessage(ImageRejection rejection) => rejection switch
-    {
-        ImageRejection.NotAnImage =>
-            "O arquivo não é uma imagem válida — a extensão não basta, o conteúdo é verificado.",
-        ImageRejection.TooLarge =>
-            $"A imagem passa de {ImageValidation.MaxFileSizeInBytes / (1024 * 1024)} MB.",
-        ImageRejection.DimensionsTooLarge =>
-            $"A imagem passa de {ImageValidation.MaxDimension} px de lado.",
-        ImageRejection.DimensionsTooSmall =>
-            $"A imagem tem menos de {ImageValidation.MinDimension} px de lado e ficaria ruim impressa.",
-        _ => "Não foi possível usar este arquivo."
-    };
 
     private int SummaryLength => draft.Summary?.Trim().Length ?? 0;
     private bool SummaryOverflow => SummaryLength > Product.SummaryMaxLength;

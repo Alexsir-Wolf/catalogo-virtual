@@ -32,6 +32,7 @@ builder.Services.AddHttpClient<IObjectStorage, SupabaseObjectStorage>();
 builder.Services.AddScoped<ProductPhotoService>();
 builder.Services.AddScoped<CategoryMaintenance>();
 builder.Services.AddScoped<ProductMaintenance>();
+builder.Services.AddScoped<ProductPhotoUpload>();
 
 builder.Services.AddPanelAuthentication(builder.Configuration);
 builder.Services.AddCascadingAuthenticationState();
