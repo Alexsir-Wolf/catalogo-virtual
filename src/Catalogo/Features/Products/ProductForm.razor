@@ -312,8 +312,7 @@
 
         if (Id is null)
         {
-            draft = new ProductDraft();
-            notFound = false;
+            Reset();
             return;
         }
 
@@ -331,11 +330,35 @@
         publication = Id is null || notFound ? null : await Publication.FindStateAsync(Id.Value);
     }
 
+    /// <summary>
+    /// As duas rotas são do mesmo componente, então o roteador reaproveita a instância ao
+    /// passar de um produto para o cadastro em branco. Todo estado carregado do produto
+    /// anterior precisa sair junto: deixar `publication` para trás renderizaria o
+    /// alternador de situação sem `Id`, e o clique estouraria dentro do manipulador de
+    /// evento, sem limite acima dele (R-01 de `REVIEW-T-14-2026-09-28`).
+    /// </summary>
+    private void Reset()
+    {
+        draft = new ProductDraft();
+        errors = new Dictionary<ProductField, string>();
+        notFound = false;
+        saved = false;
+        photo = null;
+        uploadError = null;
+        publication = null;
+        publicationRefusal = null;
+    }
+
     private async Task PublishAsync()
     {
         publicationRefusal = null;
 
-        var outcome = await Publication.PublishAsync(Id!.Value);
+        if (Id is null)
+        {
+            return;
+        }
+
+        var outcome = await Publication.PublishAsync(Id.Value);
 
         if (outcome is null)
         {
@@ -358,7 +381,12 @@
     {
         publicationRefusal = null;
 
-        var outcome = await Publication.WithdrawAsync(Id!.Value);
+        if (Id is null)
+        {
+            return;
+        }
+
+        var outcome = await Publication.WithdrawAsync(Id.Value);
 
         if (outcome is null)
         {
