@@ -1,0 +1,487 @@
+/* Sistema de design da vitrine, extraído de docs/prototype/prototipos/vitrine.html.
+   Separado do painel de propósito: são dois públicos e dois modos de renderização
+   (ADR-010). O painel é ferramenta de trabalho de uma pessoa; a vitrine é página pública
+   servida de cache, e o peso dela conta na meta de LCP em 4G (arquitetura 3.3).
+
+   Só o vocabulário de UI-01 está aqui. O de UI-02 entra com T-20. */
+
+:root {
+    --navy: #0c2a4a;
+    --navy-2: #143258;
+    --on-navy: #fff;
+    --wa: #1f7a4d;
+    --wa-hover: #186340;
+}
+
+.vitrine {
+    background: var(--ground);
+    min-height: 100vh;
+}
+
+/* ---------- faixa utilitária e cabeçalho ---------- */
+
+.util {
+    background: var(--ink);
+    color: rgba(255, 255, 255, .78);
+    font-size: 11.5px;
+}
+
+.util__in {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 7px 22px;
+}
+
+.util__pill {
+    border: 1px solid rgba(255, 255, 255, .22);
+    border-radius: 2px;
+    padding: 2px 7px;
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.util a {
+    color: rgba(255, 255, 255, .85);
+    text-decoration: none;
+}
+
+.cabeca {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+}
+
+.cabeca__in {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 22px;
+}
+
+.marca {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex: none;
+    text-decoration: none;
+}
+
+.marca__m {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+    background: var(--navy);
+    color: #fff;
+    font-family: var(--ui);
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.marca__t {
+    display: block;
+    font-family: var(--ui);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    line-height: 1.1;
+}
+
+.marca__s {
+    display: block;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.1;
+}
+
+.busca {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    padding: 7px 11px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+}
+
+.busca input {
+    width: 100%;
+    border: 0;
+    background: none;
+    outline: none;
+    font-size: 13px;
+}
+
+.busca button {
+    flex: none;
+    border: 0;
+    background: none;
+    padding: 0 2px;
+    color: var(--faint);
+    cursor: pointer;
+}
+
+/* ---------- listagem ---------- */
+
+.lista {
+    display: grid;
+    grid-template-columns: 212px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+    padding: 20px 22px 30px;
+}
+
+.lateral {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: sticky;
+    top: 12px;
+}
+
+.lateral__h {
+    padding: 0 4px 4px;
+    font-family: var(--ui);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--faint);
+}
+
+.categoria {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border: 1px solid transparent;
+    border-radius: var(--r);
+    color: var(--ink-2);
+    font-size: 13px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.categoria:hover {
+    background: var(--surface-2);
+}
+
+.categoria[aria-current] {
+    background: var(--navy);
+    color: #fff;
+    font-weight: 600;
+}
+
+.categoria__n {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--faint);
+}
+
+.categoria[aria-current] .categoria__n {
+    color: rgba(255, 255, 255, .8);
+}
+
+.resumo-busca {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    font-size: 12.5px;
+    color: var(--muted);
+}
+
+.resumo-busca b {
+    font-family: var(--mono);
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.resumo-busca__fim {
+    margin-left: auto;
+}
+
+.ficha {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 4px 3px 10px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 99px;
+    font-size: 12px;
+}
+
+.ficha a {
+    padding: 0 5px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1;
+    text-decoration: none;
+}
+
+.grade {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+}
+
+.cartao {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    color: inherit;
+    text-decoration: none;
+}
+
+.cartao:hover {
+    border-color: var(--navy);
+    box-shadow: var(--shadow);
+}
+
+.cartao__f {
+    aspect-ratio: 1 / 1;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--surface-2);
+    object-fit: cover;
+    width: 100%;
+}
+
+.cartao__f--ausente {
+    display: grid;
+    place-items: center;
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 10px;
+}
+
+.cartao__b {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    padding: 10px 11px 12px;
+}
+
+.cartao__c {
+    font-family: var(--ui);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--navy);
+}
+
+.cartao__n {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.cartao__r {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 1.3em;
+    font-size: 11.5px;
+    line-height: 1.3;
+    color: var(--muted);
+}
+
+.cartao__p {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-top: auto;
+    padding-top: 7px;
+}
+
+.cartao__p b {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.cartao__p span {
+    font-family: var(--ui);
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--faint);
+}
+
+/* ---------- paginação ---------- */
+
+.paginas {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    margin-top: 20px;
+}
+
+.paginas a,
+.paginas span {
+    padding: 5px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    background: var(--surface);
+    color: var(--ink-2);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    text-decoration: none;
+}
+
+.paginas a[aria-current] {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: #fff;
+    font-weight: 600;
+}
+
+.paginas span {
+    opacity: .4;
+}
+
+/* ---------- estados vazios ---------- */
+
+.nada {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    padding: 50px 22px;
+    text-align: center;
+}
+
+.nada h2 {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.nada p {
+    max-width: 44ch;
+    margin: 0;
+    color: var(--muted);
+    font-size: 13.5px;
+}
+
+.nada__m {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--faint);
+    font-size: 19px;
+}
+
+.nada a {
+    padding: 9px 14px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    color: inherit;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.nada a:hover {
+    border-color: var(--navy);
+}
+
+/* ---------- rodapé ---------- */
+
+.rodape {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    padding: 22px;
+    background: var(--ink);
+    color: rgba(255, 255, 255, .72);
+    font-size: 12.5px;
+}
+
+.rodape__c {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.rodape b {
+    display: block;
+    color: #fff;
+    font-family: var(--ui);
+    font-size: 12.5px;
+}
+
+.rodape em {
+    display: block;
+    font-style: normal;
+    font-size: 11.5px;
+    color: rgba(255, 255, 255, .55);
+}
+
+/* ---------- celular ----------
+   O tráfego vem de link em rede social, então o celular é o caso principal e não a
+   adaptação (PRD 2.4). A coluna de categorias vira faixa rolável, como no protótipo. */
+
+@media (max-width: 720px) {
+    .lista {
+        grid-template-columns: 1fr;
+        gap: 14px;
+        padding: 14px;
+    }
+
+    .lateral {
+        position: static;
+        flex-direction: row;
+        overflow-x: auto;
+        gap: 7px;
+        padding-bottom: 4px;
+    }
+
+    .lateral__h {
+        display: none;
+    }
+
+    .categoria {
+        flex: none;
+        background: var(--surface);
+        border-color: var(--line);
+    }
+
+    .grade {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .cabeca__in {
+        flex-wrap: wrap;
+    }
+
+    .busca {
+        order: 3;
+        flex-basis: 100%;
+    }
+}

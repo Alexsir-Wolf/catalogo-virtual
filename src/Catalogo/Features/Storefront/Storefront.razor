@@ -1,15 +1,265 @@
 @page "/"
+@using System.Globalization
+@using Catalogo.Features.Media
+@using Catalogo.Features.Products
+@inject StorefrontQuery Query
+@inject ProductPhotoService PhotoService
 
-<PageTitle>Catálogo Virtual</PageTitle>
+@*
+    UI-01. **Sem `@@rendermode`**: esta página é renderizada de forma estática no servidor
+    e não abre conexão persistente (ADR-010, RN-47). É o que a torna cacheável por inteiro
+    em T-21 e leve no celular, que é de onde vem o tráfego (PRD 2.4).
 
-<h1>Catálogo Virtual</h1>
+    Por isso buscar, filtrar e paginar são **navegações**, não interações: o formulário é
+    um GET e os filtros são links. Todo o estado vive na URL (RN-56), e qualquer listagem
+    é compartilhável — que é literalmente o CA-24.
 
-<p>
-    Vitrine pública. Esta área é renderizada de forma estática no servidor (ADR-010):
-    a resposta é HTML pronto, sem estado por visitante e sem conexão persistente.
-    O acervo começa na Fase 2.
-</p>
+    Não há estado de carregamento nem de erro de rede aqui, e a SPEC-UI explica: ou a
+    página chega pronta, ou o navegador mostra o erro dele.
+*@
 
-<ul>
-    <li><a href="/painel">/painel</a> — área interativa do dono do catálogo</li>
-</ul>
+<PageTitle>@Title</PageTitle>
+
+<div class="vitrine">
+    <div class="util">
+        <div class="util__in">
+            <span class="util__pill">Catálogo</span>
+            <span>Atendimento Seg–Sex 08h–18h</span>
+        </div>
+    </div>
+
+    <header class="cabeca">
+        <div class="cabeca__in">
+            <a class="marca" href="/">
+                <span class="marca__m">CT</span>
+                <span>
+                    <span class="marca__t">CATÁLOGO</span>
+                    <span class="marca__s">Suprimentos &amp; Informática</span>
+                </span>
+            </a>
+
+            @* GET, e não POST: a busca precisa virar URL para o resultado ser
+               compartilhável (RN-56) e para o cache de T-21 ter o que guardar. *@
+            <form class="busca" method="get" action="/" role="search">
+                <input type="search" name="@TermParameter" value="@Term"
+                       aria-label="Buscar produto pelo nome"
+                       placeholder="Buscar pelo nome do produto" />
+                <button type="submit" aria-label="Buscar">⌕</button>
+            </form>
+        </div>
+    </header>
+
+    @if (result is null)
+    {
+        <div class="nada"><p>Carregando o catálogo…</p></div>
+    }
+    else if (result.Total == 0 && !HasFilter)
+    {
+        @* UI-01.vazio — primeiro uso. Neutro de propósito: não é erro, é um catálogo que
+           ainda não foi publicado. *@
+        <div class="nada" data-estado="vazio">
+            <div class="nada__m">▢</div>
+            <h2>O catálogo ainda está sendo montado</h2>
+            <p>
+                Assim que os produtos forem publicados eles aparecem aqui.
+                Enquanto isso, fale com a gente pelos contatos no rodapé.
+            </p>
+        </div>
+    }
+    else if (result.Total == 0)
+    {
+        <div class="nada" data-estado="buscaSemResultado">
+            <div class="nada__m">⌕</div>
+            <h2>
+                @if (Search is { } term)
+                {
+                    <text>Nenhum produto encontrado para “@term”</text>
+                }
+                else
+                {
+                    <text>Nenhum produto nesta categoria</text>
+                }
+            </h2>
+            <p>Confira a escrita ou veja o catálogo completo. A busca procura no nome do produto.</p>
+            <a href="/">Ver catálogo completo</a>
+        </div>
+    }
+    else
+    {
+        <div class="lista" data-estado="@(HasFilter ? "filtrado" : "default")">
+            <aside class="lateral">
+                <div class="lateral__h">Categorias</div>
+
+                <a class="categoria" href="@RouteFor(categoryId: null, number: 1)"
+                   aria-current="@(CategoryId is null ? "true" : null)">
+                    <span>Todos</span>
+                    <span class="categoria__n">@TotalInCategories</span>
+                </a>
+
+                @foreach (var category in result.Categories)
+                {
+                    <a class="categoria" href="@RouteFor(category.Id, number: 1)"
+                       aria-current="@(CategoryId == category.Id ? "true" : null)">
+                        <span>@category.Name</span>
+                        <span class="categoria__n">@category.Products</span>
+                    </a>
+                }
+            </aside>
+
+            <div>
+                <div class="resumo-busca">
+                    <span><b>@result.Total</b> @(result.Total == 1 ? "produto" : "produtos")</span>
+
+                    @if (ActiveCategoryName is { } active)
+                    {
+                        <span class="ficha">
+                            @active
+                            <a href="@RouteFor(categoryId: null, number: 1)"
+                               aria-label="Remover filtro de categoria">×</a>
+                        </span>
+                    }
+
+                    <span class="resumo-busca__fim">
+                        página <b>@result.Page</b> de <b>@result.PageCount</b>
+                    </span>
+                </div>
+
+                <div class="grade">
+                    @foreach (var product in result.Products)
+                    {
+                        <a class="cartao" href="/produto/@product.Id">
+                            @if (product.ThumbnailFileName is { } thumbnail)
+                            {
+                                <img class="cartao__f" alt="" loading="lazy"
+                                     src="@PhotoService.PublicUrlFor(thumbnail)" />
+                            }
+                            else
+                            {
+                                <div class="cartao__f cartao__f--ausente">sem foto</div>
+                            }
+
+                            <div class="cartao__b">
+                                <span class="cartao__c">@product.CategoryName</span>
+                                <span class="cartao__n">@product.Name</span>
+                                <span class="cartao__r">@product.Summary</span>
+                                <span class="cartao__p">
+                                    <b>@Money(product.Price)</b>
+                                    <span>@LabelOf(product.PriceLabel)</span>
+                                </span>
+                            </div>
+                        </a>
+                    }
+                </div>
+
+                @if (result.PageCount > 1)
+                {
+                    <nav class="paginas" aria-label="Paginação">
+                        @for (var number = 1; number <= result.PageCount; number++)
+                        {
+                            var target = number;
+                            <a href="@RouteFor(CategoryId, target)"
+                               aria-current="@(target == result.Page ? "page" : null)"
+                               aria-label="Página @target">@target</a>
+                        }
+                    </nav>
+                }
+            </div>
+        </div>
+    }
+
+    <footer class="rodape">
+        <div class="rodape__c">
+            <b>Suprimentos &amp; Informática</b>
+            <em>Atendimento de segunda a sexta, das 08h às 18h</em>
+        </div>
+        <div class="rodape__c">
+            <b>Como comprar</b>
+            <em>Escolha o produto e fale com o vendedor pelo WhatsApp ou telefone</em>
+        </div>
+    </footer>
+</div>
+
+@code {
+    public const string TermParameter = "busca";
+    public const string CategoryParameter = "categoria";
+    public const string PageParameter = "pagina";
+
+    private static readonly CultureInfo Brazil = CultureInfo.GetCultureInfo("pt-BR");
+
+    private StorefrontPage? result;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = TermParameter)]
+    public string? Term { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = CategoryParameter)]
+    public int? CategoryId { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = PageParameter)]
+    public int? PageNumber { get; set; }
+
+    /// <summary>O campo vazio chega como `?busca=`, e string em branco não é filtro: sem
+    /// isto, submeter a busca vazia esconderia o estado `vazio` de primeiro uso.</summary>
+    private string? Search => string.IsNullOrWhiteSpace(Term) ? null : Term.Trim();
+
+    private bool HasFilter => Search is not null || CategoryId is not null;
+
+    /// <summary>
+    /// A faceta ignora a categoria escolhida, então somar as contagens dá o total do
+    /// recorte de busca — que é o número correto ao lado de "Todos" (RN-50).
+    /// </summary>
+    private int TotalInCategories => result?.Categories.Sum(category => category.Products) ?? 0;
+
+    private string? ActiveCategoryName => CategoryId is { } id
+        ? result?.Categories.FirstOrDefault(category => category.Id == id)?.Name
+        : null;
+
+    private string Title => Search is { } term
+        ? $"{term} — Catálogo"
+        : ActiveCategoryName is { } category ? $"{category} — Catálogo" : "Catálogo";
+
+    protected override async Task OnParametersSetAsync() =>
+        result = await Query.SearchAsync(new StorefrontRequest
+        {
+            Term = Search,
+            CategoryId = CategoryId,
+            Page = PageNumber ?? 1
+        });
+
+    /// <summary>
+    /// Monta a URL do recorte. Parâmetro ausente **não** aparece: `/` é o catálogo
+    /// completo, e não `/?busca=&amp;categoria=&amp;pagina=1` — o endereço curto é o que
+    /// alguém compartilha, e é também a chave que o cache de T-21 vai guardar.
+    /// </summary>
+    private string RouteFor(int? categoryId, int number)
+    {
+        var parts = new List<string>();
+
+        if (Search is { } term)
+        {
+            parts.Add($"{TermParameter}={Uri.EscapeDataString(term)}");
+        }
+
+        if (categoryId is { } id)
+        {
+            parts.Add($"{CategoryParameter}={id}");
+        }
+
+        if (number > 1)
+        {
+            parts.Add($"{PageParameter}={number}");
+        }
+
+        return parts.Count == 0 ? "/" : $"/?{string.Join('&', parts)}";
+    }
+
+    private static string Money(decimal price) => price.ToString("C2", Brazil);
+
+    private static string LabelOf(PriceLabel label) => label switch
+    {
+        PriceLabel.PricePerUnit => "Preço/und",
+        _ => "Preço"
+    };
+}
