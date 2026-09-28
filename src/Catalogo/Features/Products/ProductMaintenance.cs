@@ -101,12 +101,10 @@ public sealed class ProductMaintenance(
 
         if (product is null)
         {
-            product = new Product { Name = draft.Name.Trim() };
-
-            // Todo produto nasce em Rascunho (RN-14), e a posição vai para o fim da
-            // categoria — reposicionar é ação separada, de T-15.
-            product.Status = ProductStatus.Draft;
-            product.Position = await NextPositionAsync(context, draft.CategoryId!.Value, cancellationToken);
+            // Todo produto nasce em Rascunho (RN-14). A posição é atribuída adiante, pelo
+            // mesmo caminho que trata a troca de categoria — entrar numa categoria é
+            // sempre entrar no fim dela, seja no cadastro ou na edição.
+            product = new Product { Name = draft.Name.Trim(), Status = ProductStatus.Draft };
 
             context.Products.Add(product);
         }
@@ -116,7 +114,16 @@ public sealed class ProductMaintenance(
         product.Description = Blank(draft.Description);
         product.Price = draft.Price!.Value;
         product.PriceLabel = draft.PriceLabel;
-        product.CategoryId = draft.CategoryId!.Value;
+
+        // Trocar de categoria é entrar numa fila nova, e a posição antiga não vale nela:
+        // mantida, o produto cai no meio da categoria de destino empatado com quem já
+        // ocupa aquele número, e a ordem impressa sai de duas formas diferentes (ADR-015).
+        // Vai para o fim, que é o que a criação faz — reposicionar é ação separada, de T-15.
+        if (product.CategoryId != draft.CategoryId!.Value)
+        {
+            product.CategoryId = draft.CategoryId.Value;
+            product.Position = await NextPositionAsync(context, product.CategoryId, cancellationToken);
+        }
 
         await context.SaveChangesAsync(cancellationToken);
 

@@ -37,6 +37,47 @@ public sealed class ProductMaintenanceTests(PostgresFixture postgres)
         Assert.Equal(category.Id, saved.CategoryId);
     }
 
+    /// <summary>
+    /// Correção do R-02 de <c>REVIEW-T-12-2026-09-24</c>: a posição antiga não vale na
+    /// categoria nova. Mantida, o produto cairia empatado com quem já ocupa aquele número
+    /// e a ordem impressa sairia de duas formas (ADR-015).
+    /// </summary>
+    [Fact]
+    public async Task RN_21_trocar_de_categoria_manda_o_produto_para_o_fim_da_nova()
+    {
+        var maintenance = CreateMaintenance();
+        var origin = await CreateCategoryAsync();
+        var destination = await CreateCategoryAsync();
+
+        var moved = await maintenance.SaveAsync(Draft("Primeiro da origem", origin.Id));
+        await maintenance.SaveAsync(Draft("Segundo da origem", origin.Id));
+        await maintenance.SaveAsync(Draft("Único do destino", destination.Id));
+
+        await maintenance.SaveAsync(Draft("Primeiro da origem", destination.Id) with
+        {
+            Id = moved.Id
+        });
+
+        Assert.Equal(2, await PositionOfAsync(moved.Id!.Value));
+    }
+
+    [Fact]
+    public async Task Salvar_sem_trocar_de_categoria_preserva_a_posicao()
+    {
+        var maintenance = CreateMaintenance();
+        var category = await CreateCategoryAsync();
+
+        await maintenance.SaveAsync(Draft("Primeiro", category.Id));
+        var second = await maintenance.SaveAsync(Draft("Segundo", category.Id));
+
+        await maintenance.SaveAsync(Draft("Segundo renomeado", category.Id) with
+        {
+            Id = second.Id
+        });
+
+        Assert.Equal(2, await PositionOfAsync(second.Id!.Value));
+    }
+
     [Fact]
     public async Task RN_14_produto_nasce_em_rascunho()
     {
@@ -189,6 +230,20 @@ public sealed class ProductMaintenanceTests(PostgresFixture postgres)
         Price = 10.50m,
         CategoryId = categoryId
     };
+
+    private static ProductDraft Draft(string name, int categoryId) =>
+        new() { Name = name, Price = 100m, CategoryId = categoryId };
+
+    private async Task<int> PositionOfAsync(int productId)
+    {
+        await using var context = postgres.CreateContext();
+
+        return await context.Products
+            .AsNoTracking()
+            .Where(product => product.Id == productId)
+            .Select(product => product.Position)
+            .SingleAsync();
+    }
 
     private async Task<Category> CreateCategoryAsync()
     {

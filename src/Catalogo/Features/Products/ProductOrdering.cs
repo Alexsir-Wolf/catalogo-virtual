@@ -41,9 +41,16 @@ public sealed class ProductOrdering(IDbContextFactory<CatalogDbContext> contextF
             .InCuratedOrder()
             .ToListAsync(cancellationToken);
 
+        // A consulta anterior prova que o produto existia, não que ele ainda está na
+        // lista: entre as duas, uma exclusão concorrente o tira. Sem esta guarda, um
+        // índice de -1 escapa pela direção "para baixo" e alcança o indexador.
         var index = ordered.FindIndex(product => product.Id == productId);
-        var target = direction == MoveDirection.Up ? index - 1 : index + 1;
+        if (index < 0)
+        {
+            return;
+        }
 
+        var target = direction == MoveDirection.Up ? index - 1 : index + 1;
         if (target < 0 || target >= ordered.Count)
         {
             return;
