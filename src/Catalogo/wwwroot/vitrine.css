@@ -3,7 +3,8 @@
    (ADR-010). O painel é ferramenta de trabalho de uma pessoa; a vitrine é página pública
    servida de cache, e o peso dela conta na meta de LCP em 4G (arquitetura 3.3).
 
-   Só o vocabulário de UI-01 está aqui. O de UI-02 entra com T-20. */
+   Cobre UI-01 (T-19) e UI-02 (T-20). As duas telas compartilham cabeçalho, rodapé e o
+   card da grade — o relacionado do detalhe é o mesmo card da listagem. */
 
 :root {
     --navy: #0c2a4a;
@@ -483,5 +484,160 @@
     .busca {
         order: 3;
         flex-basis: 100%;
+    }
+}
+
+/* ---------- detalhe do produto (UI-02) ---------- */
+
+.trilha {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    padding: 10px 22px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.trilha a {
+    color: var(--muted);
+    text-decoration: none;
+}
+
+.trilha a:hover {
+    color: var(--navy);
+    text-decoration: underline;
+}
+
+.trilha b {
+    color: var(--ink);
+    font-weight: 500;
+}
+
+.produto {
+    display: grid;
+    grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+    gap: 34px;
+    align-items: start;
+    padding: 22px;
+}
+
+.foto {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.foto--ausente {
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    border-style: dashed;
+    border-color: var(--danger-line);
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-family: var(--ui);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.sobrancelha {
+    display: block;
+    margin-bottom: 8px;
+    font-family: var(--ui);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--navy);
+}
+
+.produto h1 {
+    font-family: var(--ui);
+    font-size: 27px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.texto {
+    max-width: 62ch;
+    margin-top: 12px;
+    font-size: 15px;
+    color: var(--ink-2);
+    white-space: pre-line;
+}
+
+.texto--ausente {
+    color: var(--faint);
+    font-size: 14px;
+    font-style: italic;
+}
+
+/* RN-07: o rótulo fica acima do valor, e não embutido nele. */
+.preco {
+    margin-top: 22px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+
+.preco__r {
+    display: block;
+    font-family: var(--ui);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--faint);
+}
+
+.preco__v {
+    display: block;
+    margin-top: 3px;
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.vizinhos {
+    padding: 0 22px 30px;
+}
+
+.vizinhos h2 {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 12px;
+    font-family: var(--ui);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+@media (max-width: 720px) {
+    .produto {
+        grid-template-columns: 1fr;
+        gap: 18px;
+        padding: 16px;
+    }
+
+    .produto h1 {
+        font-size: 21px;
+    }
+
+    .preco__v {
+        font-size: 27px;
+    }
+
+    .vizinhos {
+        padding: 0 16px 30px;
     }
 }

@@ -38,6 +38,22 @@ public sealed record StorefrontProduct(
 /// </summary>
 public sealed record StorefrontCategory(int Id, string Name, int Products);
 
+/// <summary>
+/// Produto na página de detalhe. É o **único lugar do sistema** onde a descrição longa
+/// aparece (RN-05, RN-53), e usa a derivada ampliada — não a de impressão, que nunca sai
+/// para o público (RN-12).
+/// </summary>
+public sealed record StorefrontDetail(
+    int Id,
+    string Name,
+    string? Summary,
+    string? Description,
+    decimal Price,
+    PriceLabel PriceLabel,
+    int CategoryId,
+    string CategoryName,
+    string? LargeFileName);
+
 public sealed record StorefrontPage(
     IReadOnlyList<StorefrontProduct> Products,
     IReadOnlyList<StorefrontCategory> Categories,
@@ -85,6 +101,64 @@ public sealed class StorefrontQuery(IDbContextFactory<CatalogDbContext> contextF
         var (items, total) = await products;
 
         return new StorefrontPage(items, await categories, total, page, pageSize);
+    }
+
+    /// <summary>
+    /// Um produto publicado, ou <c>null</c>. O filtro da RN-15 vale aqui como na listagem,
+    /// e é o que torna `UI-02.naoEncontrado` inevitável em vez de esquecível: despublicar
+    /// um produto o faz deixar de existir para a vitrine, e links já compartilhados
+    /// continuam sendo abertos.
+    /// </summary>
+    public async Task<StorefrontDetail?> FindAsync(
+        int productId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Products
+            .AsNoTracking()
+            .Published()
+            .Where(product => product.Id == productId)
+            .Select(product => new StorefrontDetail(
+                product.Id,
+                product.Name,
+                product.Summary,
+                product.Description,
+                product.Price,
+                product.PriceLabel,
+                product.CategoryId,
+                product.Category!.Name,
+                product.Photo == null ? null : product.Photo.LargeFileName))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Vizinhos da mesma categoria, na ordem curada, sem o próprio produto. O card do
+    /// relacionado exibe **resumo**, nunca descrição (RN-04, ADR-016).
+    /// </summary>
+    public async Task<IReadOnlyList<StorefrontProduct>> RelatedAsync(
+        StorefrontDetail product,
+        int limit = 4,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Products
+            .AsNoTracking()
+            .Published()
+            .Where(candidate =>
+                candidate.CategoryId == product.CategoryId && candidate.Id != product.Id)
+            .InCuratedOrder()
+            .Take(limit)
+            .Select(candidate => new StorefrontProduct(
+                candidate.Id,
+                candidate.Name,
+                candidate.Summary,
+                candidate.Price,
+                candidate.PriceLabel,
+                candidate.Category!.Name,
+                candidate.Photo == null ? null : candidate.Photo.ThumbnailFileName))
+            .ToListAsync(cancellationToken);
     }
 
     private async Task<(IReadOnlyList<StorefrontProduct> Items, int Total)> ProductsAsync(
