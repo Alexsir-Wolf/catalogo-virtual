@@ -33,6 +33,7 @@ builder.Services.AddScoped<ProductPhotoService>();
 builder.Services.AddScoped<CategoryMaintenance>();
 builder.Services.AddScoped<ProductMaintenance>();
 builder.Services.AddScoped<ProductPhotoUpload>();
+builder.Services.AddScoped<ProductPublication>();
 
 builder.Services.AddPanelAuthentication(builder.Configuration);
 builder.Services.AddCascadingAuthenticationState();
