@@ -197,12 +197,18 @@
                          data-estado="@(state.CanPublish ? null : "publicacaoBloqueada")">
                         <span class="campo__rotulo">Situação</span>
 
-                        <div class="produto__alternador" role="group" aria-label="Situação do produto">
-                            <button type="button" class="btn btn--pequeno"
+                        @* Controle segmentado do protótipo, agora em `painel.css`. Antes
+                           eram dois botões soltos, e o único com estilo de estado era o
+                           desabilitado — que é sempre o da situação vigente, invertendo a
+                           afordância (R-05 de REVIEW-T-14-2026-09-28). Com o `.seg`, o
+                           estado atual é marcado por cor, e `disabled` volta a significar
+                           apenas indisponível. *@
+                        <div class="seg" role="group" aria-label="Situação do produto">
+                            <button type="button"
                                     aria-pressed="@(!IsPublished)"
                                     disabled="@(uploading || !IsPublished)"
                                     @onclick="WithdrawAsync">Rascunho</button>
-                            <button type="button" class="btn btn--pequeno"
+                            <button type="button"
                                     aria-pressed="@IsPublished"
                                     disabled="@(uploading || IsPublished || !state.CanPublish)"
                                     @onclick="PublishAsync">No ar</button>

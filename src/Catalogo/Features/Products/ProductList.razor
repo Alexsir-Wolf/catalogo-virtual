@@ -22,15 +22,17 @@
             <div class="painel-bloco__hd">
                 <h2>Acervo</h2>
 
-                <div class="seg" role="group" aria-label="Filtrar por situação">
+                @* Links, e não botões: o recorte é um endereço, então trocá-lo é navegar.
+                   Como botão, o controle ficaria inerte até o circuito conectar — e para
+                   sempre se ele cair, o que a SPEC-UI avisa que acontece a cada publicação
+                   (R-01 de REVIEW-T-17-2026-09-28). *@
+                <nav class="seg" aria-label="Filtrar por situação">
                     @foreach (var option in Filters)
                     {
-                        <button type="button"
-                                aria-pressed="@(filter == option.Value)"
-                                @onclick="() => ApplyAsync(option.Value)">@option.Label</button>
+                        <a href="@RouteFor(option.Value)"
+                           aria-current="@(Filter == option.Value ? "page" : null)">@option.Label</a>
                     }
-
-                </div>
+                </nav>
 
                 <a class="btn btn--primario btn--pequeno" href="/painel/produtos/novo">Novo produto</a>
             </div>
@@ -39,7 +41,7 @@
             {
                 <div class="painel-bloco__bd"><p>Carregando…</p></div>
             }
-            else if (groups.Count == 0 && filter == ProductSituationFilter.All)
+            else if (groups.Count == 0 && Filter == ProductSituationFilter.All)
             {
                 <div class="painel-bloco__bd">
                     <h2>Nenhum produto cadastrado</h2>
@@ -62,23 +64,29 @@
             else
             {
                 <div class="rows">
+                    @* A lacuna 4 da SPEC-UI descartou arrastar e soltar para não ter de
+                       resolver acessibilidade por teclado, e escolheu setas. Tendo pago
+                       esse preço, a estrutura precisa dizer a que categoria cada linha
+                       pertence — daí a seção com cabeçalho, e não faixas soltas
+                       (R-03 de REVIEW-T-17-2026-09-28). *@
                     @foreach (var group in groups)
                     {
-                        <div class="catbar">
-                            <span class="catbar__n">@group.Number.ToString("00")</span>
-                            <span class="catbar__t">@group.CategoryName</span>
-                            <span class="catbar__c">@Count(group.Products.Count)</span>
-                        </div>
+                        <section class="grupo" aria-labelledby="categoria-@group.Number">
+                            <h3 class="catbar" id="categoria-@group.Number">
+                                <span class="catbar__n">@group.Number.ToString("00")</span>
+                                <span class="catbar__t">@group.CategoryName</span>
+                                <span class="catbar__c">@Count(group.Products.Count)</span>
+                            </h3>
 
                         @foreach (var (product, index) in group.Products.Select((item, i) => (item, i)))
                         {
                             <div class="linha @(product.Status == ProductStatus.Published ? null : "linha--rascunho")">
                                 <div class="ordem">
                                     <button type="button" aria-label="Subir @product.Name"
-                                            disabled="@(!Reorderable || index == 0)"
+                                            disabled="@(!Reorderable || moving || index == 0)"
                                             @onclick="() => MoveAsync(product.Id, MoveDirection.Up)">▲</button>
                                     <button type="button" aria-label="Descer @product.Name"
-                                            disabled="@(!Reorderable || index == group.Products.Count - 1)"
+                                            disabled="@(!Reorderable || moving || index == group.Products.Count - 1)"
                                             @onclick="() => MoveAsync(product.Id, MoveDirection.Down)">▼</button>
                                 </div>
 
@@ -135,6 +143,7 @@
                                 </div>
                             </div>
                         }
+                        </section>
                     }
                 </div>
 
@@ -164,20 +173,31 @@
 
     private IReadOnlyList<ProductListGroup>? groups;
 
+    /// <summary>
+    /// Reposicionar não é idempotente: dois cliques rápidos leriam a categoria em estados
+    /// diferentes e o produto andaria zero ou duas posições, sem a tela poder explicar
+    /// (R-03 de <c>REVIEW-T-15-2026-09-28</c>).
+    /// </summary>
+    private bool moving;
+
     [Parameter]
     [SupplyParameterFromQuery(Name = SituationParameter)]
     public string? Situation { get; set; }
 
     /// <summary>Recorte desconhecido na URL cai em "todos" em vez de falhar.</summary>
-    private ProductSituationFilter filter =>
-        Filters.FirstOrDefault(option => option.Slug == Situation).Value;
+    private ProductSituationFilter Filter =>
+        Filters
+            .Where(option => option.Slug == Situation)
+            .Select(option => option.Value)
+            .DefaultIfEmpty(ProductSituationFilter.All)
+            .First();
 
     /// <summary>
     /// A posição é global e o vizinho é o produto seguinte da categoria, visível ou não.
     /// Sob filtro, mover trocaria o produto com uma linha oculta — a ação sai de cena em
     /// vez de enganar (RN-21, RN-22).
     /// </summary>
-    private bool Reorderable => filter == ProductSituationFilter.All;
+    private bool Reorderable => Filter == ProductSituationFilter.All;
 
     /// <summary>
     /// A consequência da ADR-015 não é visível na tela: mover um produto aqui o move em
@@ -189,17 +209,20 @@
         : "Reposicionar exige a lista completa — com um filtro ativo, mover trocaria o produto "
           + "de lugar com uma linha que você não está vendo. Volte para Todos para reordenar.";
 
-    private string StateId => groups switch
+    /// <summary>Os estados sao o contrato com a SPEC-UI, e ela declara tres para UI-04.
+    /// Enquanto a consulta nao volta, nenhum deles vale, e a tela nao declara estado
+    /// nenhum em vez de inventar um quarto (R-05 de REVIEW-T-17-2026-09-28).</summary>
+    private string? StateId => groups switch
     {
-        null => "carregando",
-        { Count: 0 } when filter == ProductSituationFilter.All => "vazio",
+        null => null,
+        { Count: 0 } when Filter == ProductSituationFilter.All => "vazio",
         { Count: 0 } => "buscaSemResultado",
         _ => "default"
     };
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
-    private async Task LoadAsync() => groups = await Listing.ListAsync(filter);
+    private async Task LoadAsync() => groups = await Listing.ListAsync(Filter);
 
     private void ApplyAsync(ProductSituationFilter value) =>
         Navigation.NavigateTo(RouteFor(value));
@@ -211,8 +234,17 @@
 
     private async Task MoveAsync(int productId, MoveDirection direction)
     {
-        await Ordering.MoveAsync(productId, direction);
-        await LoadAsync();
+        moving = true;
+
+        try
+        {
+            await Ordering.MoveAsync(productId, direction);
+            await LoadAsync();
+        }
+        finally
+        {
+            moving = false;
+        }
     }
 
     private static string Money(decimal price) => price.ToString("C2", Brazil);

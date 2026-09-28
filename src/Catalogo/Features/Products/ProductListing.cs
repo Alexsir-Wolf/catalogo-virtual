@@ -44,6 +44,17 @@ public sealed record ProductListItem(
 /// </summary>
 public sealed class ProductListing(IDbContextFactory<CatalogDbContext> contextFactory)
 {
+    /// <summary>
+    /// Devolve o acervo inteiro, **sem paginar**. A tarefa T-17 ofereceu paginar ou
+    /// carregar imagem sob demanda; entregou-se a segunda, e a primeira foi descartada
+    /// porque a ADR-013 fixa teto de 250 produtos e o agrupamento por categoria precisa
+    /// da lista completa para numerar as faixas e decidir os extremos de cada grupo.
+    ///
+    /// O número que torna esta decisão falsa é o teto: acima de ~250 produtos, ou se a
+    /// ADR-013 for revista, a página passa a transmitir linhas demais — e o peso do HTML
+    /// não é o que <c>loading="lazy"</c> resolve, porque cada linha vive também no
+    /// `RenderTree` do circuito. Medir em T-29, quando o acervo real entrar.
+    /// </summary>
     public async Task<IReadOnlyList<ProductListGroup>> ListAsync(
         ProductSituationFilter filter,
         CancellationToken cancellationToken = default)

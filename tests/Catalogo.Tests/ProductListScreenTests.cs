@@ -141,6 +141,24 @@ public sealed class ProductListScreenTests(PostgresFixture postgres) : IAsyncLif
         Assert.DoesNotContain("Multifuncional", drafts);
     }
 
+    /// <summary>
+    /// R-01 de <c>REVIEW-T-17-2026-09-28</c>: o recorte é um endereço, então o controle
+    /// tem de ser navegação. Como botão, ficaria inerte até o circuito conectar — e a
+    /// asserção de presença não perceberia, que foi a lição do round 2 de T-07.
+    /// </summary>
+    [Fact]
+    public async Task UI_04_filtra_por_navegacao_e_nao_por_circuito()
+    {
+        await SeedAsync();
+        using var client = await SignedInClientAsync();
+
+        var html = await client.GetStringAsync(ListRoute);
+
+        Assert.Matches("""<a href="/painel/produtos\?situacao=no-ar"[\s>]""", html);
+        Assert.Matches("""<a href="/painel/produtos\?situacao=rascunhos"[\s>]""", html);
+        Assert.Contains("""aria-current="page" """.TrimEnd(), html);
+    }
+
     [Fact]
     public async Task UI_04_buscaSemResultado_quando_o_recorte_nao_encontra_nada()
     {

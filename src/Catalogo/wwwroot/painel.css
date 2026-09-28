@@ -329,7 +329,8 @@
     overflow: hidden;
 }
 
-.seg button {
+.seg button,
+.seg a {
     border: 0;
     border-right: 1px solid var(--line-strong);
     background: var(--surface);
@@ -338,19 +339,25 @@
     font-size: 12.5px;
     font-weight: 500;
     color: var(--muted);
+    text-decoration: none;
     cursor: pointer;
 }
 
-.seg button:last-child {
+.seg button:last-child,
+.seg a:last-child {
     border-right: 0;
 }
 
-.seg button:hover {
+.seg button:hover,
+.seg a:hover {
     background: var(--surface-2);
     color: var(--ink);
 }
 
-.seg button[aria-pressed="true"] {
+/* `aria-pressed` quando o controle alterna um estado no lugar; `aria-current` quando ele
+   navega para o recorte. Os dois marcam a mesma coisa para quem olha. */
+.seg button[aria-pressed="true"],
+.seg a[aria-current] {
     background: var(--accent-soft);
     color: var(--accent);
     font-weight: 600;
@@ -363,13 +370,17 @@
     flex-direction: column;
 }
 
+/* A faixa de categoria é cabeçalho de seção, não enfeite: ela nomeia o grupo a que as
+   linhas seguintes pertencem. Daí vir como `h3` — e daí precisar da margem zerada. */
 .catbar {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin: 0;
     padding: 9px 16px;
     background: var(--sunken);
     border-bottom: 1px solid var(--line);
+    font-weight: 400;
 }
 
 .catbar__n {
