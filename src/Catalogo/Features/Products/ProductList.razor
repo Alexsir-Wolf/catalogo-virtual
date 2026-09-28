@@ -1,0 +1,227 @@
+@page "/painel/produtos"
+@rendermode InteractiveServer
+@using System.Globalization
+@using Catalogo.Features.Categories
+@using Catalogo.Features.Media
+@inject ProductListing Listing
+@inject ProductOrdering Ordering
+@inject ProductPhotoService PhotoService
+@inject NavigationManager Navigation
+
+<PageTitle>Produtos</PageTitle>
+
+<div class="painel">
+    <h1>Produtos</h1>
+    <div class="painel__sub">
+        O acervo inteiro. Rascunhos aparecem só aqui — a vitrine e os catálogos veem
+        apenas o que está No ar.
+    </div>
+
+    <div class="painel__folha" data-estado="@StateId">
+        <div class="painel-bloco">
+            <div class="painel-bloco__hd">
+                <h2>Acervo</h2>
+
+                <div class="seg" role="group" aria-label="Filtrar por situação">
+                    @foreach (var option in Filters)
+                    {
+                        <button type="button"
+                                aria-pressed="@(filter == option.Value)"
+                                @onclick="() => ApplyAsync(option.Value)">@option.Label</button>
+                    }
+
+                </div>
+
+                <a class="btn btn--primario btn--pequeno" href="/painel/produtos/novo">Novo produto</a>
+            </div>
+
+            @if (groups is null)
+            {
+                <div class="painel-bloco__bd"><p>Carregando…</p></div>
+            }
+            else if (groups.Count == 0 && filter == ProductSituationFilter.All)
+            {
+                <div class="painel-bloco__bd">
+                    <h2>Nenhum produto cadastrado</h2>
+                    <p>
+                        O acervo está vazio. Cadastre o primeiro produto para começar — ele
+                        nasce em Rascunho e só vai à vitrine quando você publicar.
+                    </p>
+                    <a class="btn btn--primario" href="/painel/produtos/novo">
+                        Cadastrar o primeiro produto
+                    </a>
+                </div>
+            }
+            else if (groups.Count == 0)
+            {
+                <div class="painel-bloco__bd">
+                    <p>Nenhum produto nesta situação.</p>
+                    <a class="btn" href="@RouteFor(ProductSituationFilter.All)">Ver todos</a>
+                </div>
+            }
+            else
+            {
+                <div class="rows">
+                    @foreach (var group in groups)
+                    {
+                        <div class="catbar">
+                            <span class="catbar__n">@group.Number.ToString("00")</span>
+                            <span class="catbar__t">@group.CategoryName</span>
+                            <span class="catbar__c">@Count(group.Products.Count)</span>
+                        </div>
+
+                        @foreach (var (product, index) in group.Products.Select((item, i) => (item, i)))
+                        {
+                            <div class="linha @(product.Status == ProductStatus.Published ? null : "linha--rascunho")">
+                                <div class="ordem">
+                                    <button type="button" aria-label="Subir @product.Name"
+                                            disabled="@(!Reorderable || index == 0)"
+                                            @onclick="() => MoveAsync(product.Id, MoveDirection.Up)">▲</button>
+                                    <button type="button" aria-label="Descer @product.Name"
+                                            disabled="@(!Reorderable || index == group.Products.Count - 1)"
+                                            @onclick="() => MoveAsync(product.Id, MoveDirection.Down)">▼</button>
+                                </div>
+
+                                @if (product.ThumbnailFileName is { } thumbnail)
+                                {
+                                    <img class="miniatura" alt="" loading="lazy"
+                                         src="@PhotoService.PublicUrlFor(thumbnail)" />
+                                }
+                                else
+                                {
+                                    <div class="miniatura miniatura--ausente" data-estado="semFoto"
+                                         aria-label="Sem foto">SEM<br />FOTO</div>
+                                }
+
+                                <div class="nome">
+                                    <b title="@product.Name">@product.Name</b>
+                                    @if (product.Summary is { } summary)
+                                    {
+                                        <i>@summary</i>
+                                    }
+                                    else
+                                    {
+                                        <i class="nome--sem-resumo">sem resumo</i>
+                                    }
+                                </div>
+
+                                <div>
+                                    @if (product.Status == ProductStatus.Published)
+                                    {
+                                        <span class="selo selo--no-ar">
+                                            <span class="selo__ponto"></span>No ar
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="selo selo--rascunho">
+                                            <span class="selo__ponto"></span>Rascunho
+                                        </span>
+                                    }
+
+                                    @if (product.ThumbnailFileName is null)
+                                    {
+                                        <span class="selo selo--lacuna">sem foto</span>
+                                    }
+                                </div>
+
+                                <div class="valor">
+                                    <b>@Money(product.Price)</b>
+                                    <span>@LabelOf(product.PriceLabel)</span>
+                                </div>
+
+                                <div class="acoes">
+                                    <a class="btn btn--pequeno" href="/painel/produtos/@product.Id">Editar</a>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="painel-bloco__ft">
+                    <span class="campo__ajuda">@OrderNotice</span>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// O recorte vive na URL, e não só no estado do circuito: assim ele sobrevive a um
+    /// recarregamento, pode ser guardado como link e é endereçável em teste.
+    /// </summary>
+    public const string SituationParameter = "situacao";
+
+    private static readonly (ProductSituationFilter Value, string Label, string Slug)[] Filters =
+    [
+        (ProductSituationFilter.All, "Todos", "todos"),
+        (ProductSituationFilter.Published, "No ar", "no-ar"),
+        (ProductSituationFilter.Drafts, "Rascunhos", "rascunhos")
+    ];
+
+    private static readonly CultureInfo Brazil = CultureInfo.GetCultureInfo("pt-BR");
+
+    private IReadOnlyList<ProductListGroup>? groups;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = SituationParameter)]
+    public string? Situation { get; set; }
+
+    /// <summary>Recorte desconhecido na URL cai em "todos" em vez de falhar.</summary>
+    private ProductSituationFilter filter =>
+        Filters.FirstOrDefault(option => option.Slug == Situation).Value;
+
+    /// <summary>
+    /// A posição é global e o vizinho é o produto seguinte da categoria, visível ou não.
+    /// Sob filtro, mover trocaria o produto com uma linha oculta — a ação sai de cena em
+    /// vez de enganar (RN-21, RN-22).
+    /// </summary>
+    private bool Reorderable => filter == ProductSituationFilter.All;
+
+    /// <summary>
+    /// A consequência da ADR-015 não é visível na tela: mover um produto aqui o move em
+    /// todos os recortes onde ele apareça. A RN-22 exige que a tela diga isso (UI-04).
+    /// </summary>
+    private string OrderNotice => Reorderable
+        ? "A ordem é uma só: mover um produto aqui muda a posição dele na vitrine e em todo "
+          + "catálogo em PDF onde ele apareça. Não existe ordem por catálogo."
+        : "Reposicionar exige a lista completa — com um filtro ativo, mover trocaria o produto "
+          + "de lugar com uma linha que você não está vendo. Volte para Todos para reordenar.";
+
+    private string StateId => groups switch
+    {
+        null => "carregando",
+        { Count: 0 } when filter == ProductSituationFilter.All => "vazio",
+        { Count: 0 } => "buscaSemResultado",
+        _ => "default"
+    };
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => groups = await Listing.ListAsync(filter);
+
+    private void ApplyAsync(ProductSituationFilter value) =>
+        Navigation.NavigateTo(RouteFor(value));
+
+    private static string RouteFor(ProductSituationFilter value) =>
+        value == ProductSituationFilter.All
+            ? "/painel/produtos"
+            : $"/painel/produtos?{SituationParameter}={Filters.Single(o => o.Value == value).Slug}";
+
+    private async Task MoveAsync(int productId, MoveDirection direction)
+    {
+        await Ordering.MoveAsync(productId, direction);
+        await LoadAsync();
+    }
+
+    private static string Money(decimal price) => price.ToString("C2", Brazil);
+
+    private static string Count(int products) => products == 1 ? "1 item" : $"{products} itens";
+
+    private static string LabelOf(PriceLabel label) => label switch
+    {
+        PriceLabel.PricePerUnit => "Preço/und",
+        _ => "Preço"
+    };
+}

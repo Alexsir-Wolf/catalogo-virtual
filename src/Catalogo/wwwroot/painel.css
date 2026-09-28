@@ -289,6 +289,13 @@
     color: var(--warn);
 }
 
+/* Lacuna, não situação: marca o que falta para o produto poder ir ao ar (RN-16). */
+.selo--lacuna {
+    border-color: var(--danger-line);
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
 .selo__ponto {
     flex: none;
     width: 5px;
@@ -309,4 +316,225 @@
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
+}
+
+/* ---------- controle segmentado ----------
+   Peça que faltou na extração de T-12: o protótipo marca o estado vigente por cor, e sem
+   ela dois botões soltos não comunicam qual está ativo (R-05 de REVIEW-T-14-2026-09-28). */
+
+.seg {
+    display: inline-flex;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    overflow: hidden;
+}
+
+.seg button {
+    border: 0;
+    border-right: 1px solid var(--line-strong);
+    background: var(--surface);
+    padding: 6px 13px;
+    font-family: var(--ui);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.seg button:last-child {
+    border-right: 0;
+}
+
+.seg button:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+}
+
+.seg button[aria-pressed="true"] {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* ---------- listagem em linhas ---------- */
+
+.rows {
+    display: flex;
+    flex-direction: column;
+}
+
+.catbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    background: var(--sunken);
+    border-bottom: 1px solid var(--line);
+}
+
+.catbar__n {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.catbar__t {
+    font-family: var(--ui);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.catbar__c {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+}
+
+.linha {
+    display: grid;
+    grid-template-columns: 34px 46px 1fr 150px 104px 92px;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.linha:hover {
+    background: var(--surface-2);
+}
+
+.linha--rascunho {
+    background: linear-gradient(90deg, var(--warn-soft), transparent 55%);
+}
+
+.linha--rascunho:hover {
+    background: var(--warn-soft);
+}
+
+.ordem {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.ordem button {
+    width: 22px;
+    height: 15px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 8px;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+}
+
+.ordem button:hover:not([disabled]) {
+    background: var(--accent-soft);
+    border-color: var(--accent-line);
+    color: var(--accent);
+}
+
+.ordem button[disabled] {
+    opacity: .3;
+    cursor: not-allowed;
+}
+
+.miniatura {
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--surface-2);
+    object-fit: cover;
+}
+
+.miniatura--ausente {
+    display: grid;
+    place-items: center;
+    border-style: dashed;
+    border-color: var(--danger-line);
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-family: var(--mono);
+    font-size: 8.5px;
+    font-weight: 600;
+    line-height: 1.1;
+    text-align: center;
+}
+
+.nome {
+    min-width: 0;
+}
+
+.nome b {
+    display: block;
+    font-weight: 600;
+    font-size: 13.5px;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nome i {
+    display: block;
+    font-style: normal;
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nome i.nome--sem-resumo {
+    color: var(--faint);
+    font-style: italic;
+}
+
+.valor {
+    text-align: right;
+}
+
+.valor b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.valor span {
+    font-family: var(--ui);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--faint);
+}
+
+.acoes {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+    .linha {
+        grid-template-columns: 30px 40px 1fr 92px;
+        gap: 9px;
+    }
 }

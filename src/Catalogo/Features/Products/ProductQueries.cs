@@ -16,6 +16,14 @@ public static class ProductQueries
         products.Where(product => product.Status == ProductStatus.Published);
 
     /// <summary>
+    /// O complemento: apenas produtos em Rascunho. Existe para que a comparação de
+    /// situação continue morando num arquivo só — o painel é o único lugar que enxerga
+    /// Rascunho (RN-15), e é a listagem de UI-04 que precisa deste recorte.
+    /// </summary>
+    public static IQueryable<Product> Drafts(this IQueryable<Product> products) =>
+        products.Where(product => product.Status == ProductStatus.Draft);
+
+    /// <summary>
     /// A ordem curada pelo dono, dentro da categoria. É uma só para os dois canais: a
     /// mesma sequência sai na vitrine e no PDF, porque a posição é atributo do produto e
     /// não do recorte (RN-21, RN-22, ADR-015). Um catálogo filtra; ele não reordena.
