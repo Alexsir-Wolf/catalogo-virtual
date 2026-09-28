@@ -18,6 +18,19 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
 {
     private const string CaseInsensitiveCollation = "nome_sem_caixa";
 
+    /// <summary>
+    /// Envelope imutável de <c>unaccent</c>, criado pela migration `UnaccentSearchIndex`.
+    /// A função nativa é <c>STABLE</c> porque depende do dicionário instalado, e índice de
+    /// expressão exige <c>IMMUTABLE</c> — daí o envelope, que fixa o dicionário.
+    ///
+    /// Usar a mesma função nos dois lados da comparação é o que mantém a busca e o índice
+    /// falando da mesma coisa: normalizar o termo em C# daria um resultado parecido e
+    /// divergente nos casos difíceis (ADR-004, RN-49).
+    /// </summary>
+    [DbFunction("catalogo_unaccent")]
+    public static string Unaccent(string value) =>
+        throw new NotSupportedException("Só existe traduzida para SQL.");
+
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Product> Products => Set<Product>();
@@ -81,11 +94,14 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
             // posicional dentro dela (RN-21) — é assim que a vitrine e o PDF leem.
             product.HasIndex(entity => new { entity.CategoryId, entity.Position });
 
-            // Busca textual tolerante a erro de digitação sem motor de busca dedicado
-            // (ADR-004). O índice trigrama é o que torna o `like` da vitrine viável.
-            product.HasIndex(entity => entity.Name)
-                .HasMethod("gin")
-                .HasOperators("gin_trgm_ops");
+            // O índice que serve à busca da vitrine é sobre a **expressão**
+            // `catalogo_unaccent("Name")`, e não sobre a coluna crua: a consulta da
+            // RN-49 normaliza o acento nos dois lados, e um índice sobre a coluna não é
+            // utilizável por ela (ADR-004; R-01 de REVIEW-T-06-2026-09-23).
+            //
+            // Índice de expressão não é expressável no modelo, então ele vive no SQL da
+            // migration `UnaccentSearchIndex` junto da função imutável que a expressão
+            // exige — `unaccent` nativa é STABLE, e índice pede IMMUTABLE.
 
             product.OwnsOne(entity => entity.Photo, photo =>
             {
