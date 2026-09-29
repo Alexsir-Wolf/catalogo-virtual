@@ -490,22 +490,27 @@ A **ausência de "esqueci minha senha"** *(ADR-006)* vai surpreender quem esquec
 
 | Estado | ID | Quando ocorre | O que o dono vê | Origem |
 |---|---|---|---|---|
-| Padrão | `UI-10.default` | Configuração completa | Capa atual em miniatura, contatos preenchidos, seção de senha | Derivado do PRD |
+| Padrão | `UI-10.default` | Configuração completa | Capa atual pré-visualizada, contatos preenchidos, seção de senha | Derivado do PRD |
 | Sem capa | `UI-10.semCapa` | Nenhuma capa enviada ainda | Área de envio em destaque, avisando que **sem capa não há geração** *(RN-65)* | Derivado do PRD |
 | Capa recusada | `UI-10.capaRecusada` | Arquivo inválido *(RN-63, RN-64)* | Motivo exato — número de páginas encontrado, ou orientação incompatível. A capa anterior permanece | Derivado do PRD |
 | Enviando | `UI-10.enviando` | Envio e validação em andamento | Progresso; ações bloqueadas | Derivado do PRD |
 | Senha incorreta | `UI-10.senhaIncorreta` | Senha atual errada na troca *(RN-66)* | Erro junto ao campo; a senha não é alterada | Derivado do PRD |
 | Salvo | `UI-10.salvo` | Alteração persistida | Confirmação discreta, sem tirar o dono da tela | Derivado do PRD |
+| Contato recusado | `UI-10.contatoRecusado` | Canal em formato inválido *(RN-67)* | Erro junto ao campo recusado, dizendo o que corrigir. **Nada é gravado** — um canal inválido não derruba os outros dois | Acrescentado na implementação |
+
+> `UI-10.contatoRecusado` não vem do PRD: apareceu quando a validação dos canais saiu do atributo do formulário para o servidor, em T-31. O caso que o motivou é o número de WhatsApp colado no formato local, sem código do país, que gravava em silêncio e produzia um link de conversa que não abre — no botão principal da página do produto.
 
 **Elementos principais:**
 
-- Área de envio da capa, com miniatura da página atual
+- Área de envio da capa, com pré-visualização da página atual
 - Campos de contato, agrupados, com o aviso de que servem aos dois canais
 - Seção de troca de senha, separada visualmente do resto
 
 **Observações:** `UI-10.semCapa` **não é um estado decorativo**. Ele é a única pista que o dono tem de que a geração de PDF está bloqueada *(RN-65)* — sem esse aviso, ele só descobre ao tentar gerar, em UI-08, e não saberá por quê.
 
 A pré-visualização da capa atual importa mais do que parece: é o que permite conferir que o arquivo certo foi enviado, sem precisar gerar um catálogo para descobrir.
+
+**Divergência resolvida na implementação (T-31):** esta tela dizia "miniatura", e o que foi entregue é o **PDF embutido** em vez de uma imagem rasterizada. Rasterizar exigiria dependência nativa de imagem no Linux do host para ganhar pouco, e o propósito declarado logo acima — conferir que o arquivo certo foi enviado — é cumprido melhor pelo próprio PDF. O texto foi ajustado para "pré-visualização", que descreve o que existe. Registrado por R-10 de `REVIEW-T-31-2026-09-29`.
 
 ---
 

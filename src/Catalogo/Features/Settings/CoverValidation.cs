@@ -62,14 +62,22 @@ public static class CoverValidation
     public const int MaxBytes = 12 * 1024 * 1024;
 
     /// <summary>
-    /// As páginas de conteúdo são A4 retrato, cuja proporção é ~0,707 (210 por 297 mm). A
-    /// tolerância cobre variação de milímetros no mesmo formato. Carta fica fora: 0,773
-    /// contra 0,707 é 6,6% de diferença, e no papel isso é faixa branca ou corte visível
-    /// ao lado do miolo (RN-64).
+    /// As páginas de conteúdo são A4 retrato, cuja proporção é ~0,707 (210 por 297 mm).
     /// </summary>
     public const double ContentAspectRatio = 210d / 297d;
 
-    public const double AspectTolerance = 0.06;
+    /// <summary>
+    /// Tolerância **relativa** à proporção do miolo — 6% dela, não 6 centésimos de
+    /// proporção. A diferença importa: como valor absoluto, 0,06 equivalia a ~8,5%
+    /// relativos e aceitava uma página de 210 por 276 mm, que sai com cerca de dois
+    /// centímetros de faixa branca ao lado do conteúdo — exatamente o que a RN-64 existe
+    /// para impedir. O registro dizia "6%" e a regra aplicada era outra (R-11 de
+    /// `REVIEW-T-31-2026-09-29`).
+    ///
+    /// Carta em retrato continua recusada, e com folga: 0,774 está 9,5% fora do A4.
+    /// Variação de milímetros no mesmo formato passa — 209 por 297 mm fica em 0,5%.
+    /// </summary>
+    public const double AspectRelativeTolerance = 0.06;
 
     /// <summary>
     /// Teto de nós da árvore de páginas. A capa tem uma página; documentos legítimos de
@@ -147,7 +155,9 @@ public static class CoverValidation
                 return new CoverInspection(CoverRejection.Landscape);
             }
 
-            return Math.Abs(width / height - ContentAspectRatio) > AspectTolerance
+            var drift = Math.Abs(width / height - ContentAspectRatio) / ContentAspectRatio;
+
+            return drift > AspectRelativeTolerance
                 ? new CoverInspection(CoverRejection.AspectRatio)
                 : CoverInspection.Ok();
         }

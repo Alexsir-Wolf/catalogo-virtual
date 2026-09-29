@@ -75,8 +75,8 @@ public sealed class CoverValidationTests
     }
 
     /// <summary>
-    /// Carta em retrato **é recusada**, e de propósito: a proporção dela é 0,773 contra
-    /// 0,707 do A4 — 6,6% de diferença, que no papel é faixa branca ou corte visível ao
+    /// Carta em retrato **é recusada**, e de propósito: a proporção dela é 0,774 contra
+    /// 0,707 do A4 — 9,5% de diferença, que no papel é faixa branca ou corte visível ao
     /// lado do miolo. É exatamente o que a RN-64 existe para impedir, e a ADR-017 manda
     /// recusar no envio em vez de deixar aparecer na impressão.
     /// </summary>
@@ -86,6 +86,32 @@ public sealed class CoverValidationTests
         var inspection = CoverValidation.Inspect(Pdf(PageSize.Letter, pages: 1));
 
         Assert.Equal(CoverRejection.AspectRatio, inspection.Rejection);
+    }
+
+    /// <summary>
+    /// R-11 de `REVIEW-T-31-2026-09-29`: com tolerância **absoluta** de 0,06, esta página
+    /// passava — 210 por 276 mm dá 0,761, que está a 0,053 de proporção do A4 e portanto
+    /// dentro do limite antigo, mas a **7,6%** dele. No papel são cerca de dois centímetros
+    /// de faixa branca ao lado do conteúdo.
+    /// </summary>
+    [Fact]
+    public void RN_64_retrato_proximo_do_A4_mas_fora_da_tolerancia_relativa_e_recusado()
+    {
+        var inspection = CoverValidation.Inspect(Pdf(width: 595, height: 782));
+
+        Assert.Equal(CoverRejection.AspectRatio, inspection.Rejection);
+    }
+
+    /// <summary>
+    /// O outro lado da mesma régua: variação de milímetros no mesmo formato precisa passar,
+    /// senão uma capa exportada com margem de sangria seria recusada sem motivo real.
+    /// </summary>
+    [Fact]
+    public void RN_64_variacao_de_milimetros_no_mesmo_formato_e_aceita()
+    {
+        var inspection = CoverValidation.Inspect(Pdf(width: 592, height: 842));
+
+        Assert.True(inspection.Accepted);
     }
 
     [Fact]

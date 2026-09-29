@@ -79,7 +79,13 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
 
         var html = WebUtility.HtmlDecode(await client.GetStringAsync("/painel/configuracoes"));
 
-        Assert.Contains("""data-estado="semCapa" """.TrimEnd(), html);
+        // A asserção é sobre o **elemento do aviso**, não sobre a página: a folha também
+        // emite `data-estado="semCapa"` pelo estado geral da tela, então apagar o parágrafo
+        // da RN-65 deixaria uma busca no documento inteiro passar (R-13 de
+        // `REVIEW-T-31-2026-09-29`).
+        Assert.Matches(
+            """<p class="campo__erro"[^>]*data-estado="semCapa"[^>]*>""",
+            html);
         Assert.Contains("geração de catálogos em PDF está", html);
     }
 
@@ -378,6 +384,53 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
         Assert.Equal(PasswordFailure.CurrentPasswordWrong, outcome.Failure);
         Assert.True(await CanSignInAsync(OwnerPassword));
         Assert.False(await CanSignInAsync(NewPassword));
+    }
+
+    /// <summary>
+    /// RN-60 na troca de senha: a confirmação da senha atual passa pelo `UserManager`, fora
+    /// do `SignInManager`, então o bloqueio da tela de acesso não a alcançava — o formulário
+    /// era um caminho de tentativa ilimitada para quem já tinha sessão aberta (R-12 de
+    /// `REVIEW-T-31-2026-09-29`).
+    /// </summary>
+    [Fact]
+    public async Task RN_60_tentativas_sucessivas_na_senha_atual_bloqueiam_a_troca()
+    {
+        var service = Service();
+
+        for (var attempt = 0; attempt < PanelAuthentication.MaxFailedAccessAttempts; attempt++)
+        {
+            await service.ChangePasswordAsync(OwnerUserName, "SenhaQueNaoE!2026", NewPassword);
+        }
+
+        // Agora **com a senha certa**: o bloqueio é por tentativas, e precisa valer mesmo
+        // para quem acertou — senão bastaria errar quatro vezes e acertar na quinta.
+        var outcome = await service.ChangePasswordAsync(
+            OwnerUserName,
+            OwnerPassword,
+            NewPassword);
+
+        Assert.Equal(PasswordFailure.CurrentPasswordWrong, outcome.Failure);
+        Assert.Contains("tentativas", outcome.Message!);
+        Assert.True(await CanSignInAsync(OwnerPassword));
+    }
+
+    /// <summary>
+    /// A contraprova: acertar a senha atual zera a contagem, senão erros espalhados ao longo
+    /// do tempo acabariam bloqueando o dono legítimo sem nenhuma tentativa de invasão.
+    /// </summary>
+    [Fact]
+    public async Task Troca_bem_sucedida_zera_a_contagem_de_tentativas()
+    {
+        var service = Service();
+
+        await service.ChangePasswordAsync(OwnerUserName, "SenhaQueNaoE!2026", NewPassword);
+        await service.ChangePasswordAsync(OwnerUserName, OwnerPassword, NewPassword);
+
+        using var scope = factory.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<OwnerAccount>>();
+        var owner = await users.FindByNameAsync(OwnerUserName);
+
+        Assert.Equal(0, await users.GetAccessFailedCountAsync(owner!));
     }
 
     /// <summary>

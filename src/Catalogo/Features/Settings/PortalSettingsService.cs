@@ -160,7 +160,22 @@ public sealed class PortalSettingsService(
         var replaced = settings.CoverFileName;
         settings.CoverFileName = objectName;
 
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // O arquivo já subiu e o registro não aponta para ele: sem esta linha o objeto
+            // ficaria no bucket sem referência e **sem rastro**, porque o log de substituição
+            // abaixo só cobre o caminho bem-sucedido. Mesma prática de T-13.
+            logger.LogError(
+                exception,
+                "Capa enviada mas não registrada. Objeto sem referência: {Nome}.",
+                objectName);
+
+            throw;
+        }
 
         if (replaced is not null)
         {
@@ -194,13 +209,36 @@ public sealed class PortalSettingsService(
                 "Não foi possível confirmar a senha atual.");
         }
 
+        if (await users.IsLockedOutAsync(owner))
+        {
+            // O mesmo bloqueio da tela de acesso (RN-60). Sem esta guarda, o formulário de
+            // troca era um caminho de tentativa **ilimitada** contra a senha atual, porque a
+            // confirmação passa pelo `UserManager` e não pelo `SignInManager` — e quem já
+            // tem uma sessão aberta poderia descobrir a senha para reusá-la em outro
+            // serviço, sem deixar rastro.
+            return new PasswordOutcome(
+                PasswordFailure.CurrentPasswordWrong,
+                "Muitas tentativas. Aguarde alguns minutos antes de tentar de novo.");
+        }
+
         var result = await users.ChangePasswordAsync(owner, currentPassword, newPassword);
         if (result.Succeeded)
         {
+            await users.ResetAccessFailedCountAsync(owner);
+
             // A ADR-006 prevê troca obrigatória no primeiro acesso; trocar por vontade
             // própria também cumpre a exigência e a desliga.
             owner.MustChangePassword = false;
-            await users.UpdateAsync(owner);
+
+            var update = await users.UpdateAsync(owner);
+            if (!update.Succeeded)
+            {
+                // A troca já aconteceu, então não há o que desfazer — mas descartar este
+                // resultado deixava `MustChangePassword` verdadeiro em silêncio.
+                logger.LogWarning(
+                    "Senha trocada, mas a conta do dono não foi atualizada: {Erros}.",
+                    string.Join(" ", update.Errors.Select(error => error.Description)));
+            }
 
             return PasswordOutcome.Changed();
         }
@@ -209,6 +247,13 @@ public sealed class PortalSettingsService(
         // política para a nova. Separar os dois é o que permite pôr o erro no campo certo
         // (UI-10.senhaIncorreta).
         var mismatch = result.Errors.Any(error => error.Code == "PasswordMismatch");
+
+        if (mismatch)
+        {
+            // Só a senha atual errada conta para o bloqueio: senha nova fora da política é
+            // erro de quem já provou ser o dono, e bloquear por isso seria punir acerto.
+            await users.AccessFailedAsync(owner);
+        }
 
         return new PasswordOutcome(
             mismatch ? PasswordFailure.CurrentPasswordWrong : PasswordFailure.NewPasswordRejected,
