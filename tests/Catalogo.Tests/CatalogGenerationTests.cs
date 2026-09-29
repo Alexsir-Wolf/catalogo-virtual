@@ -178,6 +178,45 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
         Assert.Equal(0, storage.Downloads);
     }
 
+    /// <summary>
+    /// CA-37 no caminho completo (T-32): o documento entregue é a **capa mais** as páginas de
+    /// conteúdo, e a contagem total confere — uma folha de capa mais as páginas compostas.
+    /// </summary>
+    [Fact]
+    public async Task CA_37_o_documento_entregue_tem_a_capa_na_frente_do_conteudo()
+    {
+        var catalogId = await SeedAsync(products: 12);
+        await SetCoverAsync();
+
+        var outcome = await CreateGeneration().GenerateAsync(catalogId);
+
+        Assert.True(outcome.Succeeded);
+
+        using var stream = new MemoryStream(outcome.Content!, writable: false);
+        using var document = PdfSharp.Pdf.IO.PdfReader.Open(
+            stream,
+            PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+
+        // A capa do falso tem uma página; o miolo de 12 produtos tem ao menos uma. Sem a
+        // concatenação, o documento sairia só com o miolo.
+        Assert.True(document.PageCount >= 2);
+
+        // A primeira página é a da capa: ela é A4 e **vazia**, porque o falso não desenha nada
+        // nela — a página de conteúdo tem fluxo de conteúdo.
+        Assert.Empty(ContentOf(document.Pages[0]));
+        Assert.NotEmpty(ContentOf(document.Pages[1]));
+    }
+
+    private static string ContentOf(PdfSharp.Pdf.PdfPage page)
+    {
+        var contents = page.Contents.Elements;
+
+        return contents.Count == 0
+            ? string.Empty
+            : System.Text.Encoding.Latin1.GetString(
+                contents.GetDictionary(0)!.Stream.UnfilteredValue);
+    }
+
     [Fact]
     public async Task Catalogo_inexistente_e_recusado_sem_lancar()
     {
@@ -356,6 +395,7 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
                 NullLogger<CatalogComposer>.Instance),
             new CatalogMaintenance(contextFactory),
             settings,
+            new FakeCoverSource(),
             TimeProvider.System,
             NullLogger<CatalogGeneration>.Instance);
     }
@@ -369,6 +409,29 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
     {
         public CatalogDbContext CreateDbContext() =>
             new(new DbContextOptionsBuilder<CatalogDbContext>().UseNpgsql(connectionString).Options);
+    }
+
+    /// <summary>
+    /// A capa, pronta e válida, sem depender de credencial. A concatenação é exercitada de
+    /// verdade — o documento final tem capa mais conteúdo (T-32).
+    /// </summary>
+    private sealed class FakeCoverSource : ICoverSource
+    {
+        public Task<byte[]> DownloadAsync(
+            string objectName,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(SinglePagePdf());
+
+        private static byte[] SinglePagePdf()
+        {
+            using var document = new PdfSharp.Pdf.PdfDocument();
+            document.AddPage().Size = PdfSharp.PageSize.A4;
+
+            using var stream = new MemoryStream();
+            document.Save(stream, closeStream: false);
+
+            return stream.ToArray();
+        }
     }
 
     /// <summary>Conta downloads: é como se afirma "antes de compor".</summary>

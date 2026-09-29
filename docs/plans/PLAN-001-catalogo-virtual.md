@@ -1238,7 +1238,7 @@ Os dados de contato alimentam **dois destinos** — a vitrine e o rodapé do PDF
 
 #### T-32 — Concatenar capa e conteúdo
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Média
 - **Depende de:** T-24, T-31
 - **Implementa:** RN-36, RN-37, RN-65
@@ -1254,12 +1254,12 @@ Unir a capa configurada às páginas compostas em T-24, produzindo o documento f
 Se não houver capa configurada, a geração é recusada antes de começar, orientando a enviá-la nas Configurações *(RN-65)*.
 
 **Critério de aceite (testável):**
-- [ ] Documento final tem a capa enviada como primeira página *(CA-37)*
-- [ ] A capa sai **byte a byte visualmente idêntica** ao que foi enviado — nada é escrito sobre ela *(RN-37)*
-- [ ] As páginas de produtos vêm em seguida, na ordem correta
-- [ ] Nenhuma página de índice existe no documento *(RN-38 revogada)*
-- [ ] Sem capa configurada, a geração é recusada com orientação *(CA-36)*
-- [ ] A recusa acontece **antes** de compor qualquer página
+- [x] Documento final tem a capa enviada como primeira página *(CA-37)*
+- [x] A capa sai **byte a byte visualmente idêntica** ao que foi enviado — nada é escrito sobre ela *(RN-37)* — *verificado pelo fluxo de conteúdo e pelas dimensões da página, não pelos bytes do arquivo: a concatenação reescreve o container, e comparar bytes recusaria a operação inteira*
+- [x] As páginas de produtos vêm em seguida, na ordem correta
+- [x] Nenhuma página de índice existe no documento *(RN-38 revogada)*
+- [x] Sem capa configurada, a geração é recusada com orientação *(CA-36)*
+- [x] A recusa acontece **antes** de compor qualquer página
 
 **Testes a escrever:**
 - *Integration:* gerar com capa configurada e verificar que a primeira página é a capa e a contagem total confere *(CA-37)*

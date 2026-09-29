@@ -63,6 +63,7 @@ public sealed class CatalogGeneration(
     CatalogComposer composer,
     CatalogMaintenance maintenance,
     PortalSettingsService settings,
+    ICoverSource covers,
     TimeProvider time,
     ILogger<CatalogGeneration> logger)
 {
@@ -150,6 +151,15 @@ public sealed class CatalogGeneration(
         try
         {
             content = await composer.ComposeAsync(resolved, cancellationToken);
+
+            progress?.Report(GenerationProgress.Merging);
+
+            // RN-36: o documento é a capa do dono **mais** as páginas compostas. A concatenação
+            // acontece aqui, e não dentro da composição, porque a capa não é conteúdo que o
+            // sistema desenha — é arquivo que ele carrega inteiro (RN-37, ADR-017).
+            content = CoverMerge.Merge(
+                await covers.DownloadAsync(portal.CoverFileName!, cancellationToken),
+                content);
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -201,6 +211,9 @@ public sealed record GenerationProgress(string Stage, int ProductCount = 0)
 
     public static GenerationProgress Composing(int productCount) =>
         new($"Compondo {productCount} {(productCount == 1 ? "produto" : "produtos")}…", productCount);
+
+    public static readonly GenerationProgress Merging =
+        new("Unindo a capa às páginas de conteúdo…");
 
     public static readonly GenerationProgress Done = new("Documento pronto.");
 }
