@@ -1,0 +1,63 @@
+@page "/painel/sair"
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<OwnerAccount> SignInManager
+@inject NavigationManager Navigation
+
+@*
+    Saída do painel. A rota estava **declarada** em `PanelAuthentication.LogoutPath` desde
+    T-07 e nunca existiu, então fechar a sessão só era possível trocando a senha ou esperando
+    o cookie expirar (R-09 de `REVIEW-T-31-2026-09-29`).
+
+    Sem `@@rendermode`, e isso não é preferência: deslogar escreve cabeçalho de resposta, e
+    num circuito interativo a resposta já foi enviada — a mesma razão pela qual o acesso de
+    UI-03 é estático (ADR-010).
+
+    É **POST**, não link: `GET` que desloga é acionável por qualquer imagem ou pré-carregador
+    apontando para a rota, e o antiforgery do formulário garante que a saída partiu do dono.
+
+    O cromo é o do painel, global em `painel.css` — o vocabulário do acesso vive em CSS
+    isolado de `Login.razor` e não alcança outro componente.
+*@
+
+<PageTitle>Sair do Painel</PageTitle>
+
+<div class="painel">
+    <h1>Sair do painel</h1>
+    <div class="painel__sub">
+        A vitrine pública continua no ar — só este painel exige acesso.
+    </div>
+
+    <div class="painel__folha">
+        <div class="painel-bloco">
+            <div class="painel-bloco__bd">
+                <p class="campo__ajuda">
+                    Encerrar a sessão é o caminho para deixar o painel num computador que
+                    não é seu. Trocar a senha também encerra, mas isso é para quando você
+                    suspeita que alguém ficou com acesso.
+                </p>
+            </div>
+
+            <div class="painel-bloco__ft">
+                <EditForm Model="this" FormName="sair" OnValidSubmit="SignOutAsync" method="post">
+                    <AntiforgeryToken />
+
+                    <button type="submit" class="btn btn--primario">Encerrar a sessão</button>
+                </EditForm>
+
+                <a class="btn" href="@PanelAuthentication.PanelPathPrefix">Voltar ao painel</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private async Task SignOutAsync()
+    {
+        await SignInManager.SignOutAsync();
+
+        // Para a tela de acesso, e não para a vitrine: quem acabou de sair do painel
+        // costuma estar trocando de sessão, não indo ver o catálogo.
+        Navigation.NavigateTo(PanelAuthentication.LoginPath, forceLoad: true);
+    }
+}
