@@ -1,0 +1,92 @@
+@using Catalogo.Features.Settings
+
+@*
+    `ContatosVitrine` da SPEC-UI, nos dois estados que ela declara: `default` no rodapé de
+    UI-01 e `comMensagemPronta` no detalhe de UI-02.
+
+    Os dados vêm das Configurações (RN-67) por cascata do `VitrineLayout`, que os lê uma
+    vez por requisição. Um lugar só, para os canais não divergirem entre a vitrine e o
+    rodapé do PDF — é o que a regra pede.
+
+    Canal não configurado não aparece: a vitrine não inventa contato que o dono não deu.
+*@
+
+@if (contact is not { HasContact: true })
+{
+    @* Sem nenhum canal, o detalhe fica calado e o rodapé explica o caminho — não há link
+       honesto a oferecer. *@
+    @if (ProductName is null)
+    {
+        <div class="rodape__c" data-estado="semContato">
+            <b>Como comprar</b>
+            <em>Escolha o produto e fale com o vendedor pelo WhatsApp ou telefone</em>
+        </div>
+    }
+}
+else if (ProductName is { } product)
+{
+    <div class="cta" data-estado="comMensagemPronta">
+        @if (contact.WhatsApp is { } whatsapp)
+        {
+            <a class="bwa" href="@WhatsAppConversation.UrlFor(whatsapp, product)">
+                <span>Perguntar no WhatsApp</span>
+                <small>sobre @product</small>
+            </a>
+        }
+
+        <div class="blines">
+            @if (contact.Phone is { } phone)
+            {
+                <a class="bline" href="tel:@Digits(phone)">
+                    <span class="bline__i">TEL</span>
+                    <span><b>@phone</b><em>Seg–Sex 08h–18h</em></span>
+                </a>
+            }
+
+            @if (contact.Email is { } email)
+            {
+                <a class="bline" href="mailto:@email">
+                    <span class="bline__i">@@</span>
+                    <span><b>@email</b><em>orçamentos e pedidos</em></span>
+                </a>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="rodape__c" data-estado="comContato">
+        <b>Fale com o vendedor</b>
+
+        @if (contact.WhatsApp is { } whatsapp)
+        {
+            <em><a href="@WhatsAppConversation.UrlFor(whatsapp)">WhatsApp</a></em>
+        }
+
+        @if (contact.Phone is { } phone)
+        {
+            <em><a href="tel:@Digits(phone)">@phone</a></em>
+        }
+
+        @if (contact.Email is { } email)
+        {
+            <em><a href="mailto:@email">@email</a></em>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>
+    /// Presente, o componente assume o estado `comMensagemPronta` e cita o produto na
+    /// conversa (RN-55). Ausente, é o bloco do rodapé.
+    /// </summary>
+    [Parameter]
+    public string? ProductName { get; set; }
+
+    [CascadingParameter]
+    private PortalSettings? contact { get; set; }
+
+    /// <summary>`tel:` quer só dígitos; o que o dono digitou é o que a tela exibe.</summary>
+    private static string Digits(string phone) =>
+        new([.. phone.Where(char.IsAsciiDigit)]);
+}

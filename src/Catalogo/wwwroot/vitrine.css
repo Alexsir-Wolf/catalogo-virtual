@@ -608,6 +608,90 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* ---------- contato do detalhe (UI-02, ContatosVitrine.comMensagemPronta) ---------- */
+
+.cta {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.bwa {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 13px 18px;
+    background: var(--wa);
+    color: #fff;
+    border-radius: var(--r);
+    font-family: var(--ui);
+    font-size: 14.5px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.bwa:hover {
+    background: var(--wa-hover);
+}
+
+.bwa small {
+    font-size: 12px;
+    font-weight: 400;
+    opacity: .85;
+}
+
+.blines {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bline {
+    flex: 1;
+    min-width: 150px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 12px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    text-decoration: none;
+}
+
+.bline:hover {
+    border-color: var(--navy);
+}
+
+.bline__i {
+    flex: none;
+    padding: 2px 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--navy);
+}
+
+.bline b {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.bline em {
+    display: block;
+    font-style: normal;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.25;
+}
+
 .vizinhos {
     padding: 0 22px 30px;
 }

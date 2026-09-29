@@ -6,83 +6,58 @@
     Cromo da vitrine — faixa utilitária, cabeçalho com marca e busca, e rodapé.
 
     Existe porque estava duplicado literalmente entre UI-01 e UI-02 (R-02 de
-    `REVIEW-T-19-2026-09-28`, R-03 de `REVIEW-T-20-2026-09-28`). O rodapé é onde os dados
-    de contato da RN-67 vão entrar, e a regra diz "um lugar só, para não divergirem" —
-    duplicado, isso passaria a depender de disciplina em vez de estrutura.
+    `REVIEW-T-19-2026-09-28`, R-03 de `REVIEW-T-20-2026-09-28`). Os dados de contato da
+    RN-67 são lidos **uma vez por requisição** e descem por cascata: o rodapé e o bloco de
+    contato do detalhe consomem a mesma leitura, e a regra "um lugar só, para não
+    divergirem" passa a valer por estrutura em vez de disciplina.
 
     Sem `@@rendermode`: o layout não pode reintroduzir circuito na área estática (ADR-010).
 *@
 
-<div class="vitrine">
-    <div class="util">
-        <div class="util__in">
-            <span class="util__pill">Catálogo</span>
-            <span>Atendimento Seg–Sex 08h–18h</span>
+<CascadingValue Value="contact">
+    <div class="vitrine">
+        <div class="util">
+            <div class="util__in">
+                <span class="util__pill">Catálogo</span>
+                <span>Atendimento Seg–Sex 08h–18h</span>
+            </div>
         </div>
+
+        <header class="cabeca">
+            <div class="cabeca__in">
+                <a class="marca" href="/">
+                    <span class="marca__m">CT</span>
+                    <span>
+                        <span class="marca__t">CATÁLOGO</span>
+                        <span class="marca__s">Suprimentos &amp; Informática</span>
+                    </span>
+                </a>
+
+                @* GET, e não POST: a busca precisa virar URL para o resultado ser
+                   compartilhável (RN-56) e para o cache de T-21 ter o que guardar. *@
+                <form class="busca" method="get" action="/" role="search">
+                    <input type="search" name="@SearchParameter" value="@SearchTerm"
+                           aria-label="Buscar produto pelo nome"
+                           placeholder="Buscar pelo nome do produto" />
+                    <button type="submit" aria-label="Buscar">⌕</button>
+                </form>
+            </div>
+        </header>
+
+        @Body
+
+        <footer class="rodape">
+            <div class="rodape__c">
+                <b>Suprimentos &amp; Informática</b>
+                <em>Atendimento de segunda a sexta, das 08h às 18h</em>
+            </div>
+
+            @* Lido a cada requisição — é o que faz a alteração do contato refletir na
+               vitrine imediatamente (RN-68, CA-38). *@
+            <ContatosVitrine />
+        </footer>
     </div>
-
-    <header class="cabeca">
-        <div class="cabeca__in">
-            <a class="marca" href="/">
-                <span class="marca__m">CT</span>
-                <span>
-                    <span class="marca__t">CATÁLOGO</span>
-                    <span class="marca__s">Suprimentos &amp; Informática</span>
-                </span>
-            </a>
-
-            @* GET, e não POST: a busca precisa virar URL para o resultado ser
-               compartilhável (RN-56) e para o cache de T-21 ter o que guardar. *@
-            <form class="busca" method="get" action="/" role="search">
-                <input type="search" name="@SearchParameter" value="@SearchTerm"
-                       aria-label="Buscar produto pelo nome"
-                       placeholder="Buscar pelo nome do produto" />
-                <button type="submit" aria-label="Buscar">⌕</button>
-            </form>
-        </div>
-    </header>
-
-    @Body
-
-    <footer class="rodape">
-        <div class="rodape__c">
-            <b>Suprimentos &amp; Informática</b>
-            <em>Atendimento de segunda a sexta, das 08h às 18h</em>
-        </div>
-
-        @* Os canais vêm das Configurações (RN-67), lidos a cada requisição — é o que faz
-           a alteração refletir na vitrine imediatamente (RN-68, CA-38). Canal não
-           configurado simplesmente não aparece: a vitrine não inventa contato. *@
-        @if (contact is { HasContact: true })
-        {
-            <div class="rodape__c" data-estado="comContato">
-                <b>Fale com o vendedor</b>
-
-                @if (contact.WhatsApp is { } whatsapp)
-                {
-                    <em><a href="https://wa.me/@whatsapp">WhatsApp</a></em>
-                }
-
-                @if (contact.Phone is { } phone)
-                {
-                    <em><a href="tel:@Digits(phone)">@phone</a></em>
-                }
-
-                @if (contact.Email is { } email)
-                {
-                    <em><a href="mailto:@email">@email</a></em>
-                }
-            </div>
-        }
-        else
-        {
-            <div class="rodape__c" data-estado="semContato">
-                <b>Como comprar</b>
-                <em>Escolha o produto e fale com o vendedor pelo WhatsApp ou telefone</em>
-            </div>
-        }
-    </footer>
-</div>
+</CascadingValue>
 
 @code {
     public const string SearchParameter = "busca";
@@ -90,10 +65,6 @@
     private PortalSettings? contact;
 
     protected override async Task OnInitializedAsync() => contact = await Settings.LoadAsync();
-
-    /// <summary>`tel:` quer só dígitos; o que o dono digitou é o que a tela exibe.</summary>
-    private static string Digits(string phone) =>
-        new([.. phone.Where(char.IsAsciiDigit)]);
 
     /// <summary>
     /// O campo mostra o termo corrente quando ele existe na URL. Vem do parâmetro de

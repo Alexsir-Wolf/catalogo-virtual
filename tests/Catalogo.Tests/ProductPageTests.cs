@@ -1,7 +1,9 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Catalogo.Data;
 using Catalogo.Features.Categories;
 using Catalogo.Features.Products;
+using Catalogo.Features.Settings;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -193,6 +195,126 @@ public sealed class ProductPageTests(PostgresFixture postgres) : IAsyncLifetime,
         Assert.DoesNotContain("Vizinho em rascunho", html);
     }
 
+    /// <summary>
+    /// CA-25: o visitante sai daqui para a conversa **já escrita**. O que se verifica é o
+    /// nome do produto dentro da mensagem depois de decodificar a URL — o link pode estar
+    /// presente e ainda assim chegar sem assunto.
+    /// </summary>
+    [Fact]
+    public async Task CA_25_o_whatsapp_abre_com_mensagem_contendo_o_nome_do_produto()
+    {
+        var product = await SeedAsync();
+        await SeedContactAsync();
+        using var client = factory.CreateClient();
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/produto/{product}"));
+        var conversation = ConversationUrlIn(html);
+
+        Assert.StartsWith("https://wa.me/5588996541931?text=", conversation);
+        Assert.Contains(
+            "Notebook VAIO FE16",
+            Uri.UnescapeDataString(conversation[(conversation.IndexOf("?text=") + 6)..]));
+    }
+
+    /// <summary>
+    /// CA-31: telefone e e-mail são canais **além** do WhatsApp, não alternativas a ele —
+    /// os três aparecem juntos na mesma tela.
+    /// </summary>
+    [Fact]
+    public async Task CA_31_telefone_e_email_ficam_disponiveis_alem_do_whatsapp()
+    {
+        var product = await SeedAsync();
+        await SeedContactAsync();
+        using var client = factory.CreateClient();
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/produto/{product}"));
+
+        Assert.Contains("""data-estado="comMensagemPronta" """.TrimEnd(), html);
+        Assert.Contains("href=\"tel:88996541931\"", html);
+        Assert.Contains("href=\"mailto:vendas@exemplo.com.br\"", html);
+        Assert.Contains("wa.me/5588996541931", html);
+    }
+
+    /// <summary>
+    /// A vitrine não inventa canal que o dono não configurou — é a mesma decisão do rodapé
+    /// em T-31, e aqui ela também impede um botão de WhatsApp apontando para o vazio.
+    /// </summary>
+    [Fact]
+    public async Task Canal_nao_configurado_nao_aparece_no_detalhe()
+    {
+        var product = await SeedAsync();
+        await SeedContactAsync(whatsapp: null, email: null);
+        using var client = factory.CreateClient();
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/produto/{product}"));
+
+        Assert.Contains("href=\"tel:88996541931\"", html);
+        Assert.DoesNotContain("wa.me", html);
+        Assert.DoesNotContain("mailto:", html);
+    }
+
+    [Fact]
+    public async Task Sem_contato_configurado_o_detalhe_nao_exibe_bloco_de_contato()
+    {
+        var product = await SeedAsync();
+        using var client = factory.CreateClient();
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/produto/{product}"));
+
+        Assert.DoesNotContain("""data-estado="comMensagemPronta" """.TrimEnd(), html);
+    }
+
+    /// <summary>
+    /// O nome com acento e aspas é o caso que quebra o link na mão do visitante. A
+    /// asserção é sobre a URL servida, e não sobre a montagem — essa já tem caso próprio
+    /// em <see cref="WhatsAppConversationTests"/>.
+    /// </summary>
+    [Fact]
+    public async Task RN_55_nome_com_acento_e_aspas_sai_codificado_na_url_da_conversa()
+    {
+        var product = await SeedAsync(name: """Cadeira Ergonômica "Pró" """.TrimEnd());
+        await SeedContactAsync();
+        using var client = factory.CreateClient();
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/produto/{product}"));
+        var conversation = ConversationUrlIn(html);
+
+        Assert.DoesNotContain("Ergonômica", conversation);
+        Assert.Contains(
+            """Cadeira Ergonômica "Pró" """.TrimEnd(),
+            Uri.UnescapeDataString(conversation[(conversation.IndexOf("?text=") + 6)..]));
+    }
+
+    /// <summary>
+    /// O href do botão de WhatsApp, como o navegador o receberia. O HTML já vem decodificado
+    /// pelo chamador, então o que sobra na URL é a codificação de percentual dela mesma.
+    /// </summary>
+    private static string ConversationUrlIn(string html)
+    {
+        var match = Regex.Match(html, "<a class=\"bwa\" href=\"(?<url>[^\"]+)\"");
+
+        Assert.True(match.Success, "O botão de WhatsApp não foi encontrado na página.");
+
+        return match.Groups["url"].Value;
+    }
+
+    private async Task SeedContactAsync(
+        string? whatsapp = "5588996541931",
+        string? phone = "(88) 99654-1931",
+        string? email = "vendas@exemplo.com.br")
+    {
+        await using var context = CreateContext();
+
+        context.PortalSettings.Add(new PortalSettings
+        {
+            WhatsApp = whatsapp,
+            Phone = phone,
+            Email = email
+        });
+
+        await context.SaveChangesAsync();
+    }
+
     private async Task<int> CategoryOfAsync(int productId)
     {
         await using var context = CreateContext();
@@ -208,7 +330,8 @@ public sealed class ProductPageTests(PostgresFixture postgres) : IAsyncLifetime,
         string? summary = "Core i5, 16GB, SSD 512GB",
         string? description = null,
         PriceLabel label = PriceLabel.Price,
-        ProductStatus status = ProductStatus.Published)
+        ProductStatus status = ProductStatus.Published,
+        string name = "Notebook VAIO FE16")
     {
         await using var context = CreateContext();
         await context.Database.MigrateAsync();
@@ -219,7 +342,7 @@ public sealed class ProductPageTests(PostgresFixture postgres) : IAsyncLifetime,
 
         var product = new Product
         {
-            Name = "Notebook VAIO FE16",
+            Name = name,
             Summary = summary,
             Description = description,
             Price = 4750.00m,

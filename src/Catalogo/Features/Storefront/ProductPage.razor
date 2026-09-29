@@ -10,10 +10,8 @@
     UI-02. Sem `@@rendermode`, como a listagem: renderização estática, sem circuito
     (ADR-010, RN-47).
 
-    **O bloco de contato não está aqui.** A RN-54 manda os dados vindos das Configurações
-    (RN-67), que são um registro no banco criado por T-31 — e inventar telefone, WhatsApp
-    e e-mail do cliente seria pior que declarar a ausência. CA-25 e CA-31 ficam com T-31
-    como desbloqueadora; ver o histórico de T-20 no plano.
+    O bloco de contato (RN-54) usa os dados das Configurações (RN-67), que descem por
+    cascata do `VitrineLayout` — a mesma leitura que alimenta o rodapé.
 *@
 
 <PageTitle>@(product is null ? "Produto não encontrado" : $"{product.Name} — Catálogo")</PageTitle>
@@ -84,10 +82,9 @@ else
                 <span class="preco__v">@Money(product.Price)</span>
             </div>
 
-            <p class="campo__ajuda">
-                Para comprar, fale com o vendedor. Os canais de contato aparecem aqui
-                quando configurados.
-            </p>
+            @* RN-54 e RN-55: WhatsApp em destaque com a mensagem já escrita, telefone e
+               e-mail ao lado. Tudo na tela converge para cá — é o ponto de saída. *@
+            <ContatosVitrine ProductName="@product.Name" />
         </div>
     </div>
 
