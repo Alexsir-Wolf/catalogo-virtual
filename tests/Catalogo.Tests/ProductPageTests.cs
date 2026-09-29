@@ -228,11 +228,11 @@ public sealed class ProductPageTests(PostgresFixture postgres) : IAsyncLifetime,
         using var client = factory.CreateClient();
 
         var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/produto/{product}"));
+        var block = ContactBlockIn(html);
 
-        Assert.Contains("""data-estado="comMensagemPronta" """.TrimEnd(), html);
-        Assert.Contains("href=\"tel:88996541931\"", html);
-        Assert.Contains("href=\"mailto:vendas@exemplo.com.br\"", html);
-        Assert.Contains("wa.me/5588996541931", html);
+        Assert.Contains("href=\"tel:88996541931\"", block);
+        Assert.Contains("href=\"mailto:vendas@exemplo.com.br\"", block);
+        Assert.Contains("wa.me/5588996541931", block);
     }
 
     /// <summary>
@@ -247,10 +247,11 @@ public sealed class ProductPageTests(PostgresFixture postgres) : IAsyncLifetime,
         using var client = factory.CreateClient();
 
         var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/produto/{product}"));
+        var block = ContactBlockIn(html);
 
-        Assert.Contains("href=\"tel:88996541931\"", html);
-        Assert.DoesNotContain("wa.me", html);
-        Assert.DoesNotContain("mailto:", html);
+        Assert.Contains("href=\"tel:88996541931\"", block);
+        Assert.DoesNotContain("wa.me", block);
+        Assert.DoesNotContain("mailto:", block);
     }
 
     [Fact]
@@ -283,6 +284,28 @@ public sealed class ProductPageTests(PostgresFixture postgres) : IAsyncLifetime,
         Assert.Contains(
             """Cadeira Ergonômica "Pró" """.TrimEnd(),
             Uri.UnescapeDataString(conversation[(conversation.IndexOf("?text=") + 6)..]));
+    }
+
+    /// <summary>
+    /// O bloco de contato **do detalhe**, e não a página inteira. O rodapé da vitrine emite
+    /// os mesmos `tel:` e `mailto:` para o mesmo registro de contato, então asserção sobre o
+    /// documento todo passaria mesmo se o bloco daqui fosse apagado — e é justamente a
+    /// presença dele que o CA-31 exige. O bloco termina onde começam os relacionados ou o
+    /// rodapé, os dois únicos elementos que vêm depois dele.
+    /// </summary>
+    private static string ContactBlockIn(string html)
+    {
+        var start = html.IndexOf("""data-estado="comMensagemPronta" """.TrimEnd());
+
+        Assert.True(start >= 0, "O bloco de contato do detalhe não foi encontrado na página.");
+
+        var neighbours = html.IndexOf("""class="vizinhos" """.TrimEnd(), start);
+        var footer = html.IndexOf("<footer", start);
+        var end = neighbours >= 0 ? neighbours : footer;
+
+        Assert.True(end > start, "Não foi possível delimitar o fim do bloco de contato.");
+
+        return html[start..end];
     }
 
     /// <summary>
