@@ -949,7 +949,7 @@ Produtos que passaram a integrar o catálogo desde a última geração são dest
 
 #### T-24 — Composição do documento
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Alta
 - **Depende de:** T-04, T-23
 - **Implementa:** RN-39, RN-40, RN-40.1, RN-41, RN-42, RN-43, RN-67 *(a metade que falta: o rodapé das páginas de conteúdo, com os dados de contato que T-31 já grava — acrescentada por R-08 de `REVIEW-T-31-2026-09-29`)*
@@ -965,14 +965,14 @@ Compor **apenas as páginas de conteúdo** — a capa vem pronta e é concatenad
 Categorias fluem continuamente, sem quebra forçada, e **nenhuma célula é dividida entre páginas** *(RN-42)*. **Não há página de índice** — a RN-38 foi revogada.
 
 **Critério de aceite (testável):**
-- [ ] Categorias numeradas conforme o recorte, não a posição global *(CA-10)*
-- [ ] Nenhuma página de índice é produzida
-- [ ] Numeração de página considera a capa como primeira folha *(RN-40.1)*
-- [ ] Grade de três colunas, com categorias em fluxo contínuo *(RN-41)*
-- [ ] Nenhuma célula partida entre páginas *(CA-30)*
-- [ ] Produto sem resumo exibe apenas nome e preço *(CA-04)*
-- [ ] Cabeçalho e rodapé em todas as páginas de conteúdo, com numeração
-- [ ] Usa a derivada de impressão, nunca a de tela
+- [x] Categorias numeradas conforme o recorte, não a posição global *(CA-10)*
+- [x] Nenhuma página de índice é produzida
+- [x] Numeração de página considera a capa como primeira folha *(RN-40.1)*
+- [x] Grade de três colunas, com categorias em fluxo contínuo *(RN-41)*
+- [x] Nenhuma célula partida entre páginas *(CA-30)* — *garantida por `ShowEntire`; verificada por composição que atravessa páginas, não por inspeção visual das quebras*
+- [x] Produto sem resumo exibe apenas nome e preço *(CA-04)*
+- [x] Cabeçalho e rodapé em todas as páginas de conteúdo, com numeração
+- [x] Usa a derivada de impressão, nunca a de tela
 
 **Testes a escrever:**
 - *Unit:* composição com produto sem resumo não deixa espaço vazio *(CA-04)*

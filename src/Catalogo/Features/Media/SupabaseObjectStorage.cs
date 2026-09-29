@@ -48,6 +48,20 @@ public sealed class SupabaseObjectStorage(
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<byte[]> DownloadAsync(
+        string bucket,
+        string objectName,
+        CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, ObjectPath(bucket, objectName));
+        Authorize(request);
+
+        using var response = await client.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
     public string PublicUrlFor(string objectName) =>
         $"{options.Url.TrimEnd('/')}/storage/v1/object/public/{options.PublicBucket}/{objectName}";
 

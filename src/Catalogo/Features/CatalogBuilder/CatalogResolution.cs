@@ -12,6 +12,14 @@ public sealed record ResolvedProduct(
     decimal Price,
     PriceLabel PriceLabel,
     string? ThumbnailFileName,
+
+    /// <summary>
+    /// A derivada **de impressão** (RN-11, RN-12). A prévia usa a miniatura; o documento usa
+    /// esta. Consumir a de tela no PDF produz página borrada, e o erro só aparece no papel —
+    /// é o risco que o plano de T-24 destaca.
+    /// </summary>
+    string? PrintFileName,
+
     bool IsNewSinceLastGeneration);
 
 /// <summary>
@@ -127,6 +135,7 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
                 CategoryName = product.Category!.Name,
                 CategoryPosition = product.Category.Position,
                 Thumbnail = product.Photo!.ThumbnailFileName,
+                Print = product.Photo.PrintFileName,
                 product.PublishedAt
             })
             .ToListAsync(cancellationToken);
@@ -149,6 +158,7 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
                     product.Price,
                     product.PriceLabel,
                     product.Thumbnail,
+                    product.Print,
                     IsNew(product.PublishedAt, catalog.LastGeneratedAt))).ToList()))
             .ToList();
 

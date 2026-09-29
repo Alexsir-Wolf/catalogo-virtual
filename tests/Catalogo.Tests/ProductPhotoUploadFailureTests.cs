@@ -250,6 +250,12 @@ public sealed class ProductPhotoUploadFailureTests(PostgresFixture postgres)
             return Task.CompletedTask;
         }
 
+        public Task<byte[]> DownloadAsync(
+            string bucket,
+            string objectName,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public string PublicUrlFor(string objectName) => objectName;
     }
 }

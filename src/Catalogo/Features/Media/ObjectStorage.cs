@@ -29,5 +29,15 @@ public interface IObjectStorage
 
     Task DeleteAsync(string bucket, string objectName, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Lê um objeto de volta. Existe para a composição do PDF (T-24), que consome a derivada
+    /// **de impressão** — ela vive no bucket privado (RN-12) e por isso não pode ser buscada
+    /// por URL pública como as derivadas de tela.
+    /// </summary>
+    Task<byte[]> DownloadAsync(
+        string bucket,
+        string objectName,
+        CancellationToken cancellationToken = default);
+
     string PublicUrlFor(string objectName);
 }

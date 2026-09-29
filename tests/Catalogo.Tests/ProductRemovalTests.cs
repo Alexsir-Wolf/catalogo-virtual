@@ -252,6 +252,12 @@ public sealed class ProductRemovalTests(PostgresFixture postgres)
             deleted.Add((bucket, objectName));
         }
 
+        public Task<byte[]> DownloadAsync(
+            string bucket,
+            string objectName,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public string PublicUrlFor(string objectName) => objectName;
     }
 }

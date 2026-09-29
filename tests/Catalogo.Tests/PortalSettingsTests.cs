@@ -610,6 +610,12 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<byte[]> DownloadAsync(
+            string bucket,
+            string objectName,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public string PublicUrlFor(string objectName) => objectName;
     }
 

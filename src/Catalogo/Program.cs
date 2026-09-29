@@ -5,6 +5,7 @@ using Catalogo.Features.Account;
 using Catalogo.Features.CatalogBuilder;
 using Catalogo.Features.Categories;
 using Catalogo.Features.Media;
+using Catalogo.Features.PdfExport;
 using Catalogo.Features.Products;
 using Catalogo.Features.Settings;
 using Catalogo.Features.Storefront;
@@ -12,6 +13,10 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+
+// A licença Community do QuestPDF vale para uso interno e receita abaixo do teto da licença;
+// sem esta linha a biblioteca lança na primeira composição (ADR-012).
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +42,7 @@ builder.Services.AddHttpClient<IObjectStorage, SupabaseObjectStorage>();
 builder.Services.AddScoped<ProductPhotoService>();
 builder.Services.AddScoped<CatalogMaintenance>();
 builder.Services.AddScoped<CatalogResolution>();
+builder.Services.AddScoped<CatalogComposer>();
 builder.Services.AddScoped<CategoryMaintenance>();
 builder.Services.AddScoped<ProductMaintenance>();
 builder.Services.AddScoped<ProductPhotoUpload>();
