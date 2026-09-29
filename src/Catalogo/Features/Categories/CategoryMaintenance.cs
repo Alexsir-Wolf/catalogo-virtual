@@ -15,7 +15,15 @@ public enum CategoryFailure
     None,
     NameRequired,
     NameAlreadyInUse,
-    HasProducts
+    HasProducts,
+
+    /// <summary>
+    /// Retida por integrar catálogo salvo (RN-25.1). É **distinta** de <see cref="HasProducts"/>
+    /// de propósito: a causa e a saída são diferentes — num caso o dono move ou exclui produtos,
+    /// no outro ele edita o critério de um catálogo. Unificar em "categoria em uso" deixaria a
+    /// pessoa sem saber o que fazer.
+    /// </summary>
+    UsedByCatalogs
 }
 
 public sealed record CategoryOutcome(CategoryFailure Failure)
@@ -30,9 +38,15 @@ public sealed record CategoryOutcome(CategoryFailure Failure)
 /// acrescenta aqui a segunda condição — catálogo que usa a categoria (RN-25.1) —, e por
 /// isso a verificação vive em um ponto só.
 /// </summary>
-public sealed record CategoryDeletionOutcome(CategoryFailure Failure, int BlockingProducts)
+public sealed record CategoryDeletionOutcome(
+    CategoryFailure Failure,
+    int BlockingProducts,
+    IReadOnlyList<string>? BlockingCatalogs = null)
 {
     public bool Succeeded => Failure == CategoryFailure.None;
+
+    /// <summary>Os catálogos que retêm a categoria, nomeados (RN-25.1).</summary>
+    public IReadOnlyList<string> Catalogs => BlockingCatalogs ?? [];
 
     public static readonly CategoryDeletionOutcome Success = new(CategoryFailure.None, 0);
 }
@@ -160,6 +174,25 @@ public sealed class CategoryMaintenance(IDbContextFactory<CatalogDbContext> cont
         if (blockingProducts > 0)
         {
             return new CategoryDeletionOutcome(CategoryFailure.HasProducts, blockingProducts);
+        }
+
+        // RN-25.1: a categoria também fica retida enquanto integrar algum catálogo salvo, ainda
+        // que esteja **vazia**. Sem isso, excluir uma categoria sem produtos deixaria um
+        // catálogo sem critério resolvível — o "catálogo órfão" que a lacuna 8 da SPEC-UI
+        // levantou. O `Restrict` da FK impediria a exclusão no banco, mas como exceção crua;
+        // aqui a recusa vira mensagem que **nomeia** os catálogos.
+        var blockingCatalogs = await context.Catalogs
+            .Where(catalog => catalog.Categories.Any(link => link.CategoryId == id))
+            .OrderBy(catalog => catalog.Name)
+            .Select(catalog => catalog.Name)
+            .ToListAsync(cancellationToken);
+
+        if (blockingCatalogs.Count > 0)
+        {
+            return new CategoryDeletionOutcome(
+                CategoryFailure.UsedByCatalogs,
+                BlockingProducts: 0,
+                blockingCatalogs);
         }
 
         var category = await context.Categories

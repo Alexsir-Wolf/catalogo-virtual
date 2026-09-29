@@ -1028,7 +1028,7 @@ No momento do download, a tela informa que aquele arquivo é o único registro d
 
 #### T-26 — Bloqueio de exclusão de categoria usada por catálogo
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Baixa
 - **Depende de:** T-11, T-22
 - **Implementa:** RN-25.1
@@ -1043,10 +1043,10 @@ Estende a verificação de T-11: além de produtos, a categoria também fica ret
 É a correção da lacuna do catálogo órfão: sem isso, excluir uma categoria vazia deixaria um catálogo sem critério resolvível.
 
 **Critério de aceite (testável):**
-- [ ] Categoria vazia usada por catálogo não pode ser excluída *(CA-32)*
-- [ ] A mensagem nomeia os catálogos que impedem
-- [ ] A mensagem é **distinta** da de bloqueio por produtos — causa e saída são diferentes
-- [ ] Categoria sem produtos e sem catálogo é excluída normalmente
+- [x] Categoria vazia usada por catálogo não pode ser excluída *(CA-32)*
+- [x] A mensagem nomeia os catálogos que impedem
+- [x] A mensagem é **distinta** da de bloqueio por produtos — causa e saída são diferentes
+- [x] Categoria sem produtos e sem catálogo é excluída normalmente
 
 **Testes a escrever:**
 - *Integration:* categoria vazia em catálogo não pode ser excluída, e a mensagem nomeia o catálogo *(CA-32)*

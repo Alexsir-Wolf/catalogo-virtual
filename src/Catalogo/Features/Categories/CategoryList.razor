@@ -94,12 +94,27 @@ else
                             }
                         }
 
-                        @if (blockedId == category.Id)
+                        @if (blockedId == category.Id && blockingProducts > 0)
                         {
                             <p class="categorias__erro" role="alert" data-estado="bloqueadaPorProdutos">
                                 Não dá para excluir: @blockingProducts produto(s) pertencem a esta
                                 categoria, inclusive rascunhos. Mova-os para outra categoria ou
                                 exclua-os antes.
+                            </p>
+                        }
+
+                        @* RN-25.1 com mensagem **própria**, e não uma variação da de produtos: a
+                           causa é outra e a saída também. Lá o dono move ou exclui produtos; aqui
+                           ele edita o critério de um catálogo. "Categoria em uso" para os dois
+                           casos deixaria a pessoa sem saber o que fazer. *@
+                        @if (blockedId == category.Id && blockingCatalogs.Count > 0)
+                        {
+                            <p class="categorias__erro" role="alert" data-estado="bloqueadaPorCatalogo">
+                                Não dá para excluir: esta categoria integra o critério
+                                @(blockingCatalogs.Count == 1 ? "do catálogo" : "dos catálogos")
+                                <b>@string.Join(", ", blockingCatalogs)</b>. Retire-a do critério
+                                @(blockingCatalogs.Count == 1 ? "dele" : "deles") antes, ou o
+                                catálogo ficaria sem critério resolvível.
                             </p>
                         }
                     </td>
@@ -159,6 +174,7 @@ else
     private int? pendingDeletionId;
     private int? blockedId;
     private int blockingProducts;
+    private IReadOnlyList<string> blockingCatalogs = [];
 
     /// <summary>
     /// A exclusão é definitiva, então exige um segundo clique deliberado. Nunca
@@ -184,6 +200,7 @@ else
 
         blockedId = id;
         blockingProducts = outcome.BlockingProducts;
+        blockingCatalogs = outcome.Catalogs;
     }
 
     private async Task MoveAsync(int id, MoveDirection direction)
