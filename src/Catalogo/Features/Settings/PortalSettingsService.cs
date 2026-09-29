@@ -64,6 +64,7 @@ public sealed class PortalSettingsService(
     IObjectStorage storage,
     IOptions<ObjectStorageOptions> storageOptions,
     UserManager<OwnerAccount> users,
+    PasswordAttemptLimiter attempts,
     ILogger<PortalSettingsService> logger)
 {
     private readonly ObjectStorageOptions options = storageOptions.Value;
@@ -209,13 +210,15 @@ public sealed class PortalSettingsService(
                 "Não foi possível confirmar a senha atual.");
         }
 
-        if (await users.IsLockedOutAsync(owner))
+        if (attempts.IsBlocked)
         {
-            // O mesmo bloqueio da tela de acesso (RN-60). Sem esta guarda, o formulário de
-            // troca era um caminho de tentativa **ilimitada** contra a senha atual, porque a
-            // confirmação passa pelo `UserManager` e não pelo `SignInManager` — e quem já
-            // tem uma sessão aberta poderia descobrir a senha para reusá-la em outro
-            // serviço, sem deixar rastro.
+            // Teto de tentativas contra a senha atual (RN-60). Sem ele, o formulário de troca
+            // era caminho de tentativa **ilimitada**, porque a confirmação passa pelo
+            // `UserManager` e não pelo `SignInManager`. O contador é **próprio**, e não o do
+            // Identity: compartilhá-lo trancava o dono fora do login por erro de digitação.
+            //
+            // A guarda sai antes de verificar a senha, então durante o bloqueio a resposta é
+            // a mesma para senha certa e errada — não há oráculo.
             return new PasswordOutcome(
                 PasswordFailure.CurrentPasswordWrong,
                 "Muitas tentativas. Aguarde alguns minutos antes de tentar de novo.");
@@ -224,7 +227,7 @@ public sealed class PortalSettingsService(
         var result = await users.ChangePasswordAsync(owner, currentPassword, newPassword);
         if (result.Succeeded)
         {
-            await users.ResetAccessFailedCountAsync(owner);
+            attempts.Reset();
 
             // A ADR-006 prevê troca obrigatória no primeiro acesso; trocar por vontade
             // própria também cumpre a exigência e a desliga.
@@ -250,9 +253,9 @@ public sealed class PortalSettingsService(
 
         if (mismatch)
         {
-            // Só a senha atual errada conta para o bloqueio: senha nova fora da política é
-            // erro de quem já provou ser o dono, e bloquear por isso seria punir acerto.
-            await users.AccessFailedAsync(owner);
+            // Só a senha atual errada conta: senha nova fora da política é erro de quem já
+            // provou ser o dono, e bloquear por isso seria punir acerto.
+            attempts.RegisterFailure();
         }
 
         return new PasswordOutcome(

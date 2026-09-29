@@ -40,6 +40,7 @@ builder.Services.AddScoped<ProductPublication>();
 builder.Services.AddScoped<ProductOrdering>();
 builder.Services.AddScoped<ProductListing>();
 builder.Services.AddScoped<StorefrontQuery>();
+builder.Services.AddSingleton<PasswordAttemptLimiter>();
 builder.Services.AddScoped<PortalSettingsService>();
 
 builder.Services.AddPanelAuthentication(builder.Configuration);

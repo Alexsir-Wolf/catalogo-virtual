@@ -411,7 +411,13 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
 
         Assert.Equal(PasswordFailure.CurrentPasswordWrong, outcome.Failure);
         Assert.Contains("tentativas", outcome.Message!);
-        Assert.True(await CanSignInAsync(OwnerPassword));
+
+        // **O dono continua entrando.** É o ponto da correção: o contador é próprio, e não o
+        // do Identity — compartilhá-lo deixava cinco erros de digitação trancarem o acesso, e
+        // permitia a quem tivesse sessão aberta manter o dono fora do login indefinidamente.
+        // A verificação é pelo `SignInManager`, que **respeita** bloqueio; `CheckPasswordAsync`
+        // o ignora por contrato e passaria mesmo com a conta travada.
+        Assert.True(await CanActuallySignInAsync(OwnerPassword));
     }
 
     /// <summary>
@@ -422,15 +428,31 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
     public async Task Troca_bem_sucedida_zera_a_contagem_de_tentativas()
     {
         var service = Service();
+        var limiter = factory.Services.GetRequiredService<PasswordAttemptLimiter>();
 
         await service.ChangePasswordAsync(OwnerUserName, "SenhaQueNaoE!2026", NewPassword);
         await service.ChangePasswordAsync(OwnerUserName, OwnerPassword, NewPassword);
 
-        using var scope = factory.Services.CreateScope();
-        var users = scope.ServiceProvider.GetRequiredService<UserManager<OwnerAccount>>();
-        var owner = await users.FindByNameAsync(OwnerUserName);
+        Assert.False(limiter.IsBlocked);
+    }
 
-        Assert.Equal(0, await users.GetAccessFailedCountAsync(owner!));
+    /// <summary>
+    /// "Entrar de verdade" passa pelo `SignInManager`, que consulta o bloqueio. É a diferença
+    /// entre afirmar que o hash confere e afirmar que o dono tem acesso.
+    /// </summary>
+    private async Task<bool> CanActuallySignInAsync(string password)
+    {
+        using var scope = factory.Services.CreateScope();
+        var signIn = scope.ServiceProvider.GetRequiredService<SignInManager<OwnerAccount>>();
+
+        var result = await signIn.CheckPasswordSignInAsync(
+            (await scope.ServiceProvider
+                .GetRequiredService<UserManager<OwnerAccount>>()
+                .FindByNameAsync(OwnerUserName))!,
+            password,
+            lockoutOnFailure: false);
+
+        return result.Succeeded;
     }
 
     /// <summary>
@@ -550,6 +572,7 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
                 ServiceKey = "chave-de-teste"
             }),
             scope.ServiceProvider.GetRequiredService<UserManager<OwnerAccount>>(),
+            scope.ServiceProvider.GetRequiredService<PasswordAttemptLimiter>(),
             NullLogger<PortalSettingsService>.Instance);
     }
 

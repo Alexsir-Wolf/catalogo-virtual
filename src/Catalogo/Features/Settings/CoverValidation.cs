@@ -86,6 +86,19 @@ public static class CoverValidation
     /// </summary>
     public const int MaxPageTreeNodes = 4096;
 
+    /// <summary>
+    /// A partir daqui a contagem para: já se sabe que não é uma página, e a mensagem de
+    /// recusa não precisa do número exato quando ele é absurdo.
+    /// </summary>
+    public const int MaxPagesToCount = 64;
+
+    /// <summary>
+    /// Teto de lado da página, em pontos — é o limite do próprio formato PDF (200 polegadas).
+    /// Sem ele, `MediaBox` de proporção perfeita e dimensões absurdas passava: uma página de
+    /// dezenas de quilômetros seria aceita e iria para a concatenação de T-32.
+    /// </summary>
+    public const double MaxSidePoints = 14_400;
+
     private const string RootPagesKey = "/Pages";
 
     private const string KidsKey = "/Kids";
@@ -99,6 +112,15 @@ public static class CoverValidation
         if (content.Length > MaxBytes)
         {
             return new CoverInspection(CoverRejection.TooLarge);
+        }
+
+        // **Antes** de o arquivo tocar o PdfSharp: o parser dele desce recursivamente por
+        // dicionários e arrays, e 10 KB com 5.000 níveis de aninhamento esgotam a pilha e
+        // matam o processo. A caminhada iterativa abaixo protege a travessia da árvore de
+        // páginas; ela não protege o parse, que acontece antes (R-01, segunda rodada).
+        if (PdfNestingScan.ExceedsMaxDepth(content))
+        {
+            return new CoverInspection(CoverRejection.MalformedStructure);
         }
 
         PdfDocument document;
@@ -150,6 +172,13 @@ public static class CoverValidation
                 return new CoverInspection(CoverRejection.NotAPdf);
             }
 
+            if (width > MaxSidePoints || height > MaxSidePoints)
+            {
+                // Proporção certa não basta: uma página fora do limite do formato é estrutura
+                // inválida, e passaria por ser proporcional ao A4.
+                return new CoverInspection(CoverRejection.MalformedStructure);
+            }
+
             if (width > height)
             {
                 return new CoverInspection(CoverRejection.Landscape);
@@ -193,11 +222,16 @@ public static class CoverValidation
         pending.Push(new InheritedNode(root, Box: null, Rotation: 0));
 
         var pages = 0;
+        var seen = 0;
         var first = (Width: 0d, Height: 0d);
 
         while (pending.Count > 0)
         {
-            if (visited.Count > MaxPageTreeNodes)
+            // O teto conta **nós visitados**, não nós com identidade. Contra `visited.Count`
+            // ele era cego para dicionários diretos: 300 mil páginas diretas num `/Kids`
+            // cabem em 11 MB, nunca tocavam o teto, e a fila sozinha custava mais de 300 MB
+            // de memória num container pequeno (ADR-018).
+            if (++seen > MaxPageTreeNodes)
             {
                 return PageSurvey.Broken();
             }
@@ -219,6 +253,11 @@ public static class CoverValidation
                 ? node.Elements.GetInteger(RotateKey)
                 : inheritedRotation;
 
+            if (!IsValidRotation(rotation))
+            {
+                return PageSurvey.Broken();
+            }
+
             if (node.Elements.GetArray(KidsKey) is not { } kids)
             {
                 pages++;
@@ -228,11 +267,24 @@ public static class CoverValidation
                     first = Oriented(leaf, rotation);
                 }
 
+                // A capa tem uma página. Contar até o fim de uma árvore de centenas de
+                // milhares de folhas só para dizer "não é uma" é trabalho jogado fora, e a
+                // contagem exata não entra na mensagem quando passa do teto.
+                if (pages > MaxPagesToCount)
+                {
+                    return new PageSurvey(pages, first.Width, first.Height, Malformed: false);
+                }
+
                 continue;
             }
 
             for (var index = kids.Elements.Count - 1; index >= 0; index--)
             {
+                if (pending.Count + seen > MaxPageTreeNodes)
+                {
+                    return PageSurvey.Broken();
+                }
+
                 if (kids.Elements.GetDictionary(index) is { } kid)
                 {
                     pending.Push(new InheritedNode(kid, box, rotation));
@@ -250,12 +302,23 @@ public static class CoverValidation
     /// </summary>
     private static (double Width, double Height) Oriented(PdfRectangle box, int rotation)
     {
+        // Os cantos da caixa podem vir em qualquer ordem — o formato permite, e ler a
+        // dimensão como negativa recusava uma capa legítima dizendo "não é um PDF".
+        var width = Math.Abs(box.Width);
+        var height = Math.Abs(box.Height);
+
         var quarters = ((rotation % 360) + 360) % 360 / 90;
 
         return quarters % 2 == 0
-            ? (box.Width, box.Height)
-            : (box.Height, box.Width);
+            ? (width, height)
+            : (height, width);
     }
+
+    /// <summary>
+    /// `/Rotate` é definido em múltiplos de 90 pelo formato. Valor fora disso era tratado
+    /// como zero pela divisão inteira — `/Rotate 45` passava como retrato.
+    /// </summary>
+    private static bool IsValidRotation(int rotation) => rotation % 90 == 0;
 
     private readonly record struct InheritedNode(
         PdfDictionary Node,

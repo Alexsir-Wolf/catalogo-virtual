@@ -35,7 +35,20 @@ public static class ContactValidation
             return Rejected(ContactField.WhatsApp);
         }
 
-        if (DigitsOrNull(draft.WhatsApp) is { } whatsapp
+        // Texto preenchido que não tem dígito nenhum é **recusa**, não ausência: tratá-lo
+        // como campo vazio apagava em silêncio o número que estava gravado.
+        var typedSomething = !string.IsNullOrWhiteSpace(draft.WhatsApp);
+        var whatsappDigits = DigitsOrNull(draft.WhatsApp);
+
+        if (typedSomething && whatsappDigits is null)
+        {
+            return new ContactOutcome(
+                ContactField.WhatsApp,
+                "O WhatsApp precisa ser um número. Informe os dígitos com o código do país, "
+                + "ou deixe o campo vazio para não oferecer este canal.");
+        }
+
+        if (whatsappDigits is { } whatsapp
             && (whatsapp.Length < MinWhatsAppDigits || whatsapp.Length > MaxWhatsAppDigits))
         {
             return new ContactOutcome(

@@ -231,6 +231,93 @@ public sealed class CoverValidationTests
     }
 
     /// <summary>
+    /// R-01, segunda rodada: a árvore de páginas é **válida** e nada se repete — o que mata o
+    /// processo é o aninhamento sintático numa chave qualquer, dentro do parser do PdfSharp,
+    /// antes de qualquer travessia. Reproduzido com 10 KB e 5.000 níveis, saída `exit 127`.
+    ///
+    /// Que este caso chegue a uma asserção é o que ele prova: a detecção de ciclo e o teto de
+    /// nós não veem nada aqui.
+    /// </summary>
+    [Fact]
+    public void Aninhamento_sintatico_profundo_e_recusado_antes_de_chegar_ao_parser()
+    {
+        var nested = new string('[', 5_000) + new string(']', 5_000);
+
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+            $"<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Lixo {nested}>>"));
+
+        Assert.Equal(CoverRejection.MalformedStructure, inspection.Rejection);
+    }
+
+    /// <summary>
+    /// O teto de nós contava só os que têm identidade de objeto, e era cego para dicionários
+    /// **diretos** — uma árvore de centenas de milhares de páginas diretas cabia no limite de
+    /// tamanho, nunca tocava o teto, e a fila sozinha custava centenas de megabytes.
+    /// </summary>
+    [Fact]
+    public void Arvore_larga_de_paginas_diretas_para_no_teto_em_vez_de_crescer()
+    {
+        var kids = string.Concat(
+            Enumerable.Repeat("<</Type/Page/MediaBox[0 0 595 842]>>", 6_000));
+
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            $"<</Type/Pages/Count 1/Kids[{kids}]>>"));
+
+        // Recusado por estrutura ou por contagem — o que importa é **terminar barato**, sem
+        // percorrer a árvore inteira nem empilhar tudo.
+        Assert.False(inspection.Accepted);
+    }
+
+    /// <summary>
+    /// `/Rotate` é definido em múltiplos de 90. Fora disso, a divisão inteira tratava o valor
+    /// como zero: `/Rotate 45` passava como retrato.
+    /// </summary>
+    [Fact]
+    public void Rotacao_fora_de_multiplo_de_noventa_e_recusada()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+            "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Rotate 45>>"));
+
+        Assert.Equal(CoverRejection.MalformedStructure, inspection.Rejection);
+    }
+
+    /// <summary>
+    /// Proporção certa não basta: uma página de dezenas de quilômetros é proporcional ao A4 e
+    /// era **aceita**, seguindo para a concatenação de T-32.
+    /// </summary>
+    [Fact]
+    public void Pagina_acima_do_limite_do_formato_e_recusada_apesar_da_proporcao()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+            "<</Type/Page/Parent 2 0 R/MediaBox[0 0 210000 297000]>>"));
+
+        Assert.Equal(CoverRejection.MalformedStructure, inspection.Rejection);
+    }
+
+    /// <summary>
+    /// O formato permite os cantos da caixa em qualquer ordem. Lida como dimensão negativa, a
+    /// capa era recusada com "não é um PDF" — mensagem que manda o dono procurar um problema
+    /// que não existe.
+    /// </summary>
+    [Fact]
+    public void MediaBox_com_cantos_invertidos_e_aceita()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+            "<</Type/Page/Parent 2 0 R/MediaBox[0 842 595 0]>>"));
+
+        Assert.True(inspection.Accepted);
+    }
+
+    /// <summary>
     /// PDF montado byte a byte, com tabela xref calculada. O `PdfDocument` do PdfSharp não
     /// serve aqui: ele não deixa produzir árvore inconsistente, que é justamente o que
     /// estes casos precisam enviar.
