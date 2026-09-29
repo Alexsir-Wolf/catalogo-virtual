@@ -196,7 +196,10 @@ public sealed class ProductPublicationTests(PostgresFixture postgres)
     }
 
     private ProductPublication CreatePublication() =>
-        new(new ContextFactory(postgres.ConnectionString), NullLogger<ProductPublication>.Instance);
+        new(
+            new ContextFactory(postgres.ConnectionString),
+            TimeProvider.System,
+            NullLogger<ProductPublication>.Instance);
 
     private sealed class ContextFactory(string connectionString) : IDbContextFactory<CatalogDbContext>
     {

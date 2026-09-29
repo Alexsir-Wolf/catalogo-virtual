@@ -46,6 +46,7 @@ public sealed record PublicationOutcome(
 /// </summary>
 public sealed class ProductPublication(
     IDbContextFactory<CatalogDbContext> contextFactory,
+    TimeProvider time,
     ILogger<ProductPublication> logger)
 {
     /// <returns><c>null</c> quando o produto não existe mais — quem chama mostra isso em
@@ -76,6 +77,11 @@ public sealed class ProductPublication(
         }
 
         product.Status = ProductStatus.Published;
+
+        // A data de entrada no ar é o que permite à prévia destacar o que é novo desde a
+        // última geração (RN-32), sem guardar a lista de produtos de catálogo nenhum.
+        product.PublishedAt = time.GetUtcNow();
+
         await context.SaveChangesAsync(cancellationToken);
 
         return PublicationOutcome.Published();

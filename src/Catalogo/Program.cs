@@ -31,10 +31,12 @@ builder.Services.AddScoped(services =>
 
 builder.Services.Configure<ObjectStorageOptions>(
     builder.Configuration.GetSection(ObjectStorageOptions.SectionName));
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ImageProcessor>();
 builder.Services.AddHttpClient<IObjectStorage, SupabaseObjectStorage>();
 builder.Services.AddScoped<ProductPhotoService>();
 builder.Services.AddScoped<CatalogMaintenance>();
+builder.Services.AddScoped<CatalogResolution>();
 builder.Services.AddScoped<CategoryMaintenance>();
 builder.Services.AddScoped<ProductMaintenance>();
 builder.Services.AddScoped<ProductPhotoUpload>();

@@ -44,6 +44,18 @@ public class Product
     public ProductStatus Status { get; set; } = ProductStatus.Draft;
 
     /// <summary>
+    /// Quando o produto foi ao ar pela última vez, ou nulo se nunca foi.
+    ///
+    /// Existe por causa da RN-32: a prévia precisa destacar o que passou a integrar o catálogo
+    /// **desde a última geração**, e comparar duas datas é a única forma de saber isso sem
+    /// guardar a lista de produtos de cada catálogo — que é exatamente o que a ADR-014 proíbe.
+    ///
+    /// Despublicar **não apaga** a data: um produto que sai e volta ao ar depois da última
+    /// geração é novidade para quem vai receber o PDF, e é isso que o destaque comunica.
+    /// </summary>
+    public DateTimeOffset? PublishedAt { get; set; }
+
+    /// <summary>
     /// Nomes imutáveis das derivadas da foto. Substituir a foto gera nomes novos em vez
     /// de sobrescrever os anteriores (RN-11, RN-13, ADR-005). A derivada de impressão
     /// nunca é exposta publicamente (RN-12).

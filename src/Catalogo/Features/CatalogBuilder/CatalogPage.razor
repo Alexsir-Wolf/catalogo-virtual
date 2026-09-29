@@ -2,7 +2,9 @@
 @page "/painel/catalogos/{Id:int}"
 @rendermode InteractiveServer
 @using Catalogo.Features.Categories
+@using System.Globalization
 @inject CatalogMaintenance Maintenance
+@inject CatalogResolution Resolution
 @inject CategoryMaintenance Categories
 @inject NavigationManager Navigation
 
@@ -116,9 +118,97 @@
                 </div>
             </div>
 
-            <p class="campo__ajuda">
-                A prévia do que vai sair e a geração do PDF entram nas próximas etapas.
-            </p>
+            @* RN-31: a prévia **precede a geração, sempre**. Não existe caminho que a pule, e
+               é por isso que ela não é uma aba nem um modal: é o corpo da tela, ao lado do
+               critério. Um botão "gerar direto" anularia a proteção que justifica a ADR-014. *@
+            @if (Id is not null)
+            {
+                <div class="painel-bloco">
+                    <div class="painel-bloco__hd">
+                        <h2>Prévia do que vai sair</h2>
+
+                        @if (resolved is { IsEmpty: false } preview)
+                        {
+                            <span class="selo selo--no-ar">
+                                @preview.ProductCount @(preview.ProductCount == 1 ? "produto" : "produtos")
+                            </span>
+                            <span class="selo selo--rascunho">
+                                ~@preview.EstimatedPages @(preview.EstimatedPages == 1 ? "página" : "páginas")
+                            </span>
+                        }
+                    </div>
+
+                    <div class="painel-bloco__bd">
+                        @if (resolved is null)
+                        {
+                            <p class="campo__ajuda">Salve o critério para ver a prévia.</p>
+                        }
+                        else if (resolved.IsEmpty)
+                        {
+                            @* RN-46 / CA-18: nenhum produto No ar atende ao critério. A razão
+                               precisa estar na tela — "nada aqui" sem motivo faz o dono achar
+                               que o catálogo quebrou, quando o acervo é que está em Rascunho. *@
+                            <p class="campo__erro" role="alert" data-estado="previaVazia">
+                                <b>Nenhum produto No ar atende a este critério.</b><br />
+                                <span class="campo__ajuda">
+                                    A geração está indisponível. Produtos em Rascunho não saem
+                                    no documento — confira a situação deles nas categorias
+                                    escolhidas.
+                                </span>
+                            </p>
+                        }
+                        else
+                        {
+                            @if (resolved.HasNewProducts)
+                            {
+                                @* RN-32: o destaque é a mitigação do risco central do sistema.
+                                   O dono gera achando que conhece o conteúdo; sem este aviso,
+                                   descobre no cliente que algo entrou. *@
+                                <p class="campo__ajuda" role="status" data-estado="comItensNovos">
+                                    <b>@resolved.NewSinceLastGeneration
+                                    @(resolved.NewSinceLastGeneration == 1 ? "produto entrou" : "produtos entraram")
+                                    neste catálogo desde a última geração.</b>
+                                    Estão marcados na lista abaixo.
+                                </p>
+                            }
+
+                            <p class="campo__ajuda">
+                                A numeração abaixo é a <b>deste recorte</b>: uma categoria que é
+                                a 6ª no cadastro sai como <span class="mono">02</span> se for a
+                                segunda daqui. O número de páginas é estimativa — a contagem
+                                exata só existe depois de compor.
+                            </p>
+
+                            @foreach (var category in resolved.Categories)
+                            {
+                                <div class="previa">
+                                    <div class="previa__h">
+                                        <span class="mono previa__n">@category.Label</span>
+                                        <b>@category.Name</b>
+                                        <em>@category.Products.Count</em>
+                                    </div>
+
+                                    <ul class="previa__l">
+                                        @foreach (var product in category.Products)
+                                        {
+                                            <li class="previa__i @(product.IsNewSinceLastGeneration ? "previa__i--novo" : null)">
+                                                <span>@product.Name</span>
+
+                                                @if (product.IsNewSinceLastGeneration)
+                                                {
+                                                    <span class="previa__b">novo</span>
+                                                }
+
+                                                <span class="mono">@product.Price.ToString("C2", Brazil)</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
         }
     </div>
 </div>
@@ -127,7 +217,10 @@
     [Parameter]
     public int? Id { get; set; }
 
+    private static readonly CultureInfo Brazil = CultureInfo.GetCultureInfo("pt-BR");
+
     private CatalogDraft draft = new();
+    private ResolvedCatalog? resolved;
     private IReadOnlyList<Category>? categories;
     private CatalogFailure? failure;
     private bool notFound;
@@ -160,7 +253,13 @@
             }
 
             draft = found;
+            await ResolveAsync();
         }
+    }
+
+    private async Task ResolveAsync()
+    {
+        resolved = Id is { } id ? await Resolution.ResolveAsync(id) : null;
     }
 
     private void Toggle(int categoryId, ChangeEventArgs change)
@@ -195,6 +294,10 @@
 
         failure = null;
         saved = true;
+
+        // A prévia é recalculada a cada mudança de critério (RN-30): o que ela mostra é
+        // resolvido agora, e guardar o resultado anterior seria exibir passado.
+        await ResolveAsync();
 
         if (Id is null)
         {

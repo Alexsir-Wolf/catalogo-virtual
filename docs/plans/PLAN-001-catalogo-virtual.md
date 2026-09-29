@@ -913,7 +913,7 @@ Lista de catálogos com contagem resolvida no momento da exibição e data da ú
 
 #### T-23 — Resolução do filtro e pré-visualização
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Alta
 - **Depende de:** T-22
 - **Implementa:** RN-30, RN-31, RN-32, RN-39, RN-40, RN-46
@@ -929,12 +929,12 @@ Resolver o filtro no momento da exibição — apenas produtos No ar, agrupados 
 Produtos que passaram a integrar o catálogo desde a última geração são destacados *(RN-32)*. Esse destaque é a mitigação do risco central do sistema, não enfeite.
 
 **Critério de aceite (testável):**
-- [ ] Prévia resolve apenas produtos No ar *(RN-30)*
-- [ ] Numeração recalculada por recorte, não a global *(CA-10, RN-39)*
-- [ ] Produto publicado após a última geração aparece destacado *(CA-14)*
-- [ ] Prévia obrigatória antes de gerar — não há caminho que a pule *(CA-16)*
-- [ ] Filtro sem nenhum produto No ar impede a geração, com a razão *(CA-18)*
-- [ ] Alterar o critério recalcula a prévia
+- [x] Prévia resolve apenas produtos No ar *(RN-30)*
+- [x] Numeração recalculada por recorte, não a global *(CA-10, RN-39)*
+- [x] Produto publicado após a última geração aparece destacado *(CA-14)*
+- [x] Prévia obrigatória antes de gerar — não há caminho que a pule *(CA-16)* — *a prévia é o corpo da tela; a geração entra em T-25 e nascerá abaixo dela*
+- [x] Filtro sem nenhum produto No ar impede a geração, com a razão *(CA-18)*
+- [x] Alterar o critério recalcula a prévia
 
 **Testes a escrever:**
 - *Integration:* publicar produto em categoria de catálogo existente e verificar que consta da prévia destacado *(CA-14)*
