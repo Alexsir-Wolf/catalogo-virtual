@@ -1,4 +1,5 @@
 @page "/produto/{Id:int}"
+@layout VitrineLayout
 @using System.Globalization
 @using Catalogo.Features.Media
 @using Catalogo.Features.Products
@@ -17,162 +18,119 @@
 
 <PageTitle>@(product is null ? "Produto não encontrado" : $"{product.Name} — Catálogo")</PageTitle>
 
-<div class="vitrine">
-    <div class="util">
-        <div class="util__in">
-            <span class="util__pill">Catálogo</span>
-            <span>Atendimento Seg–Sex 08h–18h</span>
+@if (product is null)
+{
+    @* UI-02.naoEncontrado. Obrigatório e com consequência real: despublicar um produto
+       o faz deixar de existir para a vitrine, e o link que alguém já compartilhou
+       continua sendo aberto. *@
+    <div class="nada" data-estado="naoEncontrado">
+        <div class="nada__m">▢</div>
+        <h2>Produto não encontrado</h2>
+        <p>
+            Este produto não está mais disponível no catálogo, ou o endereço está
+            incorreto. O catálogo completo continua no ar.
+        </p>
+        <a href="/">Ver catálogo completo</a>
+    </div>
+}
+else
+{
+    <nav class="trilha" aria-label="Trilha de navegação">
+        <a href="/">Catálogo</a>
+        <span>›</span>
+        <a href="/?categoria=@product.CategoryId">@product.CategoryName</a>
+        <span>›</span>
+        <b>@product.Name</b>
+    </nav>
+
+    <div class="produto" data-estado="@(HasDescription ? "default" : "semDescricao")">
+        <div>
+            @if (product.LargeFileName is { } photo)
+            {
+                <img class="foto" alt="@product.Name"
+                     src="@PhotoService.PublicUrlFor(photo)" />
+            }
+            else
+            {
+                <div class="foto foto--ausente">Produto sem foto</div>
+            }
+        </div>
+
+        <div>
+            <span class="sobrancelha">@product.CategoryName</span>
+            <h1>@product.Name</h1>
+
+            @* RN-05: a descrição completa aparece só aqui, e sem truncamento. Sem
+               descrição, o resumo assume; sem os dois, uma linha neutra — o que a
+               UI-02 chama de `semDescricao`. *@
+            @if (product.Description is { } description)
+            {
+                <p class="texto">@description</p>
+            }
+            else if (product.Summary is { } summary)
+            {
+                <p class="texto">@summary</p>
+            }
+            else
+            {
+                <p class="texto texto--ausente">
+                    Este produto ainda não tem descrição cadastrada.
+                </p>
+            }
+
+            @* RN-07: o rótulo fica **acima** do valor, não embutido nele. *@
+            <div class="preco">
+                <span class="preco__r">@LabelOf(product.PriceLabel)</span>
+                <span class="preco__v">@Money(product.Price)</span>
+            </div>
+
+            <p class="campo__ajuda">
+                Para comprar, fale com o vendedor. Os canais de contato aparecem aqui
+                quando configurados.
+            </p>
         </div>
     </div>
 
-    <header class="cabeca">
-        <div class="cabeca__in">
-            <a class="marca" href="/">
-                <span class="marca__m">CT</span>
-                <span>
-                    <span class="marca__t">CATÁLOGO</span>
-                    <span class="marca__s">Suprimentos &amp; Informática</span>
-                </span>
-            </a>
-
-            <form class="busca" method="get" action="/" role="search">
-                <input type="search" name="busca"
-                       aria-label="Buscar produto pelo nome"
-                       placeholder="Buscar pelo nome do produto" />
-                <button type="submit" aria-label="Buscar">⌕</button>
-            </form>
-        </div>
-    </header>
-
-    @if (loading)
+    @if (related.Count > 0)
     {
-        <div class="nada"><p>Carregando…</p></div>
-    }
-    else if (product is null)
-    {
-        @* UI-02.naoEncontrado. Obrigatório e com consequência real: despublicar um produto
-           o faz deixar de existir para a vitrine, e o link que alguém já compartilhou
-           continua sendo aberto. *@
-        <div class="nada" data-estado="naoEncontrado">
-            <div class="nada__m">▢</div>
-            <h2>Produto não encontrado</h2>
-            <p>
-                Este produto não está mais disponível no catálogo, ou o endereço está
-                incorreto. O catálogo completo continua no ar.
-            </p>
-            <a href="/">Ver catálogo completo</a>
-        </div>
-    }
-    else
-    {
-        <nav class="trilha" aria-label="Trilha de navegação">
-            <a href="/">Catálogo</a>
-            <span>›</span>
-            <a href="/?categoria=@product.CategoryId">@product.CategoryName</a>
-            <span>›</span>
-            <b>@product.Name</b>
-        </nav>
+        <section class="vizinhos">
+            <h2>Outros produtos em @product.CategoryName</h2>
 
-        <div class="produto" data-estado="@(HasDescription ? "default" : "semDescricao")">
-            <div>
-                @if (product.LargeFileName is { } photo)
+            <div class="grade">
+                @foreach (var neighbour in related)
                 {
-                    <img class="foto" alt="@product.Name"
-                         src="@PhotoService.PublicUrlFor(photo)" />
-                }
-                else
-                {
-                    <div class="foto foto--ausente">Produto sem foto</div>
+                    <a class="cartao" href="/produto/@neighbour.Id">
+                        @if (neighbour.ThumbnailFileName is { } thumbnail)
+                        {
+                            <img class="cartao__f" alt="" loading="lazy"
+                                 src="@PhotoService.PublicUrlFor(thumbnail)" />
+                        }
+                        else
+                        {
+                            <div class="cartao__f cartao__f--ausente">sem foto</div>
+                        }
+
+                        <div class="cartao__b">
+                            <span class="cartao__n">@neighbour.Name</span>
+                            <span class="cartao__r">@neighbour.Summary</span>
+                            <span class="cartao__p">
+                                <b>@Money(neighbour.Price)</b>
+                                <span>@LabelOf(neighbour.PriceLabel)</span>
+                            </span>
+                        </div>
+                    </a>
                 }
             </div>
-
-            <div>
-                <span class="sobrancelha">@product.CategoryName</span>
-                <h1>@product.Name</h1>
-
-                @* RN-05: a descrição completa aparece só aqui, e sem truncamento. Sem
-                   descrição, o resumo assume; sem os dois, uma linha neutra — o que a
-                   UI-02 chama de `semDescricao`. *@
-                @if (product.Description is { } description)
-                {
-                    <p class="texto">@description</p>
-                }
-                else if (product.Summary is { } summary)
-                {
-                    <p class="texto">@summary</p>
-                }
-                else
-                {
-                    <p class="texto texto--ausente">
-                        Este produto ainda não tem descrição cadastrada.
-                    </p>
-                }
-
-                @* RN-07: o rótulo fica **acima** do valor, não embutido nele. *@
-                <div class="preco">
-                    <span class="preco__r">@LabelOf(product.PriceLabel)</span>
-                    <span class="preco__v">@Money(product.Price)</span>
-                </div>
-
-                <p class="campo__ajuda">
-                    Para comprar, fale com o vendedor. Os canais de contato aparecem aqui
-                    quando configurados.
-                </p>
-            </div>
-        </div>
-
-        @if (related.Count > 0)
-        {
-            <section class="vizinhos">
-                <h2>Outros produtos em @product.CategoryName</h2>
-
-                <div class="grade">
-                    @foreach (var neighbour in related)
-                    {
-                        <a class="cartao" href="/produto/@neighbour.Id">
-                            @if (neighbour.ThumbnailFileName is { } thumbnail)
-                            {
-                                <img class="cartao__f" alt="" loading="lazy"
-                                     src="@PhotoService.PublicUrlFor(thumbnail)" />
-                            }
-                            else
-                            {
-                                <div class="cartao__f cartao__f--ausente">sem foto</div>
-                            }
-
-                            <div class="cartao__b">
-                                <span class="cartao__n">@neighbour.Name</span>
-                                <span class="cartao__r">@neighbour.Summary</span>
-                                <span class="cartao__p">
-                                    <b>@Money(neighbour.Price)</b>
-                                    <span>@LabelOf(neighbour.PriceLabel)</span>
-                                </span>
-                            </div>
-                        </a>
-                    }
-                </div>
-            </section>
-        }
+        </section>
     }
+}
 
-    <footer class="rodape">
-        <div class="rodape__c">
-            <b>Suprimentos &amp; Informática</b>
-            <em>Atendimento de segunda a sexta, das 08h às 18h</em>
-        </div>
-        <div class="rodape__c">
-            <b>Como comprar</b>
-            <em>Escolha o produto e fale com o vendedor pelo WhatsApp ou telefone</em>
-        </div>
-    </footer>
-</div>
 
 @code {
     private static readonly CultureInfo Brazil = CultureInfo.GetCultureInfo("pt-BR");
 
     private StorefrontDetail? product;
     private IReadOnlyList<StorefrontProduct> related = [];
-    private bool loading = true;
 
     [Parameter]
     public int Id { get; set; }
@@ -188,7 +146,6 @@
     {
         product = await Query.FindAsync(Id);
         related = product is null ? [] : await Query.RelatedAsync(product);
-        loading = false;
     }
 
     private static string Money(decimal price) => price.ToString("C2", Brazil);

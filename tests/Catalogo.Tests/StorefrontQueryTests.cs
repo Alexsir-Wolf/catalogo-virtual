@@ -204,14 +204,17 @@ public sealed class StorefrontQueryTests(PostgresFixture postgres) : IAsyncLifet
     }
 
     [Fact]
-    public async Task Pagina_alem_da_ultima_devolve_vazio_sem_erro()
+    public async Task Pagina_alem_da_ultima_serve_a_ultima_existente()
     {
         var category = await CreateCategoryAsync("Impressoras", position: 1);
         await CreateProductAsync(category, "Multifuncional", ProductStatus.Published);
 
         var page = await QueryAsync(new StorefrontRequest { Page = 9, PageSize = 12 });
 
-        Assert.Empty(page.Products);
+        // Serve a última em vez de devolver grade vazia: a RN-56 promete link
+        // compartilhável, e link envelhece (R-02 de REVIEW-T-18-2026-09-28).
+        Assert.Single(page.Products);
+        Assert.Equal(1, page.Page);
         Assert.Equal(1, page.Total);
     }
 

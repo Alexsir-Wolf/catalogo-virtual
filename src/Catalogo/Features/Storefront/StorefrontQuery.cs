@@ -77,28 +77,33 @@ public sealed class StorefrontQuery(IDbContextFactory<CatalogDbContext> contextF
     private const int MaxPageSize = 60;
 
     /// <summary>
-    /// A página e as facetas saem de duas consultas **disparadas juntas**, cada uma no seu
-    /// contexto. O plano pedia "a mesma ida ao banco", e o motivo declarado era latência:
-    /// a ADR-004, na revisão 0.7, registra que o banco passou a ser acessado pela rede e
-    /// que o custo por consulta cresceu. Duas consultas concorrentes pagam uma latência,
-    /// não duas, e continuam sendo LINQ tipado — a alternativa de uma instrução única
-    /// exigiria SQL cru com função de janela, trocando verificabilidade por uma economia
-    /// que o cache da T-21 vai absorver de todo modo.
+    /// O plano pedia página e contagens "na mesma ida ao banco", e o motivo declarado era
+    /// latência: a ADR-004, na revisão 0.7, registra que o banco passou a ser acessado
+    /// pela rede e que o custo por consulta cresceu.
+    ///
+    /// **O que está entregue são três consultas, custando duas latências**, e não uma:
+    /// o ramo dos produtos conta o total e depois busca a página — sequencialmente, porque
+    /// o total é o que limita a página pedida —, enquanto o ramo das facetas corre em
+    /// paralelo com ele. A alternativa de uma instrução única exigiria SQL cru com função
+    /// de janela, trocando LINQ verificável por uma economia que o cache de T-21 absorve.
+    ///
+    /// O número está aqui porque uma versão anterior deste comentário afirmava uma
+    /// latência só, e a afirmação era falsa (R-01 de `REVIEW-T-18-2026-09-28`).
     /// </summary>
     public async Task<StorefrontPage> SearchAsync(
         StorefrontRequest request,
         CancellationToken cancellationToken = default)
     {
-        var page = Math.Max(request.Page, 1);
+        var requested = Math.Max(request.Page, 1);
         var pageSize = Math.Clamp(request.PageSize, 1, MaxPageSize);
         var term = Normalize(request.Term);
 
-        var products = ProductsAsync(request.CategoryId, term, page, pageSize, cancellationToken);
+        var products = ProductsAsync(request.CategoryId, term, requested, pageSize, cancellationToken);
         var categories = CategoriesAsync(term, cancellationToken);
 
         await Task.WhenAll(products, categories);
 
-        var (items, total) = await products;
+        var (items, total, page) = await products;
 
         return new StorefrontPage(items, await categories, total, page, pageSize);
     }
@@ -161,10 +166,10 @@ public sealed class StorefrontQuery(IDbContextFactory<CatalogDbContext> contextF
             .ToListAsync(cancellationToken);
     }
 
-    private async Task<(IReadOnlyList<StorefrontProduct> Items, int Total)> ProductsAsync(
+    private async Task<(IReadOnlyList<StorefrontProduct> Items, int Total, int Page)> ProductsAsync(
         int? categoryId,
         string? term,
-        int page,
+        int requested,
         int pageSize,
         CancellationToken cancellationToken)
     {
@@ -178,6 +183,14 @@ public sealed class StorefrontQuery(IDbContextFactory<CatalogDbContext> contextF
         }
 
         var total = await matching.CountAsync(cancellationToken);
+
+        // A página é limitada às que existem, e não só a partir de 1. A RN-56 promete que
+        // toda listagem é compartilhável por link, e link envelhece: despublicado o
+        // suficiente, `?pagina=3` passaria a devolver grade vazia com "página 3 de 1".
+        // Servir a última é mais gentil que perder o visitante (R-02 de
+        // REVIEW-T-18-2026-09-28).
+        var pageCount = Math.Max((int)Math.Ceiling(total / (double)pageSize), 1);
+        var page = Math.Min(requested, pageCount);
 
         var items = await matching
             .OrderBy(product => product.Category!.Position)
@@ -195,7 +208,7 @@ public sealed class StorefrontQuery(IDbContextFactory<CatalogDbContext> contextF
                 product.Photo == null ? null : product.Photo.ThumbnailFileName))
             .ToListAsync(cancellationToken);
 
-        return (items, total);
+        return (items, total, page);
     }
 
     /// <summary>

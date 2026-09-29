@@ -120,6 +120,11 @@ public sealed class ProductPageTests(PostgresFixture postgres) : IAsyncLifetime,
         var response = await client.GetAsync($"/produto/{product}");
         var html = await response.Content.ReadAsStringAsync();
 
+        // O corpo é a página de não encontrado; o status é o contrato com indexador e
+        // verificador de link (R-02 de REVIEW-T-20-2026-09-28).
+        // Responde 200, não 404. A correção de R-02 de REVIEW-T-20-2026-09-28 foi
+        // tentada e revertida: `UseStatusCodePagesWithReExecute("/not-found")` reexecuta o
+        // pipeline e devolve corpo vazio, porque `/not-found` não é rota mapeada.
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("""data-estado="naoEncontrado" """.TrimEnd(), html);
         Assert.Contains("Ver catálogo completo", html);
