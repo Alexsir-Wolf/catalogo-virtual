@@ -43,6 +43,7 @@ builder.Services.AddScoped<ProductPhotoService>();
 builder.Services.AddScoped<CatalogMaintenance>();
 builder.Services.AddScoped<CatalogResolution>();
 builder.Services.AddScoped<CatalogComposer>();
+builder.Services.AddScoped<CatalogGeneration>();
 builder.Services.AddScoped<CategoryMaintenance>();
 builder.Services.AddScoped<ProductMaintenance>();
 builder.Services.AddScoped<ProductPhotoUpload>();

@@ -989,7 +989,7 @@ Categorias fluem continuamente, sem quebra forçada, e **nenhuma célula é divi
 
 #### T-25 — Geração, progresso e download
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Média
 - **Depende de:** T-24
 - **Implementa:** RN-35, RN-44, RN-45
@@ -1006,14 +1006,14 @@ Geração síncrona no circuito do painel, com progresso item a item, teto de pr
 No momento do download, a tela informa que aquele arquivo é o único registro daquele envio.
 
 **Critério de aceite (testável):**
-- [ ] Progresso visível durante a composição *(RN-44)*
-- [ ] Arquivo entregue como download ao final *(CA-17)*
-- [ ] **Nenhum PDF permanece no servidor após a entrega** *(CA-17, RN-35)*
-- [ ] Data da última geração registrada *(CA-17)*
-- [ ] Catálogo acima do teto é recusado **antes** de iniciar a composição *(CA-19)*
-- [ ] A recusa informa o limite e a quantidade resolvida
-- [ ] Falha na geração não entrega arquivo parcial
-- [ ] O download informa que o arquivo é o único registro
+- [x] Progresso visível durante a composição *(RN-44)*
+- [x] Arquivo entregue como download ao final *(CA-17)*
+- [x] **Nenhum PDF permanece no servidor após a entrega** *(CA-17, RN-35)*
+- [x] Data da última geração registrada *(CA-17)*
+- [x] Catálogo acima do teto é recusado **antes** de iniciar a composição *(CA-19)*
+- [x] A recusa informa o limite e a quantidade resolvida
+- [x] Falha na geração não entrega arquivo parcial
+- [x] O download informa que o arquivo é o único registro
 
 **Testes a escrever:**
 - *Integration:* gerar e verificar que nenhum arquivo ficou no disco *(CA-17, RN-35)*

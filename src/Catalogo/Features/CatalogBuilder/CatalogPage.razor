@@ -2,9 +2,14 @@
 @page "/painel/catalogos/{Id:int}"
 @rendermode InteractiveServer
 @using Catalogo.Features.Categories
+@using Catalogo.Features.PdfExport
+@using Microsoft.JSInterop
 @using System.Globalization
 @inject CatalogMaintenance Maintenance
 @inject CatalogResolution Resolution
+@inject CatalogGeneration Generation
+@inject IJSRuntime Download
+@inject ILogger<CatalogPage> Logger
 @inject CategoryMaintenance Categories
 @inject NavigationManager Navigation
 
@@ -179,6 +184,21 @@
                                 exata só existe depois de compor.
                             </p>
 
+                            @* RN-45: o teto é conferido **antes** de compor, e a recusa informa
+                               o limite e a quantidade resolvida — "não deu" sem número deixa o
+                               dono sem saber o que reduzir. *@
+                            @if (resolved.ProductCount > CatalogGeneration.MaxProducts)
+                            {
+                                <p class="campo__erro" role="alert" data-estado="acimaDoTeto">
+                                    <b>Este critério resolve @resolved.ProductCount produtos, e o
+                                    limite por catálogo é @CatalogGeneration.MaxProducts.</b><br />
+                                    <span class="campo__ajuda">
+                                        Reduza as categorias do recorte. O limite existe porque a
+                                        composição concorre com a vitrine pelo mesmo servidor.
+                                    </span>
+                                </p>
+                            }
+
                             @foreach (var category in resolved.Categories)
                             {
                                 <div class="previa">
@@ -207,6 +227,53 @@
                             }
                         }
                     </div>
+                    @* A geração nasce **abaixo** da prévia, e não ao lado nem antes: a RN-31 diz
+                       que a pré-visualização precede a geração sempre, e a ordem na tela é o
+                       que garante isso sem depender de disciplina. *@
+                    <div class="painel-bloco__ft">
+                        <button type="button" class="btn btn--primario" @onclick="GenerateAsync"
+                                disabled="@(!CanGenerate)">
+                            Gerar o PDF
+                        </button>
+
+                        @if (generating)
+                        {
+                            <span class="campo__ajuda" role="status" data-estado="gerando">
+                                @stage?.Stage
+                            </span>
+                        }
+
+                        @if (generated is { } file)
+                        {
+                            <span class="produto__salvo" role="status" data-estado="concluido">
+                                Documento pronto: @file.FileName (@Size(file.Content!.Length)).
+                            </span>
+                        }
+
+                        @if (refusal is { } reason)
+                        {
+                            <span class="campo__erro" role="alert"
+                                  data-estado="@(reason == GenerationRefusal.Failed ? "erroGeracao" : "recusado")">
+                                @MessageFor(reason)
+                            </span>
+                        }
+                    </div>
+
+                    @if (generated is not null)
+                    {
+                        @* RN-35: o sistema **não guarda** o arquivo. Se o dono perder o
+                           download, o caminho é gerar de novo — e o documento sairá com o
+                           acervo daquele momento, não com este. Avisar isso no momento da
+                           entrega é a diferença entre um sistema honesto e uma surpresa. *@
+                        <div class="painel-bloco__bd">
+                            <p class="campo__ajuda">
+                                <b>Este arquivo é o único registro deste envio.</b> O sistema não
+                                guarda cópia: gerar de novo produz um documento com o acervo
+                                daquele momento, que pode não ser este. Guarde o arquivo se
+                                precisar do registro.
+                            </p>
+                        </div>
+                    }
                 </div>
             }
         }
@@ -225,6 +292,11 @@
     private CatalogFailure? failure;
     private bool notFound;
     private bool saved;
+
+    private bool generating;
+    private GenerationProgress? stage;
+    private GenerationOutcome? generated;
+    private GenerationRefusal? refusal;
 
     /// <summary>
     /// `semCategoria` é o estado que a UI-08 declara para critério sem categoria marcada: com
@@ -261,6 +333,98 @@
     {
         resolved = Id is { } id ? await Resolution.ResolveAsync(id) : null;
     }
+
+    /// <summary>
+    /// Gerar exige prévia com conteúdo e dentro do teto. O botão desabilitado não é a única
+    /// proteção — a geração confere tudo de novo no servidor, porque o critério pode ter mudado
+    /// entre carregar a tela e clicar.
+    /// </summary>
+    private bool CanGenerate =>
+        !generating
+        && resolved is { IsEmpty: false } preview
+        && preview.ProductCount <= CatalogGeneration.MaxProducts;
+
+    private async Task GenerateAsync()
+    {
+        if (generating)
+        {
+            return;
+        }
+
+        generating = true;
+        generated = null;
+        refusal = null;
+        stage = GenerationProgress.Resolving;
+
+        try
+        {
+            // O progresso chega pelo circuito já existente (ADR-013): sem fila, sem worker,
+            // sem tela de acompanhamento. `InvokeAsync` porque o relatório vem de outro
+            // contexto de execução.
+            var report = new Progress<GenerationProgress>(current =>
+                InvokeAsync(() =>
+                {
+                    stage = current;
+                    StateHasChanged();
+                }));
+
+            var outcome = await Generation.GenerateAsync(Id!.Value, report);
+
+            if (!outcome.Succeeded)
+            {
+                refusal = outcome.Refusal;
+                return;
+            }
+
+            generated = outcome;
+
+            // O arquivo vai do servidor para o navegador e **não é gravado em disco** em
+            // momento nenhum (RN-35). O fluxo é lido a partir da memória e descartado quando o
+            // download termina.
+            using var stream = new MemoryStream(outcome.Content!);
+            using var reference = new DotNetStreamReference(stream);
+
+            await Download.InvokeVoidAsync("baixarArquivo", outcome.FileName, reference);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Falha ao gerar o catálogo {Id}.", Id);
+            refusal = GenerationRefusal.Failed;
+        }
+        finally
+        {
+            generating = false;
+
+            // A data da última geração mudou: a prévia precisa refletir isso, porque o destaque
+            // de itens novos é relativo a ela (RN-32).
+            await ResolveAsync();
+        }
+    }
+
+    private static string Size(int bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:0.#} KB",
+        _ => $"{bytes / (1024.0 * 1024):0.#} MB"
+    };
+
+    private string MessageFor(GenerationRefusal refusal) => refusal switch
+    {
+        GenerationRefusal.NotFound => "O catálogo não existe mais.",
+        GenerationRefusal.NoProducts =>
+            "Nenhum produto No ar atende ao critério — não há o que gerar.",
+        GenerationRefusal.AboveLimit =>
+            $"O critério resolve {resolved?.ProductCount} produtos, acima do limite de "
+            + $"{CatalogGeneration.MaxProducts}. Reduza as categorias do recorte.",
+        GenerationRefusal.NoCover =>
+            "Envie a capa nas Configurações antes de gerar: o documento é a capa mais as "
+            + "páginas de conteúdo.",
+        GenerationRefusal.AlreadyRunning =>
+            "Já existe uma geração em andamento. Aguarde a conclusão e tente de novo.",
+        GenerationRefusal.Failed =>
+            "A composição falhou e nada foi entregue. Tente novamente.",
+        _ => string.Empty
+    };
 
     private void Toggle(int categoryId, ChangeEventArgs change)
     {
