@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using PdfSharp;
@@ -269,6 +270,40 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
         Assert.Equal(0, await context.PortalSettings.CountAsync());
     }
 
+    /// <summary>
+    /// A ponta de integração de R-07: recusa **não grava nada**. Um canal inválido não pode
+    /// derrubar os outros dois que já estavam certos.
+    /// </summary>
+    [Fact]
+    public async Task RN_67_contato_recusado_nao_altera_o_que_estava_gravado()
+    {
+        var service = Service();
+        await service.SaveContactAsync(new ContactDraft { Phone = "(88) 99654-1931" });
+
+        var outcome = await service.SaveContactAsync(new ContactDraft
+        {
+            WhatsApp = "99654-1931",
+            Phone = "(11) 3333-4444"
+        });
+
+        Assert.Equal(ContactField.WhatsApp, outcome.Rejected);
+        Assert.Equal("(88) 99654-1931", (await service.LoadAsync()).Phone);
+    }
+
+    /// <summary>
+    /// O número chega ao banco só com dígitos, que é o que a URL de conversa exige — a
+    /// vitrine não tem como consertar depois.
+    /// </summary>
+    [Fact]
+    public async Task RN_67_whatsapp_e_gravado_apenas_com_digitos()
+    {
+        var service = Service();
+
+        await service.SaveContactAsync(new ContactDraft { WhatsApp = "+55 (88) 99654-1931" });
+
+        Assert.Equal("5588996541931", (await service.LoadAsync()).WhatsApp);
+    }
+
     [Fact]
     public async Task Contato_em_branco_e_gravado_como_ausencia()
     {
@@ -397,6 +432,109 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
         response.EnsureSuccessStatusCode();
 
         return client;
+    }
+
+    /// <summary>
+    /// CA-34, com verificação que **roda**: um PDF de uma página em retrato é aceito e
+    /// **vira a capa**. O caso que provava isso dependia de credencial do Supabase e era
+    /// pulado, então remover a gravação do nome deixaria a suíte verde com o critério
+    /// principal da tarefa descumprido (R-05 de `REVIEW-T-31-2026-09-29`).
+    ///
+    /// O armazenamento é substituído por um que registra o que recebeu — o mesmo recurso que
+    /// T-13 já usava para provar persistência sem credencial. O caso do armazenamento real
+    /// continua existindo, pulado, porque é ele que exerce o Supabase de verdade.
+    /// </summary>
+    [Fact]
+    public async Task CA_34_pdf_aceito_vira_a_capa_e_vai_para_o_armazenamento()
+    {
+        await database!.MigrateAsync();
+
+        var storage = new RecordingObjectStorage();
+        var service = ServiceWith(storage);
+
+        var inspection = await service.SaveCoverAsync(Pdf(PageSize.A4, pages: 1));
+        var settings = await service.LoadAsync();
+
+        Assert.True(inspection.Accepted);
+        Assert.True(settings.HasCover);
+        Assert.Equal(settings.CoverFileName, Assert.Single(storage.Uploaded));
+        Assert.StartsWith("capa/", settings.CoverFileName);
+        Assert.EndsWith(".pdf", settings.CoverFileName);
+    }
+
+    /// <summary>
+    /// A contraprova do caso acima, no caminho de recusa: sem aceitação, nada é enviado ao
+    /// armazenamento. Antes só era possível afirmar isso com credencial.
+    /// </summary>
+    [Fact]
+    public async Task Capa_recusada_nao_chega_ao_armazenamento()
+    {
+        await database!.MigrateAsync();
+
+        var storage = new RecordingObjectStorage();
+
+        var inspection = await ServiceWith(storage).SaveCoverAsync(Pdf(PageSize.A4, pages: 2));
+
+        Assert.False(inspection.Accepted);
+        Assert.Empty(storage.Uploaded);
+    }
+
+    /// <summary>
+    /// O serviço com o armazenamento trocado. O <c>UserManager</c> vem do contêiner da
+    /// aplicação porque depende do banco e da configuração do Identity, e montá-lo à mão
+    /// seria reconstruir T-07 dentro do teste.
+    /// </summary>
+    private PortalSettingsService ServiceWith(IObjectStorage storage)
+    {
+        var scope = factory.Services.CreateScope();
+
+        return new PortalSettingsService(
+            new SettingsContextFactory(connectionString),
+            storage,
+            Options.Create(new ObjectStorageOptions
+            {
+                Url = "https://armazenamento.invalido",
+                ServiceKey = "chave-de-teste"
+            }),
+            scope.ServiceProvider.GetRequiredService<UserManager<OwnerAccount>>(),
+            NullLogger<PortalSettingsService>.Instance);
+    }
+
+    private sealed class SettingsContextFactory(string connectionString)
+        : IDbContextFactory<CatalogDbContext>
+    {
+        public CatalogDbContext CreateDbContext() =>
+            new(new DbContextOptionsBuilder<CatalogDbContext>()
+                .UseNpgsql(connectionString)
+                .Options);
+    }
+
+    /// <summary>Armazenamento que aceita tudo e guarda o nome do que recebeu.</summary>
+    private sealed class RecordingObjectStorage : IObjectStorage
+    {
+        private readonly List<string> uploaded = [];
+
+        public IReadOnlyList<string> Uploaded => uploaded;
+
+        public Task UploadAsync(
+            string bucket,
+            string objectName,
+            byte[] content,
+            string contentType,
+            CancellationToken cancellationToken = default)
+        {
+            uploaded.Add(objectName);
+
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(
+            string bucket,
+            string objectName,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public string PublicUrlFor(string objectName) => objectName;
     }
 
     /// <summary>

@@ -107,8 +107,15 @@
                                placeholder="5588996541931" />
                         <span class="campo__ajuda">
                             Só dígitos, com código do país e DDD — é o formato que a URL de
-                            conversa exige.
+                            conversa exige. Pontuação é removida ao salvar.
                         </span>
+
+                        @if (RejectionFor(ContactField.WhatsApp) is { } whatsappError)
+                        {
+                            <span class="campo__erro" role="alert" data-estado="contatoRecusado">
+                                @whatsappError
+                            </span>
+                        }
                     </div>
 
                     <div class="campo">
@@ -116,6 +123,13 @@
                         <input id="telefone" type="text" @bind="contact.Phone"
                                maxlength="@PortalSettings.ContactMaxLength"
                                placeholder="(88) 99654-1931" />
+
+                        @if (RejectionFor(ContactField.Phone) is { } phoneError)
+                        {
+                            <span class="campo__erro" role="alert" data-estado="contatoRecusado">
+                                @phoneError
+                            </span>
+                        }
                     </div>
 
                     <div class="campo">
@@ -123,6 +137,13 @@
                         <input id="email" type="text" @bind="contact.Email"
                                maxlength="@PortalSettings.ContactMaxLength"
                                placeholder="vendas@exemplo.com.br" />
+
+                        @if (RejectionFor(ContactField.Email) is { } emailError)
+                        {
+                            <span class="campo__erro" role="alert" data-estado="contatoRecusado">
+                                @emailError
+                            </span>
+                        }
                     </div>
                 </div>
 
@@ -202,6 +223,7 @@
     private string? coverError;
     private bool coverSaved;
     private bool contactSaved;
+    private ContactOutcome? contactRejection;
 
     private string currentPassword = string.Empty;
     private string newPassword = string.Empty;
@@ -316,14 +338,30 @@
 
     private async Task SaveContactAsync()
     {
-        await Settings.SaveContactAsync(contact);
+        contactRejection = null;
+        coverError = null;
+        coverSaved = false;
+        passwordChanged = false;
+        contactSaved = false;
+
+        var outcome = await Settings.SaveContactAsync(contact);
+
+        if (!outcome.Succeeded)
+        {
+            // Recusa não grava nada: um canal inválido não derruba os outros dois, e o
+            // formulário mantém o que o dono digitou para ele corrigir em vez de redigitar.
+            contactRejection = outcome;
+            return;
+        }
+
         await LoadAsync();
 
         contactSaved = true;
-        coverSaved = false;
-        passwordChanged = false;
-        coverError = null;
     }
+
+    /// <summary>Erro do canal recusado, ou nulo quando não há recusa em tela.</summary>
+    private string? RejectionFor(ContactField field) =>
+        contactRejection?.Rejected == field ? contactRejection.Message : null;
 
     private async Task ChangePasswordAsync()
     {

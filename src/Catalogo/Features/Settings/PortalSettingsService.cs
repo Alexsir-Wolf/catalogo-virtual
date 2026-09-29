@@ -17,6 +17,25 @@ public sealed record ContactDraft
     public string? Email { get; set; }
 }
 
+/// <summary>Qual canal foi recusado, para o erro aparecer no campo certo.</summary>
+public enum ContactField
+{
+    WhatsApp,
+    Phone,
+    Email
+}
+
+/// <summary>
+/// Resultado da gravação do contato. Recusa **não grava nada** — um canal inválido não
+/// pode derrubar os outros dois que já estavam certos.
+/// </summary>
+public sealed record ContactOutcome(ContactField? Rejected = null, string? Message = null)
+{
+    public bool Succeeded => Rejected is null;
+
+    public static ContactOutcome Saved() => new();
+}
+
 public enum PasswordFailure
 {
     None,
@@ -80,18 +99,28 @@ public sealed class PortalSettingsService(
     /// (RN-68, CA-38). Quando o cache de T-21 entrar, é aqui que a invalidação precisa
     /// ser disparada — escrita como qualquer outra.
     /// </summary>
-    public async Task SaveContactAsync(
+    public async Task<ContactOutcome> SaveContactAsync(
         ContactDraft draft,
         CancellationToken cancellationToken = default)
     {
+        if (ContactValidation.Check(draft) is { Succeeded: false } rejection)
+        {
+            return rejection;
+        }
+
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var settings = await TrackedAsync(context, cancellationToken);
 
-        settings.WhatsApp = Blank(draft.WhatsApp);
+        // O WhatsApp é gravado **só com dígitos**, que é o que a RN-67 exige e o que a URL
+        // de conversa aceita. O telefone é gravado como digitado: é texto para o visitante
+        // ler, e quem precisa de dígitos ali é o `href`, que os extrai na hora.
+        settings.WhatsApp = ContactValidation.DigitsOrNull(draft.WhatsApp);
         settings.Phone = Blank(draft.Phone);
         settings.Email = Blank(draft.Email);
 
         await context.SaveChangesAsync(cancellationToken);
+
+        return ContactOutcome.Saved();
     }
 
     /// <summary>
