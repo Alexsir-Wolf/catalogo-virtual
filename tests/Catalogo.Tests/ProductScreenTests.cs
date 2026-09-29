@@ -4,6 +4,7 @@ using Catalogo.Features.Account;
 using Catalogo.Features.Categories;
 using Catalogo.Features.Products;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 
 namespace Catalogo.Tests;
 
@@ -120,6 +121,43 @@ public sealed class ProductScreenTests : IDisposable
 
         Assert.Contains("Enviar foto", html);
         Assert.Contains("enviar outra substitui a atual", html);
+    }
+
+    /// <summary>
+    /// RN-20: a exclusão exige confirmação explícita, e o botão da tela **pede** em vez de
+    /// executar. A renderização estática mostra o pedido; a confirmação em si vive no
+    /// circuito, como o resto de UI-05.
+    /// </summary>
+    [Fact]
+    public async Task RN_20_a_edicao_oferece_excluir_sem_ja_excluir()
+    {
+        using var client = await SignedInClientAsync();
+        var productId = await CreateProductAsync();
+
+        var html = await client.GetStringAsync($"/painel/produtos/{productId}");
+
+        Assert.Contains(">Excluir<", html);
+
+        // O pedido não é a confirmação: o estado de confirmação só aparece depois da ação.
+        Assert.DoesNotContain("confirmarExclusao", html);
+
+        // E nada foi excluído por ter aberto a tela.
+        await using var context = postgres.CreateContext();
+        Assert.True(await context.Products.AnyAsync(product => product.Id == productId));
+    }
+
+    /// <summary>
+    /// Não há o que excluir num produto que ainda não existe — oferecer o botão ali seria
+    /// convidar a um erro sem efeito.
+    /// </summary>
+    [Fact]
+    public async Task UI_05_novo_nao_oferece_exclusao()
+    {
+        using var client = await SignedInClientAsync();
+
+        var html = await client.GetStringAsync(NewProductRoute);
+
+        Assert.DoesNotContain(">Excluir<", html);
     }
 
     private async Task<int> CreateProductAsync()

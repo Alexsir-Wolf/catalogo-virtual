@@ -238,11 +238,50 @@
                             disabled="@uploading">Salvar</button>
                     <a class="btn btn--fantasma" href="/painel">Cancelar</a>
 
+                    @* A exclusão só existe na edição: não há o que excluir num produto que
+                       ainda não foi criado (RN-20). *@
+                    @if (Id is not null && !confirmingDeletion)
+                    {
+                        <button type="button" class="btn btn--perigo" @onclick="AskDeletionAsync"
+                                disabled="@uploading">Excluir</button>
+                    }
+
                     @if (saved)
                     {
                         <span class="produto__salvo" role="status">Produto salvo.</span>
                     }
                 </div>
+
+                @if (confirmingDeletion)
+                {
+                    @* UI-05.confirmarExclusao. A confirmação é do **dono**, nunca automática:
+                       a operação não tem volta e leva a foto junto (RN-20). O que ela declara
+                       é exatamente o que vai acontecer — sem eufemismo. *@
+                    <div class="painel-bloco__ft" data-estado="confirmarExclusao">
+                        <p class="campo__erro" role="alert">
+                            <b>Excluir “@draft.Name” definitivamente?</b><br />
+                            Esta operação <b>não pode ser desfeita</b>. O produto sai do
+                            acervo e @(photo is null
+                                ? "nenhum arquivo de imagem será removido, porque este produto não tem foto"
+                                : "a foto e todas as suas versões são removidas junto").
+                            @if (deletionAffectsStorefront)
+                            {
+                                <text>
+                                    Ele está <b>No ar</b>: deixa de aparecer na vitrine, e os
+                                    links já compartilhados para ele param de funcionar.
+                                </text>
+                            }
+                        </p>
+
+                        <button type="button" class="btn btn--perigo" @onclick="DeleteAsync"
+                                disabled="@deleting">Excluir definitivamente</button>
+
+                        <button type="button" class="btn btn--fantasma"
+                                @onclick="CancelDeletion" disabled="@deleting">
+                            Manter o produto
+                        </button>
+                    </div>
+                }
             </div>
         }
     </div>
@@ -259,6 +298,10 @@
 
     private bool notFound;
     private bool saved;
+
+    private bool confirmingDeletion;
+    private bool deleting;
+    private bool deletionAffectsStorefront;
 
     private ProductPhoto? photo;
     private bool uploading;
@@ -440,6 +483,48 @@
         if (Id is null)
         {
             Navigation.NavigateTo($"/painel/produtos/{outcome.Id}");
+        }
+    }
+
+    /// <summary>
+    /// Abre a confirmação. Não exclui nada: o botão de excluir **pede**, o da confirmação
+    /// executa (RN-20). A situação é relida aqui, e não tirada do que a tela carregou, porque
+    /// a confirmação afirma se o produto está no ar — e isso pode ter mudado noutra aba.
+    /// </summary>
+    private async Task AskDeletionAsync()
+    {
+        saved = false;
+        await LoadPublicationAsync();
+        deletionAffectsStorefront = IsPublished;
+        confirmingDeletion = true;
+    }
+
+    private void CancelDeletion() => confirmingDeletion = false;
+
+    private async Task DeleteAsync()
+    {
+        deleting = true;
+
+        try
+        {
+            var removed = await Maintenance.DeleteAsync(Id!.Value);
+
+            if (removed is not null)
+            {
+                // Os arquivos vão depois do registro, e uma falha aqui não desfaz a exclusão
+                // — o produto já saiu do acervo, que é o que foi pedido.
+                await PhotoService.DeleteAsync(removed);
+            }
+
+            Navigation.NavigateTo("/painel/produtos");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "Falha ao excluir o produto {Id}.", Id);
+
+            deleting = false;
+            confirmingDeletion = false;
+            uploadError = "Não foi possível excluir o produto agora. Tente novamente.";
         }
     }
 

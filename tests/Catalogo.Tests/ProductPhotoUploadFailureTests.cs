@@ -86,7 +86,11 @@ public sealed class ProductPhotoUploadFailureTests(PostgresFixture postgres)
         });
 
         return new ProductPhotoUpload(
-            new ProductPhotoService(storage, new ImageProcessor(), options),
+            new ProductPhotoService(
+                storage,
+                new ImageProcessor(),
+                options,
+                NullLogger<ProductPhotoService>.Instance),
             maintenance,
             NullLogger<ProductPhotoUpload>.Instance);
     }
@@ -138,6 +142,61 @@ public sealed class ProductPhotoUploadFailureTests(PostgresFixture postgres)
     private ProductMaintenance CreateMaintenance() =>
         new(new ContextFactory(postgres.ConnectionString), NullLogger<ProductMaintenance>.Instance);
 
+    /// <summary>
+    /// CA-08, a metade dos arquivos: a exclusão remove o original **e as quatro derivadas**,
+    /// cada um do bucket em que vive — a de impressão é privada (RN-12), as três de tela são
+    /// públicas. Sem este caso, esquecer uma derivada passaria sem ninguém ver.
+    /// </summary>
+    [Fact]
+    public async Task CA_08_excluir_remove_o_original_e_as_quatro_derivadas()
+    {
+        var maintenance = CreateMaintenance();
+        var productId = await CreateProductAsync(maintenance);
+        var photo = await maintenance.AttachPhotoAsync(productId, PhotoNamed("excluida"));
+
+        var storage = new FakeObjectStorage(fails: false);
+        var removed = await maintenance.DeleteAsync(productId);
+
+        await CreatePhotoService(storage).DeleteAsync(removed!);
+
+        Assert.Equal(5, storage.Deleted.Count);
+        Assert.Contains(photo!.OriginalFileName, storage.Deleted);
+        Assert.Contains(photo.ThumbnailFileName, storage.Deleted);
+        Assert.Contains(photo.CardFileName, storage.Deleted);
+        Assert.Contains(photo.LargeFileName, storage.Deleted);
+        Assert.Contains(photo.PrintFileName, storage.Deleted);
+    }
+
+    /// <summary>
+    /// Falha em um objeto **não interrompe os outros**: o registro já saiu do acervo, e parar
+    /// no meio deixaria mais arquivos órfãos, não menos.
+    /// </summary>
+    [Fact]
+    public async Task Falha_ao_remover_um_objeto_nao_interrompe_a_limpeza_dos_outros()
+    {
+        var maintenance = CreateMaintenance();
+        var productId = await CreateProductAsync(maintenance);
+        await maintenance.AttachPhotoAsync(productId, PhotoNamed("parcial"));
+
+        var storage = new FakeObjectStorage(fails: false, failsDeletion: true);
+        var removed = await maintenance.DeleteAsync(productId);
+
+        await CreatePhotoService(storage).DeleteAsync(removed!);
+
+        Assert.Equal(5, storage.DeleteAttempts);
+    }
+
+    private static ProductPhotoService CreatePhotoService(IObjectStorage storage) =>
+        new(
+            storage,
+            new ImageProcessor(),
+            Options.Create(new ObjectStorageOptions
+            {
+                Url = "https://armazenamento.invalido",
+                ServiceKey = "chave-de-teste"
+            }),
+            NullLogger<ProductPhotoService>.Instance);
+
     private sealed class ContextFactory(string connectionString) : IDbContextFactory<CatalogDbContext>
     {
         public CatalogDbContext CreateDbContext() =>
@@ -148,9 +207,17 @@ public sealed class ProductPhotoUploadFailureTests(PostgresFixture postgres)
     /// Armazenamento que falha como o Supabase falha na prática: a resposta de erro vira
     /// <see cref="HttpRequestException"/> no <c>EnsureSuccessStatusCode</c>.
     /// </summary>
-    private sealed class FakeObjectStorage(bool fails) : IObjectStorage
+    private sealed class FakeObjectStorage(bool fails, bool failsDeletion = false) : IObjectStorage
     {
+        private readonly List<string> deleted = [];
+
         public int Uploads { get; private set; }
+
+        /// <summary>Nomes removidos com sucesso.</summary>
+        public IReadOnlyList<string> Deleted => deleted;
+
+        /// <summary>Tentativas de remoção, com ou sem sucesso.</summary>
+        public int DeleteAttempts { get; private set; }
 
         public Task UploadAsync(
             string bucket,
@@ -169,8 +236,19 @@ public sealed class ProductPhotoUploadFailureTests(PostgresFixture postgres)
         public Task DeleteAsync(
             string bucket,
             string objectName,
-            CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            CancellationToken cancellationToken = default)
+        {
+            DeleteAttempts++;
+
+            if (failsDeletion)
+            {
+                throw new HttpRequestException("O armazenamento respondeu 503.");
+            }
+
+            deleted.Add(objectName);
+
+            return Task.CompletedTask;
+        }
 
         public string PublicUrlFor(string objectName) => objectName;
     }

@@ -122,7 +122,8 @@ public sealed class ProductPhotoUploadTests(PostgresFixture postgres)
         return new ProductPhotoService(
             new SupabaseObjectStorage(new HttpClient(), wrapped),
             new ImageProcessor(),
-            wrapped);
+            wrapped,
+            NullLogger<ProductPhotoService>.Instance);
     }
 
     private async Task<int> CreateProductAsync(ProductMaintenance maintenance)

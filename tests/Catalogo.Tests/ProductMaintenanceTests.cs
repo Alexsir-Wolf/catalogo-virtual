@@ -234,6 +234,106 @@ public sealed class ProductMaintenanceTests(PostgresFixture postgres)
     private static ProductDraft Draft(string name, int categoryId) =>
         new() { Name = name, Price = 100m, CategoryId = categoryId };
 
+    /// <summary>
+    /// CA-08: confirmada a exclusão, o produto sai do acervo **e** os arquivos de imagem são
+    /// removidos (RN-20). As duas metades contam: apagar só o registro deixaria cinco objetos
+    /// pagos no armazenamento por produto excluído.
+    /// </summary>
+    [Fact]
+    public async Task CA_08_excluir_remove_o_produto_do_acervo_e_devolve_a_foto_para_limpeza()
+    {
+        var maintenance = CreateMaintenance();
+        var category = await CreateCategoryAsync();
+
+        var outcome = await maintenance.SaveAsync(new ProductDraft
+        {
+            Name = "Cabo HDMI Ugreen",
+            Price = 49.90m,
+            CategoryId = category.Id
+        });
+
+        var photo = PhotoNamed($"foto-{Guid.NewGuid():N}");
+        await AttachPhotoDirectlyAsync(outcome.Id!.Value, photo);
+
+        var removed = await maintenance.DeleteAsync(outcome.Id.Value);
+
+        Assert.NotNull(removed);
+        Assert.Equal(photo.OriginalFileName, removed.OriginalFileName);
+        Assert.Equal(photo.PrintFileName, removed.PrintFileName);
+        Assert.Null(await maintenance.FindAsync(outcome.Id.Value));
+    }
+
+    [Fact]
+    public async Task RN_20_produto_sem_foto_e_excluido_sem_nada_para_remover()
+    {
+        var maintenance = CreateMaintenance();
+        var category = await CreateCategoryAsync();
+
+        var outcome = await maintenance.SaveAsync(new ProductDraft
+        {
+            Name = "Cabo sem foto",
+            Price = 19.90m,
+            CategoryId = category.Id
+        });
+
+        var removed = await maintenance.DeleteAsync(outcome.Id!.Value);
+
+        Assert.Null(removed);
+        Assert.Null(await maintenance.FindAsync(outcome.Id.Value));
+    }
+
+    /// <summary>
+    /// Excluir duas vezes na mesma aba é acidente comum, e a segunda vez não é erro: o
+    /// resultado pedido já é o estado atual.
+    /// </summary>
+    [Fact]
+    public async Task Excluir_produto_inexistente_nao_lanca()
+    {
+        Assert.Null(await CreateMaintenance().DeleteAsync(987654));
+    }
+
+    /// <summary>
+    /// A exclusão não pode levar a categoria junto: ela é pré-requisito de outros produtos, e
+    /// a RN-20 fala de produto, não de categoria.
+    /// </summary>
+    [Fact]
+    public async Task Excluir_produto_preserva_a_categoria()
+    {
+        var maintenance = CreateMaintenance();
+        var category = await CreateCategoryAsync();
+
+        var outcome = await maintenance.SaveAsync(new ProductDraft
+        {
+            Name = "Produto de passagem",
+            Price = 10m,
+            CategoryId = category.Id
+        });
+
+        await maintenance.DeleteAsync(outcome.Id!.Value);
+
+        await using var context = postgres.CreateContext();
+        Assert.True(await context.Categories.AnyAsync(saved => saved.Id == category.Id));
+    }
+
+    private async Task AttachPhotoDirectlyAsync(int productId, ProductPhoto photo)
+    {
+        await using var context = postgres.CreateContext();
+
+        var product = await context.Products.SingleAsync(saved => saved.Id == productId);
+        product.Photo = photo;
+
+        await context.SaveChangesAsync();
+    }
+
+    private static ProductPhoto PhotoNamed(string root) => new()
+    {
+        OriginalFileName = $"{root}-original",
+        ThumbnailFileName = $"{root}-miniatura.webp",
+        CardFileName = $"{root}-cartao.webp",
+        LargeFileName = $"{root}-ampliada.webp",
+        PrintFileName = $"{root}-impressao.jpg"
+    };
+
     private async Task<int> PositionOfAsync(int productId)
     {
         await using var context = postgres.CreateContext();

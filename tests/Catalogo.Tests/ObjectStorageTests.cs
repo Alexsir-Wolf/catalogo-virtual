@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Net;
 using System.Text;
 using Catalogo.Features.Media;
@@ -93,7 +94,11 @@ public sealed class ObjectStorageTests
         var wrapped = Options.Create(options);
         var storage = new SupabaseObjectStorage(new HttpClient(), wrapped);
 
-        return new ProductPhotoService(storage, new ImageProcessor(), wrapped);
+        return new ProductPhotoService(
+            storage,
+            new ImageProcessor(),
+            wrapped,
+            NullLogger<ProductPhotoService>.Instance);
     }
 
     private static MemoryStream CreateImage(int width, int height)

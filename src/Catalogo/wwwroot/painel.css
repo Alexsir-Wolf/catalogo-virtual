@@ -241,6 +241,21 @@
     box-shadow: 0 2px 6px rgba(13, 27, 42, .16);
 }
 
+/* Ação destrutiva (UI-05.confirmarExclusao). Não é a cor de ação principal: o botão que
+   apaga não pode parecer o botão que salva. */
+.btn--perigo {
+    border-color: var(--danger-line);
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.btn--perigo:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+}
+
 .btn--fantasma {
     border-color: transparent;
     background: none;

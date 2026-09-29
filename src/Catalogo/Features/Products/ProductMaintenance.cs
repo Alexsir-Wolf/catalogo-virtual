@@ -183,6 +183,46 @@ public sealed class ProductMaintenance(
             .SingleOrDefaultAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Exclusão definitiva (RN-20, CA-08). Devolve a foto que existia, para quem chamou
+    /// mandar remover os arquivos — o serviço de mídia é que conhece os buckets.
+    ///
+    /// **O registro sai primeiro, os arquivos depois.** A ordem importa: o banco é a fonte de
+    /// verdade do acervo, e o que o dono pediu foi que o produto deixasse de existir. Se a
+    /// remoção dos arquivos falhar, sobram objetos órfãos — desperdício, registrado em log.
+    /// Na ordem inversa, uma falha de banco deixaria um produto no acervo **sem imagem
+    /// alguma**, que é pior: a vitrine passaria a exibir um item quebrado.
+    ///
+    /// Produto inexistente devolve nulo em vez de lançar: excluir duas vezes na mesma aba é
+    /// acidente comum, e a segunda vez não é erro — o resultado pedido já é o estado atual.
+    /// </summary>
+    public async Task<ProductPhoto?> DeleteAsync(
+        int productId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var product = await context.Products
+            .SingleOrDefaultAsync(candidate => candidate.Id == productId, cancellationToken);
+
+        if (product is null)
+        {
+            return null;
+        }
+
+        var photo = product.Photo;
+
+        context.Products.Remove(product);
+        await context.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Produto {Id} excluído definitivamente. Tinha foto: {TinhaFoto}.",
+            productId,
+            photo is not null);
+
+        return photo;
+    }
+
     private static IEnumerable<string> ReplacedNames(ProductPhoto photo) =>
     [
         photo.OriginalFileName,

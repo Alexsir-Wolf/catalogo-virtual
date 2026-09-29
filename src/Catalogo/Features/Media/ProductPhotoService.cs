@@ -16,7 +16,8 @@ public sealed record PhotoUploadResult(ProductPhoto? Photo, ImageRejection Rejec
 public sealed class ProductPhotoService(
     IObjectStorage storage,
     ImageProcessor processor,
-    IOptions<ObjectStorageOptions> options)
+    IOptions<ObjectStorageOptions> options,
+    ILogger<ProductPhotoService> logger)
 {
     private readonly ObjectStorageOptions options = options.Value;
 
@@ -71,6 +72,48 @@ public sealed class ProductPhotoService(
     }
 
     public string PublicUrlFor(string objectName) => storage.PublicUrlFor(objectName);
+
+    /// <summary>
+    /// Remove o original e as quatro derivadas de uma foto (RN-20). É o **único** lugar do
+    /// sistema que apaga imagem: substituir foto deixa a anterior para trás de propósito,
+    /// porque um PDF já gerado ou uma página em cache ainda podem apontar para ela. Aqui o
+    /// produto inteiro deixa de existir, então não há quem aponte.
+    ///
+    /// Falha em um objeto **não interrompe os outros**: o registro já saiu do acervo, e
+    /// parar no meio deixaria mais arquivos órfãos, não menos. Cada falha vai para o log com
+    /// o nome, que é o que permite limpar depois.
+    /// </summary>
+    public async Task DeleteAsync(ProductPhoto photo, CancellationToken cancellationToken = default)
+    {
+        foreach (var (bucket, objectName) in ObjectsOf(photo))
+        {
+            try
+            {
+                await storage.DeleteAsync(bucket, objectName, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(
+                    exception,
+                    "Falha ao remover objeto de foto. Objeto sem referência: {Bucket}/{Nome}.",
+                    bucket,
+                    objectName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Os cinco objetos de uma foto, cada um com o bucket em que vive. A derivada de
+    /// impressão é a única privada (RN-12), e é por isso que o bucket vem junto do nome.
+    /// </summary>
+    private IEnumerable<(string Bucket, string ObjectName)> ObjectsOf(ProductPhoto photo)
+    {
+        yield return (options.PrivateBucket, photo.OriginalFileName);
+        yield return (options.PublicBucket, photo.ThumbnailFileName);
+        yield return (options.PublicBucket, photo.CardFileName);
+        yield return (options.PublicBucket, photo.LargeFileName);
+        yield return (options.PrivateBucket, photo.PrintFileName);
+    }
 
     private string BucketFor(DerivativeSpecification specification) =>
         specification.IsPublic ? options.PublicBucket : options.PrivateBucket;
