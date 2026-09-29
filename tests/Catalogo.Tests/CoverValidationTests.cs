@@ -1,3 +1,4 @@
+using System.Text;
 using Catalogo.Features.Settings;
 using PdfSharp;
 using PdfSharp.Pdf;
@@ -99,6 +100,145 @@ public sealed class CoverValidationTests
     public void Capa_aceita_nao_tem_mensagem()
     {
         Assert.Empty(CoverValidation.MessageFor(CoverInspection.Ok()));
+    }
+
+    /// <summary>
+    /// R-01 de `REVIEW-T-31-2026-09-29`: o nó `/Pages` se lista entre os próprios `/Kids`,
+    /// e as APIs `PageCount`/`Pages` do PdfSharp achatam a árvore por recursão sem detectar
+    /// o ciclo — 316 bytes esgotavam a pilha e **matavam o processo**, porque
+    /// `StackOverflowException` não é capturável em .NET.
+    ///
+    /// Que este teste chegue a asserção alguma é metade do que ele prova: antes da
+    /// correção, o executor de testes morria aqui em vez de reportar falha.
+    /// </summary>
+    [Fact]
+    public void Arvore_de_paginas_ciclica_e_recusada_sem_derrubar_o_processo()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[2 0 R 3 0 R]/Count 1>>",
+            "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>"));
+
+        Assert.Equal(CoverRejection.MalformedStructure, inspection.Rejection);
+        Assert.Contains("estrutura", CoverValidation.MessageFor(inspection));
+    }
+
+    /// <summary>
+    /// Ciclo mais longo que o auto-referente: dois nós intermediários apontando um para o
+    /// outro. Detecção que só comparasse com o nó imediatamente anterior deixaria passar.
+    /// </summary>
+    [Fact]
+    public void Ciclo_indireto_entre_nos_da_arvore_e_recusado()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+            "<</Type/Pages/Kids[2 0 R]/Count 1>>"));
+
+        Assert.Equal(CoverRejection.MalformedStructure, inspection.Rejection);
+    }
+
+    /// <summary>
+    /// `MediaBox` é herdável no formato: produtores a declaram no nó `/Pages` e omitem na
+    /// página. Ler só a folha faria uma capa legítima ser recusada por dimensão zero.
+    /// </summary>
+    [Fact]
+    public void MediaBox_declarada_no_no_pai_e_herdada_pela_pagina()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[3 0 R]/Count 1/MediaBox[0 0 595 842]>>",
+            "<</Type/Page/Parent 2 0 R>>"));
+
+        Assert.True(inspection.Accepted);
+    }
+
+    /// <summary>
+    /// RN-64: um A4 retrato com um quarto de volta **sai em paisagem** no papel. A
+    /// orientação que importa é a que o leitor exibe, não a da caixa de mídia.
+    /// </summary>
+    [Fact]
+    public void RN_64_retrato_girado_um_quarto_de_volta_e_recusado_como_paisagem()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+            "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Rotate 90>>"));
+
+        Assert.Equal(CoverRejection.Landscape, inspection.Rejection);
+    }
+
+    [Fact]
+    public void Meia_volta_preserva_a_orientacao_e_e_aceita()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+            "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Rotate 180>>"));
+
+        Assert.True(inspection.Accepted);
+    }
+
+    /// <summary>
+    /// `/Count` é declaração do produtor, não contagem. A recusa precisa vir do que a
+    /// árvore realmente tem, senão um número inflado viraria alocação proporcional.
+    /// </summary>
+    [Fact]
+    public void Count_declarado_e_ignorado_em_favor_da_arvore_real()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[3 0 R 4 0 R]/Count 1>>",
+            "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>",
+            "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>"));
+
+        Assert.Equal(CoverRejection.PageCount, inspection.Rejection);
+        Assert.Equal(2, inspection.PagesFound);
+    }
+
+    [Fact]
+    public void Documento_sem_no_de_paginas_e_recusado()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf("<</Type/Catalog>>"));
+
+        Assert.Equal(CoverRejection.MalformedStructure, inspection.Rejection);
+    }
+
+    /// <summary>
+    /// PDF montado byte a byte, com tabela xref calculada. O `PdfDocument` do PdfSharp não
+    /// serve aqui: ele não deixa produzir árvore inconsistente, que é justamente o que
+    /// estes casos precisam enviar.
+    /// </summary>
+    private static byte[] RawPdf(params string[] objects)
+    {
+        using var buffer = new MemoryStream();
+
+        void Write(string text) => buffer.Write(Encoding.ASCII.GetBytes(text));
+
+        Write("%PDF-1.4\n");
+
+        var offsets = new List<long>();
+
+        for (var index = 0; index < objects.Length; index++)
+        {
+            offsets.Add(buffer.Length);
+            Write($"{index + 1} 0 obj\n{objects[index]}\nendobj\n");
+        }
+
+        var startxref = buffer.Length;
+
+        Write($"xref\n0 {objects.Length + 1}\n");
+        Write("0000000000 65535 f \n");
+
+        foreach (var offset in offsets)
+        {
+            Write($"{offset:D10} 00000 n \n");
+        }
+
+        Write($"trailer\n<</Size {objects.Length + 1}/Root 1 0 R>>\n");
+        Write($"startxref\n{startxref}\n%%EOF\n");
+
+        return buffer.ToArray();
     }
 
     private static byte[] Pdf(PageSize size, int pages, bool landscape = false)

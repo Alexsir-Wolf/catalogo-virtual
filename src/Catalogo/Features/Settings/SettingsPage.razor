@@ -236,6 +236,19 @@
 
         try
         {
+            // O tamanho é conferido **antes** de abrir o stream, como faz o envio de foto
+            // em T-13: um arquivo grande recusado depois de ser copiado para memória custa
+            // o dobro dele em RAM antes de virar mensagem de erro, e o container é pequeno
+            // (ADR-018). O `Size` vem do navegador, então é porteiro e não garantia — o
+            // limite do leitor abaixo continua valendo.
+            if (change.File.Size > CoverValidation.MaxBytes)
+            {
+                coverError = CoverValidation.MessageFor(
+                    new CoverInspection(CoverRejection.TooLarge));
+
+                return;
+            }
+
             // O limite do leitor é explícito: o padrão do Blazor é 512 KB, e quem decide a
             // recusa por tamanho é a validação da capa, não o transporte.
             await using var content = change.File.OpenReadStream(CoverValidation.MaxBytes);
@@ -253,10 +266,12 @@
         }
         catch (IOException exception)
         {
-            // Transporte, não conteúdo: arquivo acima do limite do leitor nem chega a ser
-            // inspecionado, e a mensagem precisa dizer isso em vez de falar de páginas.
+            // Com o tamanho já conferido acima, o que chega aqui é envio interrompido no
+            // meio — e dizer "o arquivo passa de 12 MB" nesse caso manda o dono procurar um
+            // problema que não existe. Mesma separação de T-13, cobrada em R-06 de
+            // `REVIEW-T-13-2026-09-24`.
             Logger.LogWarning(exception, "Falha de transporte no envio da capa.");
-            coverError = $"O arquivo passa de {CoverValidation.MaxBytes / (1024 * 1024)} MB.";
+            coverError = "O envio foi interrompido antes de terminar. Tente novamente.";
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
