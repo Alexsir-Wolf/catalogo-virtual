@@ -50,8 +50,16 @@ public sealed class PortalSettingsService(
     private readonly ObjectStorageOptions options = storageOptions.Value;
 
     /// <summary>
-    /// O registro único, criado na primeira leitura. Nascer vazio é o estado real de um
-    /// portal recém-publicado, e é o que a UI-10 desenha como `semCapa`.
+    /// O registro único. Nascer vazio é o estado real de um portal recém-publicado, e é o
+    /// que a UI-10 desenha como `semCapa`.
+    ///
+    /// **Leitura é só leitura.** Antes, a ausência da linha fazia este método inseri-la — e
+    /// como o layout da vitrine chama aqui em toda requisição, uma página **pública e
+    /// anônima** abria transação de escrita, e dois visitantes simultâneos num banco recém
+    /// implantado disputavam a mesma chave fixa: um recebia `23505` e a vitrine devolvia 500
+    /// (R-04 de `REVIEW-T-31-2026-09-29`). A linha passou a ser semeada na migration, e a
+    /// ausência — banco anterior ao seed — devolve uma instância vazia em memória em vez de
+    /// gravar. Também é o que mantém a vitrine barata para o cache de T-21.
     /// </summary>
     public async Task<PortalSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -61,16 +69,7 @@ public sealed class PortalSettingsService(
             .AsNoTracking()
             .SingleOrDefaultAsync(entity => entity.Id == PortalSettings.SingletonId, cancellationToken);
 
-        if (settings is not null)
-        {
-            return settings;
-        }
-
-        settings = new PortalSettings();
-        context.PortalSettings.Add(settings);
-        await context.SaveChangesAsync(cancellationToken);
-
-        return settings;
+        return settings ?? new PortalSettings();
     }
 
     /// <summary>

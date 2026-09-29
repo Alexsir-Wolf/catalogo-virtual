@@ -65,6 +65,13 @@
                         </p>
                     }
 
+                    @if (coverSaved)
+                    {
+                        <p class="produto__salvo" role="status" data-estado="salvo">
+                            Capa atualizada. É esta que vai na frente do catálogo.
+                        </p>
+                    }
+
                     @if (settings.CoverFileName is { } cover)
                     {
                         @* A pré-visualização é o que permite conferir que o arquivo certo
@@ -172,8 +179,13 @@
 
                     @if (passwordChanged)
                     {
-                        <span class="produto__salvo" role="status">
-                            Senha trocada. A anterior deixou de dar acesso.
+                        @* A afirmação agora é verdadeira nas duas pontas: a senha antiga não
+                           autentica mais, e as sessões abertas com ela caem na próxima
+                           navegação, porque o selo de segurança passou a ser conferido
+                           (R-03 de `REVIEW-T-31-2026-09-29`). Esta aba inclusive. *@
+                        <span class="produto__salvo" role="status" data-estado="salvo">
+                            Senha trocada. A anterior deixou de dar acesso, e as sessões
+                            abertas com ela também — inclusive esta aba, na próxima navegação.
                         </span>
                     }
                 </div>
@@ -188,6 +200,7 @@
 
     private bool uploading;
     private string? coverError;
+    private bool coverSaved;
     private bool contactSaved;
 
     private string currentPassword = string.Empty;
@@ -204,13 +217,24 @@
     /// entre os persistentes porque é condição de fundo, não resultado de ação — os outros
     /// respondem a algo que o dono acabou de fazer.
     /// </summary>
-    private string StateId => (settings, uploading, coverError, passwordFailure) switch
+    /// <summary>
+    /// Estado da folha, na ordem em que a UI-10 os distingue: o que está em curso vem antes
+    /// do que falhou, que vem antes do que foi gravado. `salvo` entra aqui porque a tarefa
+    /// declara o estado e a verificação do projeto é por `data-estado` — sem isso, trocar a
+    /// senha com sucesso deixava a folha em `default` e o estado ficava invisível (R-06 de
+    /// `REVIEW-T-31-2026-09-29`).
+    ///
+    /// `semCapa` perder a vez para `salvo` não esconde o aviso da RN-65: ele é elemento
+    /// próprio, com marcador próprio, e continua na tela enquanto não houver capa.
+    /// </summary>
+    private string StateId => this switch
     {
-        (null, _, _, _) => "carregando",
-        (_, true, _, _) => "enviando",
-        (_, _, not null, _) => "capaRecusada",
-        (_, _, _, PasswordFailure.CurrentPasswordWrong) => "senhaIncorreta",
-        ({ HasCover: false }, _, _, _) => "semCapa",
+        { settings: null } => "carregando",
+        { uploading: true } => "enviando",
+        { coverError: not null } => "capaRecusada",
+        { passwordFailure: PasswordFailure.CurrentPasswordWrong } => "senhaIncorreta",
+        { coverSaved: true } or { contactSaved: true } or { passwordChanged: true } => "salvo",
+        { settings.HasCover: false } => "semCapa",
         _ => "default"
     };
 
@@ -231,7 +255,9 @@
     private async Task UploadCoverAsync(InputFileChangeEventArgs change)
     {
         coverError = null;
+        coverSaved = false;
         contactSaved = false;
+        passwordChanged = false;
         uploading = true;
 
         try
@@ -257,7 +283,11 @@
 
             var inspection = await Settings.SaveCoverAsync(buffer.ToArray());
 
-            if (!inspection.Accepted)
+            if (inspection.Accepted)
+            {
+                coverSaved = true;
+            }
+            else
             {
                 coverError = CoverValidation.MessageFor(inspection);
             }
@@ -290,6 +320,8 @@
         await LoadAsync();
 
         contactSaved = true;
+        coverSaved = false;
+        passwordChanged = false;
         coverError = null;
     }
 
@@ -299,6 +331,7 @@
         passwordFailure = PasswordFailure.None;
         passwordMessage = null;
         contactSaved = false;
+        coverSaved = false;
 
         var userName = Authentication is null
             ? null

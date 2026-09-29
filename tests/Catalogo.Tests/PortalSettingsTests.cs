@@ -23,6 +23,8 @@ namespace Catalogo.Tests;
 [Collection(PostgresCollection.Name)]
 public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifetime, IDisposable
 {
+    private const string SettingsPath = "/painel/configuracoes";
+
     private const string OwnerUserName = "dono-config";
     private const string OwnerPassword = "Catalogo!2026";
     private const string NewPassword = "Catalogo!2027";
@@ -156,8 +158,12 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
 
         await using (var context = CreateContext())
         {
-            context.PortalSettings.Add(new PortalSettings { CoverFileName = anterior });
-            await context.SaveChangesAsync();
+            // A linha já existe: é semeada pela migration desde a correção de R-04 de
+            // `REVIEW-T-31-2026-09-29`. Plantar a capa anterior é atualizar, não inserir.
+            await context.PortalSettings
+                .Where(entity => entity.Id == PortalSettings.SingletonId)
+                .ExecuteUpdateAsync(update =>
+                    update.SetProperty(entity => entity.CoverFileName, anterior));
         }
 
         var inspection = await Service().SaveCoverAsync(Pdf(PageSize.A4, pages: 4));
@@ -226,6 +232,43 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
         Assert.DoesNotContain("mailto:", html);
     }
 
+    /// <summary>
+    /// R-04 de `REVIEW-T-31-2026-09-29`: a leitura da configuração acontece no layout da
+    /// vitrine, que é público e anônimo. Quando ela **inseria** a linha ausente, duas visitas
+    /// simultâneas a um banco recém implantado disputavam a chave fixa e uma recebia violação
+    /// de unicidade — 500 na página pública. A linha agora é semeada na migration, e a
+    /// leitura não escreve.
+    /// </summary>
+    [Fact]
+    public async Task RN_61_a_migration_semeia_o_registro_unico()
+    {
+        await using var context = CreateContext();
+        await context.Database.MigrateAsync();
+
+        var rows = await context.PortalSettings.CountAsync();
+
+        Assert.Equal(1, rows);
+    }
+
+    /// <summary>
+    /// A contraprova do caso acima: apagada a linha, a leitura devolve configuração vazia e
+    /// **não a recria**. Sem isso, a correção passaria despercebida se alguém restaurasse a
+    /// inserção no caminho de leitura.
+    /// </summary>
+    [Fact]
+    public async Task Leitura_sem_registro_nao_grava_nada()
+    {
+        await using var context = CreateContext();
+        await context.Database.MigrateAsync();
+        await context.PortalSettings.ExecuteDeleteAsync();
+
+        var settings = await Service().LoadAsync();
+
+        Assert.False(settings.HasContact);
+        Assert.False(settings.HasCover);
+        Assert.Equal(0, await context.PortalSettings.CountAsync());
+    }
+
     [Fact]
     public async Task Contato_em_branco_e_gravado_como_ausencia()
     {
@@ -257,6 +300,34 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
         Assert.True(outcome.Succeeded);
         Assert.False(await CanSignInAsync(OwnerPassword));
         Assert.True(await CanSignInAsync(NewPassword));
+    }
+
+    /// <summary>
+    /// R-03 de `REVIEW-T-31-2026-09-29`: trocar a senha precisa cortar **a sessão já
+    /// aberta**, e não apenas a senha. Era o que faltava — o selo de segurança era renovado
+    /// e ninguém o conferia, então o cookie emitido antes seguia abrindo o painel. É o
+    /// cenário que motiva trocar a senha: alguém ficou com uma sessão de pé.
+    ///
+    /// A verificação é feita reusando o **mesmo cliente** que autenticou antes da troca. O
+    /// caso anterior prova a senha; este prova o acesso.
+    /// </summary>
+    [Fact]
+    public async Task CA_39_a_sessao_aberta_antes_da_troca_perde_o_acesso()
+    {
+        using var client = await SignedInClientAsync();
+
+        using var before = await client.GetAsync(SettingsPath);
+        Assert.Equal(HttpStatusCode.OK, before.StatusCode);
+
+        await Service().ChangePasswordAsync(OwnerUserName, OwnerPassword, NewPassword);
+
+        using var after = await client.GetAsync(SettingsPath);
+
+        // O cookie deixou de valer: a requisição cai na tela de acesso em vez de abrir a
+        // tela de configurações.
+        Assert.Contains(
+            PanelAuthentication.LoginPath,
+            after.RequestMessage!.RequestUri!.AbsolutePath);
     }
 
     [Fact]

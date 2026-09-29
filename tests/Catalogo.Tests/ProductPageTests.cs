@@ -328,14 +328,14 @@ public sealed class ProductPageTests(PostgresFixture postgres) : IAsyncLifetime,
     {
         await using var context = CreateContext();
 
-        context.PortalSettings.Add(new PortalSettings
-        {
-            WhatsApp = whatsapp,
-            Phone = phone,
-            Email = email
-        });
-
-        await context.SaveChangesAsync();
+        // A linha do registro único é semeada pela migration (R-04 de
+        // `REVIEW-T-31-2026-09-29`), então configurar contato é atualizar, não inserir.
+        await context.PortalSettings
+            .Where(entity => entity.Id == PortalSettings.SingletonId)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(entity => entity.WhatsApp, whatsapp)
+                .SetProperty(entity => entity.Phone, phone)
+                .SetProperty(entity => entity.Email, email));
     }
 
     private async Task<int> CategoryOfAsync(int productId)
