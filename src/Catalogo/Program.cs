@@ -7,6 +7,7 @@ using Catalogo.Features.Media;
 using Catalogo.Features.Products;
 using Catalogo.Features.Settings;
 using Catalogo.Features.Storefront;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -43,6 +44,11 @@ builder.Services.AddScoped<PortalSettingsService>();
 
 builder.Services.AddPanelAuthentication(builder.Configuration);
 builder.Services.AddCascadingAuthenticationState();
+
+// O gate do painel roda na requisição HTTP inicial e não vê as interações do circuito. Sem
+// este provedor, uma aba aberta segue operando depois de a senha mudar ou a sessão ser
+// encerrada (R-09 de REVIEW-T-31-2026-09-29).
+builder.Services.AddScoped<AuthenticationStateProvider, RevalidatingAuthenticationState>();
 
 // A plataforma termina o TLS no proxy e encaminha a requisição em HTTP (ADR-018).
 // Sem isso a aplicação se enxerga como insegura e entra em loop de redirecionamento.
