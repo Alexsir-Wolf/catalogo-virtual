@@ -1,0 +1,312 @@
+@page "/painel/configuracoes"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@inject PortalSettingsService Settings
+@inject ILogger<SettingsPage> Logger
+
+<PageTitle>Configurações</PageTitle>
+
+<div class="painel">
+    <h1>Configurações</h1>
+    <div class="painel__sub">
+        O que o dono pode mudar sem depender de uma versão nova do sistema.
+    </div>
+
+    <div class="painel__folha" data-estado="@StateId">
+        @if (settings is null)
+        {
+            <p>Carregando…</p>
+        }
+        else
+        {
+            <div class="painel-bloco">
+                <div class="painel-bloco__hd">
+                    <h2>Capa do catálogo</h2>
+                    <span class="selo @(settings.HasCover ? "selo--no-ar" : "selo--lacuna")">
+                        @(settings.HasCover ? "Configurada" : "Ausente")
+                    </span>
+                </div>
+
+                <div class="painel-bloco__bd">
+                    @* RN-65: sem capa não há geração, e esta é a única pista que o dono
+                       tem disso. Sem o aviso, ele descobre ao tentar gerar, em outra
+                       tela, e não sabe por quê. *@
+                    @if (!settings.HasCover)
+                    {
+                        <p class="campo__erro" role="alert" data-estado="semCapa">
+                            Nenhuma capa enviada. <b>A geração de catálogos em PDF está
+                            bloqueada</b> até que uma capa seja enviada aqui.
+                        </p>
+                    }
+
+                    <p class="campo__ajuda">
+                        A capa é o PDF que você já usa, enviado como está — o sistema não a
+                        redesenha. Precisa ter <b>exatamente uma página</b>, em retrato, no
+                        mesmo tamanho das páginas de produtos.
+                    </p>
+
+                    <InputFile OnChange="UploadCoverAsync" accept="application/pdf"
+                               disabled="@uploading" />
+
+                    @if (uploading)
+                    {
+                        <p class="campo__ajuda" role="status" data-estado="enviando">
+                            Enviando e validando a capa…
+                        </p>
+                    }
+
+                    @if (coverError is { } error)
+                    {
+                        <p class="campo__erro" role="alert" data-estado="capaRecusada">
+                            @error <br />
+                            <span class="campo__ajuda">A capa anterior foi preservada.</span>
+                        </p>
+                    }
+
+                    @if (settings.CoverFileName is { } cover)
+                    {
+                        @* A pré-visualização é o que permite conferir que o arquivo certo
+                           subiu, sem precisar gerar um catálogo para descobrir. *@
+                        <div class="capa">
+                            <object class="capa__pre" type="application/pdf"
+                                    data="@Settings.CoverUrlFor(cover)"
+                                    aria-label="Capa atual">
+                                <a href="@Settings.CoverUrlFor(cover)">Abrir a capa atual</a>
+                            </object>
+                            <span class="mono">@cover</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="painel-bloco">
+                <div class="painel-bloco__hd">
+                    <h2>Contato</h2>
+                </div>
+
+                <div class="painel-bloco__bd produto__campos">
+                    <p class="campo__ajuda">
+                        Estes dados alimentam <b>dois destinos</b>: a vitrine, na página de
+                        cada produto, e o rodapé das páginas de conteúdo do PDF. Um lugar
+                        só, para não divergirem.
+                    </p>
+
+                    <div class="campo">
+                        <label class="campo__rotulo" for="whatsapp">WhatsApp</label>
+                        <input id="whatsapp" type="text" @bind="contact.WhatsApp"
+                               maxlength="@PortalSettings.ContactMaxLength"
+                               placeholder="5588996541931" />
+                        <span class="campo__ajuda">
+                            Só dígitos, com código do país e DDD — é o formato que a URL de
+                            conversa exige.
+                        </span>
+                    </div>
+
+                    <div class="campo">
+                        <label class="campo__rotulo" for="telefone">Telefone</label>
+                        <input id="telefone" type="text" @bind="contact.Phone"
+                               maxlength="@PortalSettings.ContactMaxLength"
+                               placeholder="(88) 99654-1931" />
+                    </div>
+
+                    <div class="campo">
+                        <label class="campo__rotulo" for="email">E-mail</label>
+                        <input id="email" type="text" @bind="contact.Email"
+                               maxlength="@PortalSettings.ContactMaxLength"
+                               placeholder="vendas@exemplo.com.br" />
+                    </div>
+                </div>
+
+                <div class="painel-bloco__ft">
+                    <button type="button" class="btn btn--primario" @onclick="SaveContactAsync"
+                            disabled="@uploading">Salvar contato</button>
+
+                    @if (contactSaved)
+                    {
+                        <span class="produto__salvo" role="status" data-estado="salvo">
+                            Contato salvo. A vitrine já mostra os novos dados.
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <div class="painel-bloco">
+                <div class="painel-bloco__hd">
+                    <h2>Senha</h2>
+                </div>
+
+                <div class="painel-bloco__bd produto__campos">
+                    <p class="campo__ajuda">
+                        É o único caminho de troca previsto no sistema. Não há recuperação
+                        por e-mail.
+                    </p>
+
+                    <div class="campo @(passwordFailure == PasswordFailure.CurrentPasswordWrong ? "campo--erro" : null)">
+                        <label class="campo__rotulo" for="senha-atual">Senha atual</label>
+                        <input id="senha-atual" type="password" @bind="currentPassword" />
+
+                        @if (passwordFailure == PasswordFailure.CurrentPasswordWrong)
+                        {
+                            <span class="campo__erro" role="alert" data-estado="senhaIncorreta">
+                                @passwordMessage
+                            </span>
+                        }
+                    </div>
+
+                    <div class="campo @(passwordFailure == PasswordFailure.NewPasswordRejected ? "campo--erro" : null)">
+                        <label class="campo__rotulo" for="senha-nova">Nova senha</label>
+                        <input id="senha-nova" type="password" @bind="newPassword" />
+
+                        @if (passwordFailure == PasswordFailure.NewPasswordRejected)
+                        {
+                            <span class="campo__erro" role="alert">@passwordMessage</span>
+                        }
+                    </div>
+                </div>
+
+                <div class="painel-bloco__ft">
+                    <button type="button" class="btn btn--primario" @onclick="ChangePasswordAsync"
+                            disabled="@uploading">Trocar senha</button>
+
+                    @if (passwordChanged)
+                    {
+                        <span class="produto__salvo" role="status">
+                            Senha trocada. A anterior deixou de dar acesso.
+                        </span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private PortalSettings? settings;
+    private ContactDraft contact = new();
+
+    private bool uploading;
+    private string? coverError;
+    private bool contactSaved;
+
+    private string currentPassword = string.Empty;
+    private string newPassword = string.Empty;
+    private PasswordFailure passwordFailure = PasswordFailure.None;
+    private string? passwordMessage;
+    private bool passwordChanged;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? Authentication { get; set; }
+
+    /// <summary>
+    /// O estado da folha é o mais específico que estiver valendo. `semCapa` vem por último
+    /// entre os persistentes porque é condição de fundo, não resultado de ação — os outros
+    /// respondem a algo que o dono acabou de fazer.
+    /// </summary>
+    private string StateId => (settings, uploading, coverError, passwordFailure) switch
+    {
+        (null, _, _, _) => "carregando",
+        (_, true, _, _) => "enviando",
+        (_, _, not null, _) => "capaRecusada",
+        (_, _, _, PasswordFailure.CurrentPasswordWrong) => "senhaIncorreta",
+        ({ HasCover: false }, _, _, _) => "semCapa",
+        _ => "default"
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        settings = await Settings.LoadAsync();
+
+        contact = new ContactDraft
+        {
+            WhatsApp = settings.WhatsApp,
+            Phone = settings.Phone,
+            Email = settings.Email
+        };
+    }
+
+    private async Task UploadCoverAsync(InputFileChangeEventArgs change)
+    {
+        coverError = null;
+        contactSaved = false;
+        uploading = true;
+
+        try
+        {
+            // O limite do leitor é explícito: o padrão do Blazor é 512 KB, e quem decide a
+            // recusa por tamanho é a validação da capa, não o transporte.
+            await using var content = change.File.OpenReadStream(CoverValidation.MaxBytes);
+            using var buffer = new MemoryStream();
+            await content.CopyToAsync(buffer);
+
+            var inspection = await Settings.SaveCoverAsync(buffer.ToArray());
+
+            if (!inspection.Accepted)
+            {
+                coverError = CoverValidation.MessageFor(inspection);
+            }
+
+            await LoadAsync();
+        }
+        catch (IOException exception)
+        {
+            // Transporte, não conteúdo: arquivo acima do limite do leitor nem chega a ser
+            // inspecionado, e a mensagem precisa dizer isso em vez de falar de páginas.
+            Logger.LogWarning(exception, "Falha de transporte no envio da capa.");
+            coverError = $"O arquivo passa de {CoverValidation.MaxBytes / (1024 * 1024)} MB.";
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "Falha ao enviar a capa.");
+            coverError = "Não foi possível enviar a capa agora. Tente novamente.";
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private async Task SaveContactAsync()
+    {
+        await Settings.SaveContactAsync(contact);
+        await LoadAsync();
+
+        contactSaved = true;
+        coverError = null;
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        passwordChanged = false;
+        passwordFailure = PasswordFailure.None;
+        passwordMessage = null;
+        contactSaved = false;
+
+        var userName = Authentication is null
+            ? null
+            : (await Authentication).User.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (userName is null)
+        {
+            passwordFailure = PasswordFailure.CurrentPasswordWrong;
+            passwordMessage = "Sessão não identificada. Entre novamente.";
+            return;
+        }
+
+        var outcome = await Settings.ChangePasswordAsync(userName, currentPassword, newPassword);
+
+        if (outcome.Succeeded)
+        {
+            passwordChanged = true;
+            currentPassword = string.Empty;
+            newPassword = string.Empty;
+            return;
+        }
+
+        passwordFailure = outcome.Failure;
+        passwordMessage = outcome.Message;
+    }
+}

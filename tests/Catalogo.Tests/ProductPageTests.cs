@@ -23,30 +23,26 @@ public sealed class ProductPageTests(PostgresFixture postgres) : IAsyncLifetime,
         "de curso curto, dobradiça de 180 graus e chassi de alumínio escovado. Acompanha " +
         "fonte de 65 W com conector USB-C reversível e cabo destacável de 1,8 metro.";
 
+    private IsolatedDatabase? database;
     private string connectionString = string.Empty;
     private WebApplicationFactory<Program> factory = null!;
 
     public async Task InitializeAsync()
     {
-        var databaseName = $"detalhe_{Guid.NewGuid():N}";
-
-        await using var admin = new NpgsqlConnection(postgres.ConnectionString);
-        await admin.OpenAsync();
-
-        await using var create = admin.CreateCommand();
-        create.CommandText = $"""CREATE DATABASE "{databaseName}" """;
-        await create.ExecuteNonQueryAsync();
-
-        connectionString = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
-        {
-            Database = databaseName
-        }.ConnectionString;
+        database = await IsolatedDatabase.CreateAsync(postgres, "detalhe");
+        connectionString = database.ConnectionString;
 
         factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.UseSetting("ConnectionStrings:Default", connectionString));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public async Task DisposeAsync()
+    {
+        if (database is not null)
+        {
+            await database.DisposeAsync();
+        }
+    }
 
     public void Dispose() => factory?.Dispose();
 

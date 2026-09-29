@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@using Catalogo.Features.Settings
+@inject PortalSettingsService Settings
 
 @*
     Cromo da vitrine — faixa utilitária, cabeçalho com marca e busca, e rodapé.
@@ -47,15 +49,51 @@
             <b>Suprimentos &amp; Informática</b>
             <em>Atendimento de segunda a sexta, das 08h às 18h</em>
         </div>
-        <div class="rodape__c">
-            <b>Como comprar</b>
-            <em>Escolha o produto e fale com o vendedor pelo WhatsApp ou telefone</em>
-        </div>
+
+        @* Os canais vêm das Configurações (RN-67), lidos a cada requisição — é o que faz
+           a alteração refletir na vitrine imediatamente (RN-68, CA-38). Canal não
+           configurado simplesmente não aparece: a vitrine não inventa contato. *@
+        @if (contact is { HasContact: true })
+        {
+            <div class="rodape__c" data-estado="comContato">
+                <b>Fale com o vendedor</b>
+
+                @if (contact.WhatsApp is { } whatsapp)
+                {
+                    <em><a href="https://wa.me/@whatsapp">WhatsApp</a></em>
+                }
+
+                @if (contact.Phone is { } phone)
+                {
+                    <em><a href="tel:@Digits(phone)">@phone</a></em>
+                }
+
+                @if (contact.Email is { } email)
+                {
+                    <em><a href="mailto:@email">@email</a></em>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="rodape__c" data-estado="semContato">
+                <b>Como comprar</b>
+                <em>Escolha o produto e fale com o vendedor pelo WhatsApp ou telefone</em>
+            </div>
+        }
     </footer>
 </div>
 
 @code {
     public const string SearchParameter = "busca";
+
+    private PortalSettings? contact;
+
+    protected override async Task OnInitializedAsync() => contact = await Settings.LoadAsync();
+
+    /// <summary>`tel:` quer só dígitos; o que o dono digitou é o que a tela exibe.</summary>
+    private static string Digits(string phone) =>
+        new([.. phone.Where(char.IsAsciiDigit)]);
 
     /// <summary>
     /// O campo mostra o termo corrente quando ele existe na URL. Vem do parâmetro de

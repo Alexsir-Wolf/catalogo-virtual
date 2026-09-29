@@ -5,6 +5,7 @@ using Catalogo.Features.Account;
 using Catalogo.Features.Categories;
 using Catalogo.Features.Media;
 using Catalogo.Features.Products;
+using Catalogo.Features.Settings;
 using Catalogo.Features.Storefront;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +39,7 @@ builder.Services.AddScoped<ProductPublication>();
 builder.Services.AddScoped<ProductOrdering>();
 builder.Services.AddScoped<ProductListing>();
 builder.Services.AddScoped<StorefrontQuery>();
+builder.Services.AddScoped<PortalSettingsService>();
 
 builder.Services.AddPanelAuthentication(builder.Configuration);
 builder.Services.AddCascadingAuthenticationState();

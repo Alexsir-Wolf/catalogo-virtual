@@ -141,6 +141,7 @@
 .painel input[type=text],
 .painel input[type=search],
 .painel input[type=number],
+.painel input[type=password],
 .painel select,
 .painel textarea {
     width: 100%;
@@ -548,4 +549,26 @@
         grid-template-columns: 30px 40px 1fr 92px;
         gap: 9px;
     }
+}
+
+/* ---------- pré-visualização da capa (UI-10) ----------
+   A capa é PDF e é exibida como PDF, embutido. Rasterizar a página daria uma miniatura de
+   imagem — que é o que a SPEC-UI pede ao pé da letra — ao custo de uma biblioteca com
+   dependências nativas no Linux do Render, para ganhar pouco: o que o dono precisa é
+   conferir que subiu o arquivo certo, e o PDF embutido mostra isso. */
+
+.capa {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+    margin-top: 12px;
+}
+
+.capa__pre {
+    width: 220px;
+    height: 311px;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--surface-2);
 }

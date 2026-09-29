@@ -20,29 +20,25 @@ namespace Catalogo.Tests;
 [Collection(PostgresCollection.Name)]
 public sealed class ProductListingTests(PostgresFixture postgres) : IAsyncLifetime
 {
+    private IsolatedDatabase? database;
     private string connectionString = string.Empty;
 
     public async Task InitializeAsync()
     {
-        var databaseName = $"listagem_{Guid.NewGuid():N}";
-
-        await using var admin = new NpgsqlConnection(postgres.ConnectionString);
-        await admin.OpenAsync();
-
-        await using var create = admin.CreateCommand();
-        create.CommandText = $"""CREATE DATABASE "{databaseName}" """;
-        await create.ExecuteNonQueryAsync();
-
-        connectionString = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
-        {
-            Database = databaseName
-        }.ConnectionString;
+        database = await IsolatedDatabase.CreateAsync(postgres, "listagem");
+        connectionString = database.ConnectionString;
 
         await using var context = CreateContext();
         await context.Database.MigrateAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public async Task DisposeAsync()
+    {
+        if (database is not null)
+        {
+            await database.DisposeAsync();
+        }
+    }
 
     [Fact]
     public async Task Produtos_saem_agrupados_por_categoria_na_ordem_global()

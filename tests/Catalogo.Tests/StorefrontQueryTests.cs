@@ -19,29 +19,25 @@ namespace Catalogo.Tests;
 [Collection(PostgresCollection.Name)]
 public sealed class StorefrontQueryTests(PostgresFixture postgres) : IAsyncLifetime
 {
+    private IsolatedDatabase? database;
     private string connectionString = string.Empty;
 
     public async Task InitializeAsync()
     {
-        var databaseName = $"vitrine_{Guid.NewGuid():N}";
-
-        await using var admin = new NpgsqlConnection(postgres.ConnectionString);
-        await admin.OpenAsync();
-
-        await using var create = admin.CreateCommand();
-        create.CommandText = $"""CREATE DATABASE "{databaseName}" """;
-        await create.ExecuteNonQueryAsync();
-
-        connectionString = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
-        {
-            Database = databaseName
-        }.ConnectionString;
+        database = await IsolatedDatabase.CreateAsync(postgres, "vitrine");
+        connectionString = database.ConnectionString;
 
         await using var context = CreateContext();
         await context.Database.MigrateAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public async Task DisposeAsync()
+    {
+        if (database is not null)
+        {
+            await database.DisposeAsync();
+        }
+    }
 
     [Fact]
     public async Task RN_48_produto_em_rascunho_nao_aparece_no_resultado()

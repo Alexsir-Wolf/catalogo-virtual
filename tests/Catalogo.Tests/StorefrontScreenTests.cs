@@ -19,30 +19,26 @@ namespace Catalogo.Tests;
 [Collection(PostgresCollection.Name)]
 public sealed class StorefrontScreenTests(PostgresFixture postgres) : IAsyncLifetime, IDisposable
 {
+    private IsolatedDatabase? database;
     private string connectionString = string.Empty;
     private WebApplicationFactory<Program> factory = null!;
 
     public async Task InitializeAsync()
     {
-        var databaseName = $"loja_{Guid.NewGuid():N}";
-
-        await using var admin = new NpgsqlConnection(postgres.ConnectionString);
-        await admin.OpenAsync();
-
-        await using var create = admin.CreateCommand();
-        create.CommandText = $"""CREATE DATABASE "{databaseName}" """;
-        await create.ExecuteNonQueryAsync();
-
-        connectionString = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
-        {
-            Database = databaseName
-        }.ConnectionString;
+        database = await IsolatedDatabase.CreateAsync(postgres, "loja");
+        connectionString = database.ConnectionString;
 
         factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.UseSetting("ConnectionStrings:Default", connectionString));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public async Task DisposeAsync()
+    {
+        if (database is not null)
+        {
+            await database.DisposeAsync();
+        }
+    }
 
     public void Dispose() => factory?.Dispose();
 

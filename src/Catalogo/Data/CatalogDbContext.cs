@@ -1,6 +1,7 @@
 using Catalogo.Features.Account;
 using Catalogo.Features.Categories;
 using Catalogo.Features.Products;
+using Catalogo.Features.Settings;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,6 +36,9 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
 
     public DbSet<Product> Products => Set<Product>();
 
+    /// <summary>Registro único de configuração do portal (RN-61).</summary>
+    public DbSet<PortalSettings> PortalSettings => Set<PortalSettings>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -61,6 +65,26 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
             category.HasIndex(entity => entity.Name).IsUnique();
 
             category.HasIndex(entity => entity.Position);
+        });
+
+        modelBuilder.Entity<PortalSettings>(settings =>
+        {
+            settings.Property(entity => entity.WhatsApp)
+                .HasMaxLength(Features.Settings.PortalSettings.ContactMaxLength);
+
+            settings.Property(entity => entity.Phone)
+                .HasMaxLength(Features.Settings.PortalSettings.ContactMaxLength);
+
+            settings.Property(entity => entity.Email)
+                .HasMaxLength(Features.Settings.PortalSettings.ContactMaxLength);
+
+            settings.Property(entity => entity.CoverFileName)
+                .HasMaxLength(Features.Settings.PortalSettings.CoverFileNameMaxLength);
+
+            // Nada aqui é calculado a partir de outra coluna, e o registro é único — a
+            // chave fixa é a garantia de unicidade, e o banco não precisa de mais nada.
+            settings.Ignore(entity => entity.HasCover);
+            settings.Ignore(entity => entity.HasContact);
         });
 
         modelBuilder.Entity<Product>(product =>
