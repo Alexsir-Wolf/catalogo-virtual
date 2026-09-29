@@ -587,3 +587,110 @@
     border-radius: var(--r);
     background: var(--surface-2);
 }
+
+/* ---------- catálogos (UI-07, UI-08) ---------- */
+
+.campo__opcao {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 13.5px;
+    cursor: pointer;
+}
+
+.catalogos {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.catalogo {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(0, 2fr) auto auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+}
+
+.catalogo__n {
+    font-family: var(--ui);
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.catalogo__n:hover {
+    text-decoration: underline;
+}
+
+.catalogo__c {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.catalogo__t {
+    padding: 2px 7px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: 11.5px;
+    color: var(--muted);
+}
+
+.catalogo__q {
+    text-align: right;
+}
+
+.catalogo__q b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+}
+
+.catalogo__q em {
+    font-style: normal;
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.catalogo__g {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+/* Nunca gerado é marcado, não disfarçado com um traço (RN-33). */
+.catalogo[data-estado="nuncaGerado"] .catalogo__g b {
+    color: var(--warn);
+}
+
+.catalogo__x {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-line);
+    border-radius: var(--r);
+    font-size: 12.5px;
+    color: var(--ink);
+}
+
+@media (max-width: 860px) {
+    .catalogo {
+        grid-template-columns: 1fr;
+    }
+
+    .catalogo__q {
+        text-align: left;
+    }
+}

@@ -1,0 +1,214 @@
+@page "/painel/catalogos/novo"
+@page "/painel/catalogos/{Id:int}"
+@rendermode InteractiveServer
+@using Catalogo.Features.Categories
+@inject CatalogMaintenance Maintenance
+@inject CategoryMaintenance Categories
+@inject NavigationManager Navigation
+
+@*
+    UI-08, primeira parte: o **critério**. A prévia e a geração são T-23 e T-25, e é por isso
+    que esta tela ainda não tem o lado direito que a SPEC-UI desenha.
+
+    O que a tela declara em voz alta é o que a ADR-014 decidiu: salva-se o critério, não a
+    lista. Sem essa frase, o dono supõe que o catálogo é um pacote fechado de produtos — e a
+    contagem mudando entre visitas pareceria defeito.
+*@
+
+<PageTitle>@(Id is null ? "Novo catálogo" : "Catálogo")</PageTitle>
+
+<div class="painel">
+    <h1>@(Id is null ? "Novo catálogo" : "Catálogo")</h1>
+    <div class="painel__sub">
+        Nome e categorias. É isso que fica salvo.
+    </div>
+
+    <div class="painel__folha" data-estado="@StateId">
+        @if (notFound)
+        {
+            <div class="nada" data-estado="naoEncontrado">
+                <h2>Catálogo não encontrado</h2>
+                <p>Ele pode ter sido excluído em outra aba.</p>
+                <a href="/painel/catalogos">Ver todos os catálogos</a>
+            </div>
+        }
+        else if (categories is null)
+        {
+            <p>Carregando…</p>
+        }
+        else
+        {
+            <div class="painel-bloco">
+                <div class="painel-bloco__hd">
+                    <h2>Critério</h2>
+                </div>
+
+                <div class="painel-bloco__bd produto__campos">
+                    <p class="campo__ajuda">
+                        O que fica salvo é <b>o critério</b>, não a lista de produtos. Gerar
+                        este catálogo em outra data produz o acervo daquela data — é o que
+                        evita que um catálogo envelheça sozinho.
+                    </p>
+
+                    <div class="campo">
+                        <label class="campo__rotulo" for="nome">Nome</label>
+                        <input id="nome" type="text" @bind="draft.Name"
+                               maxlength="@Catalog.NameMaxLength"
+                               placeholder="Consumíveis" />
+
+                        @if (failure is CatalogFailure.NameRequired or CatalogFailure.NameAlreadyInUse)
+                        {
+                            <span class="campo__erro" role="alert">@MessageFor(failure.Value)</span>
+                        }
+                    </div>
+
+                    <fieldset class="campo">
+                        <legend class="campo__rotulo">Categorias</legend>
+
+                        @if (categories.Count == 0)
+                        {
+                            <p class="campo__erro" role="alert">
+                                Não há categorias cadastradas. Um catálogo precisa de pelo
+                                menos uma — <a href="/painel/categorias">crie a primeira</a>.
+                            </p>
+                        }
+
+                        @foreach (var category in categories)
+                        {
+                            <label class="campo__opcao">
+                                <input type="checkbox"
+                                       checked="@draft.CategoryIds.Contains(category.Id)"
+                                       @onchange="changed => Toggle(category.Id, changed)" />
+                                <span>@category.Name</span>
+                            </label>
+                        }
+
+                        @* RN-28: abranger o acervo inteiro é marcar todas, não deixar nenhuma
+                           marcada. A tela precisa dizer isso, senão "nenhuma" parece "todas". *@
+                        <span class="campo__ajuda">
+                            Marque ao menos uma. Para abranger o acervo inteiro, marque
+                            todas — deixar nenhuma marcada não significa "todas".
+                        </span>
+
+                        @if (failure is CatalogFailure.NoCategorySelected)
+                        {
+                            <span class="campo__erro" role="alert" data-estado="semCategoria">
+                                @MessageFor(failure.Value)
+                            </span>
+                        }
+                    </fieldset>
+                </div>
+
+                <div class="painel-bloco__ft">
+                    <button type="button" class="btn btn--primario" @onclick="SaveAsync"
+                            disabled="@(draft.CategoryIds.Count == 0)">
+                        Salvar critério
+                    </button>
+
+                    <a class="btn btn--fantasma" href="/painel/catalogos">Voltar</a>
+
+                    @if (saved)
+                    {
+                        <span class="produto__salvo" role="status" data-estado="salvo">
+                            Critério salvo.
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <p class="campo__ajuda">
+                A prévia do que vai sair e a geração do PDF entram nas próximas etapas.
+            </p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private CatalogDraft draft = new();
+    private IReadOnlyList<Category>? categories;
+    private CatalogFailure? failure;
+    private bool notFound;
+    private bool saved;
+
+    /// <summary>
+    /// `semCategoria` é o estado que a UI-08 declara para critério sem categoria marcada: com
+    /// ele, salvar fica indisponível e a prévia dá lugar a orientação.
+    /// </summary>
+    private string StateId => (notFound, categories, draft.CategoryIds.Count) switch
+    {
+        (true, _, _) => "naoEncontrado",
+        (_, null, _) => "carregando",
+        (_, _, 0) => "semCategoria",
+        _ => "default"
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        categories = await Categories.ListAsync();
+
+        if (Id is { } id)
+        {
+            var found = await Maintenance.FindAsync(id);
+
+            if (found is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            draft = found;
+        }
+    }
+
+    private void Toggle(int categoryId, ChangeEventArgs change)
+    {
+        failure = null;
+        saved = false;
+
+        if (change.Value is true)
+        {
+            if (!draft.CategoryIds.Contains(categoryId))
+            {
+                draft.CategoryIds.Add(categoryId);
+            }
+
+            return;
+        }
+
+        draft.CategoryIds.Remove(categoryId);
+    }
+
+    private async Task SaveAsync()
+    {
+        saved = false;
+
+        var outcome = await Maintenance.SaveAsync(draft);
+
+        if (!outcome.Succeeded)
+        {
+            failure = outcome.Failure;
+            return;
+        }
+
+        failure = null;
+        saved = true;
+
+        if (Id is null)
+        {
+            Navigation.NavigateTo($"/painel/catalogos/{outcome.Id}");
+        }
+    }
+
+    private static string MessageFor(CatalogFailure failure) => failure switch
+    {
+        CatalogFailure.NameRequired => "O catálogo precisa de um nome.",
+        CatalogFailure.NameAlreadyInUse => "Já existe um catálogo com este nome.",
+        CatalogFailure.NoCategorySelected =>
+            "Selecione pelo menos uma categoria. Para abranger o acervo inteiro, marque todas.",
+        CatalogFailure.NotFound => "O catálogo não existe mais.",
+        _ => string.Empty
+    };
+}

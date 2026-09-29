@@ -4,6 +4,7 @@
 @using Catalogo.Features.Media
 @inject ProductMaintenance Maintenance
 @inject ProductPhotoService PhotoService
+@inject ProductRemoval Removal
 @inject ProductPhotoUpload Upload
 @inject ProductPublication Publication
 @inject ILogger<ProductForm> Logger
@@ -259,7 +260,7 @@
                        é exatamente o que vai acontecer — sem eufemismo. *@
                     <div class="painel-bloco__ft" data-estado="confirmarExclusao">
                         <p class="campo__erro" role="alert">
-                            <b>Excluir “@draft.Name” definitivamente?</b><br />
+                            <b>Excluir “@confirmedName” definitivamente?</b><br />
                             Esta operação <b>não pode ser desfeita</b>. O produto sai do
                             acervo e @(photo is null
                                 ? "nenhum arquivo de imagem será removido, porque este produto não tem foto"
@@ -282,6 +283,20 @@
                         </button>
                     </div>
                 }
+
+                @* Erro **da exclusão**, junto da ação que falhou. Antes reusava o campo do
+                   envio de foto, o que fazia a tela dizer "a foto anterior foi mantida" para
+                   uma exclusão que nem envolveu foto, dentro do estado `erroUpload` que a
+                   SPEC-UI define para outra coisa. *@
+                @if (deletionError is { } removalError)
+                {
+                    <div class="painel-bloco__ft">
+                        <p class="campo__erro" role="alert" data-estado="erroExclusao">
+                            @removalError <br />
+                            <span class="campo__ajuda">O produto continua no acervo.</span>
+                        </p>
+                    </div>
+                }
             </div>
         }
     </div>
@@ -302,6 +317,14 @@
     private bool confirmingDeletion;
     private bool deleting;
     private bool deletionAffectsStorefront;
+    private string? deletionError;
+
+    /// <summary>
+    /// O nome como estava **gravado** quando a confirmação foi pedida. O campo do formulário
+    /// muda a cada tecla, e a confirmação existe para confirmar identidade: "Excluir “Cab HD”?"
+    /// não identifica nada.
+    /// </summary>
+    private string? confirmedName;
 
     private ProductPhoto? photo;
     private bool uploading;
@@ -491,10 +514,32 @@
     /// executa (RN-20). A situação é relida aqui, e não tirada do que a tela carregou, porque
     /// a confirmação afirma se o produto está no ar — e isso pode ter mudado noutra aba.
     /// </summary>
+    /// <summary>
+    /// Abre a confirmação. Não exclui nada: o botão de excluir **pede**, o da confirmação
+    /// executa (RN-20).
+    ///
+    /// Tudo o que a confirmação afirma é relido do banco aqui — a situação **e a foto**. As
+    /// duas são afirmações factuais no texto, e a tela pode estar aberta desde antes de outra
+    /// aba ter enviado uma foto ou publicado o produto; afirmar "este produto não tem foto" e
+    /// apagar cinco arquivos em seguida seria mentir no único momento em que o dono precisa
+    /// confiar no que lê.
+    /// </summary>
     private async Task AskDeletionAsync()
     {
         saved = false;
+        deletionError = null;
+
         await LoadPublicationAsync();
+
+        if (publication is null)
+        {
+            // Excluído noutra aba: não há o que confirmar.
+            notFound = true;
+            return;
+        }
+
+        photo = await Maintenance.FindPhotoAsync(Id!.Value);
+        confirmedName = draft.Name;
         deletionAffectsStorefront = IsPublished;
         confirmingDeletion = true;
     }
@@ -503,29 +548,26 @@
 
     private async Task DeleteAsync()
     {
+        // Trava de reentrância: dois cliques antes do re-render disparariam duas exclusões, e
+        // `disabled` no markup não impede a segunda chamada já em voo.
+        if (deleting)
+        {
+            return;
+        }
+
         deleting = true;
 
-        try
+        var outcome = await Removal.RemoveAsync(Id!.Value);
+
+        if (!outcome.Succeeded)
         {
-            var removed = await Maintenance.DeleteAsync(Id!.Value);
-
-            if (removed is not null)
-            {
-                // Os arquivos vão depois do registro, e uma falha aqui não desfaz a exclusão
-                // — o produto já saiu do acervo, que é o que foi pedido.
-                await PhotoService.DeleteAsync(removed);
-            }
-
-            Navigation.NavigateTo("/painel/produtos");
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            Logger.LogError(exception, "Falha ao excluir o produto {Id}.", Id);
-
             deleting = false;
             confirmingDeletion = false;
-            uploadError = "Não foi possível excluir o produto agora. Tente novamente.";
+            deletionError = outcome.Error;
+            return;
         }
+
+        Navigation.NavigateTo("/painel/produtos");
     }
 
     private string? ErrorFor(ProductField field) =>

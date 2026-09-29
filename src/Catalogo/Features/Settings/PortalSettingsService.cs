@@ -165,7 +165,7 @@ public sealed class PortalSettingsService(
         {
             await context.SaveChangesAsync(cancellationToken);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             // O arquivo já subiu e o registro não aponta para ele: sem esta linha o objeto
             // ficaria no bucket sem referência e **sem rastro**, porque o log de substituição

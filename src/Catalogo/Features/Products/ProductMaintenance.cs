@@ -213,7 +213,23 @@ public sealed class ProductMaintenance(
         var photo = product.Photo;
 
         context.Products.Remove(product);
-        await context.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Outra aba chegou primeiro: o DELETE não afetou linha nenhuma. O estado pedido já
+            // é o estado atual, então isto é sucesso e não falha — dizer "não foi possível
+            // excluir" para um produto que **foi** excluído deixaria o dono num formulário de
+            // algo que não existe mais.
+            logger.LogInformation(
+                "Produto {Id} já havia sido excluído por outro fluxo.",
+                productId);
+
+            return null;
+        }
 
         logger.LogInformation(
             "Produto {Id} excluído definitivamente. Tinha foto: {TinhaFoto}.",

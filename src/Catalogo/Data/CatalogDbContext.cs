@@ -1,4 +1,5 @@
 using Catalogo.Features.Account;
+using Catalogo.Features.CatalogBuilder;
 using Catalogo.Features.Categories;
 using Catalogo.Features.Products;
 using Catalogo.Features.Settings;
@@ -38,6 +39,12 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
 
     /// <summary>Registro único de configuração do portal (RN-61).</summary>
     public DbSet<PortalSettings> PortalSettings => Set<PortalSettings>();
+
+    /// <summary>
+    /// Catálogos salvos. **Não existe `DbSet` de itens de catálogo**, e a ausência é a
+    /// decisão: a lista de produtos nunca é persistida (RN-29, ADR-014).
+    /// </summary>
+    public DbSet<Catalog> Catalogs => Set<Catalog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -85,6 +92,40 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
             // chave fixa é a garantia de unicidade, e o banco não precisa de mais nada.
             settings.Ignore(entity => entity.HasCover);
             settings.Ignore(entity => entity.HasContact);
+        });
+
+        modelBuilder.Entity<Catalog>(catalog =>
+        {
+            catalog.Property(entity => entity.Name)
+                .HasMaxLength(Catalog.NameMaxLength)
+                .UseCollation(CaseInsensitiveCollation)
+                .IsRequired();
+
+            // Nome único (RN-27), decidido pelo índice e não por consulta prévia — duas abas
+            // abertas contornariam a verificação em memória. A collation insensível a caixa
+            // vale aqui pela mesma razão da RN-23: "Consumíveis" e "consumíveis" seriam dois
+            // catálogos com o mesmo nome na tela.
+            catalog.HasIndex(entity => entity.Name).IsUnique();
+
+            catalog.Ignore(entity => entity.WasGenerated);
+        });
+
+        modelBuilder.Entity<CatalogCategory>(link =>
+        {
+            link.HasKey(entity => new { entity.CatalogId, entity.CategoryId });
+
+            link.HasOne(entity => entity.Catalog)
+                .WithMany(entity => entity.Categories)
+                .HasForeignKey(entity => entity.CatalogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // `Restrict` na categoria, e não `Cascade`: apagar uma categoria não pode
+            // esvaziar o critério de um catálogo por baixo dos panos. Quem decide o que
+            // acontece nesse caso é a RN-25.1, em T-26.
+            link.HasOne(entity => entity.Category)
+                .WithMany()
+                .HasForeignKey(entity => entity.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Product>(product =>

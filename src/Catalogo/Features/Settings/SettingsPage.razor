@@ -325,7 +325,7 @@
             Logger.LogWarning(exception, "Falha de transporte no envio da capa.");
             coverError = "O envio foi interrompido antes de terminar. Tente novamente.";
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception)
         {
             Logger.LogError(exception, "Falha ao enviar a capa.");
             coverError = "Não foi possível enviar a capa agora. Tente novamente.";

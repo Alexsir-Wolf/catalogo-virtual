@@ -91,7 +91,7 @@ public sealed class ProductPhotoService(
             {
                 await storage.DeleteAsync(bucket, objectName, cancellationToken);
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {
                 logger.LogError(
                     exception,
@@ -108,12 +108,28 @@ public sealed class ProductPhotoService(
     /// </summary>
     private IEnumerable<(string Bucket, string ObjectName)> ObjectsOf(ProductPhoto photo)
     {
+        // O original não é derivada e não tem especificação: é o arquivo como chegou, e vive
+        // no bucket privado porque ninguém o consome pela vitrine.
         yield return (options.PrivateBucket, photo.OriginalFileName);
-        yield return (options.PublicBucket, photo.ThumbnailFileName);
-        yield return (options.PublicBucket, photo.CardFileName);
-        yield return (options.PublicBucket, photo.LargeFileName);
-        yield return (options.PrivateBucket, photo.PrintFileName);
+
+        // O bucket de cada derivada vem de `BucketFor`, a **mesma** função que o envio usa.
+        // Repetir a regra aqui à mão faria a visibilidade divergir em silêncio no dia em que
+        // uma derivada mudasse de lado — e o sintoma seria um DELETE no bucket errado, que
+        // falha com 404 e vira objeto pago para sempre.
+        foreach (var specification in DerivativeSpecifications.All)
+        {
+            yield return (BucketFor(specification), NameOf(photo, specification.Derivative));
+        }
     }
+
+    private static string NameOf(ProductPhoto photo, ImageDerivative derivative) => derivative switch
+    {
+        ImageDerivative.Thumbnail => photo.ThumbnailFileName,
+        ImageDerivative.Card => photo.CardFileName,
+        ImageDerivative.Large => photo.LargeFileName,
+        ImageDerivative.Print => photo.PrintFileName,
+        _ => throw new ArgumentOutOfRangeException(nameof(derivative), derivative, null)
+    };
 
     private string BucketFor(DerivativeSpecification specification) =>
         specification.IsPublic ? options.PublicBucket : options.PrivateBucket;

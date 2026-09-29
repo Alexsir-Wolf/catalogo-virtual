@@ -61,7 +61,7 @@ public sealed class ProductPhotoUpload(
 
             return PhotoUploadOutcome.Failed(TransportInterruptedMessage);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             logger.LogError(
                 exception,
@@ -82,7 +82,7 @@ public sealed class ProductPhotoUpload(
         {
             attached = await maintenance.AttachPhotoAsync(productId, result.Photo!, cancellationToken);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             logger.LogError(
                 exception,

@@ -875,7 +875,7 @@ Cache de saída sobre as rotas da vitrine, com chave derivada da URL completa e 
 
 #### T-22 — Catálogo como filtro salvo
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Média
 - **Depende de:** T-14
 - **Implementa:** RN-26, RN-27, RN-28, RN-29, RN-33, RN-34
@@ -892,13 +892,13 @@ Entidade de catálogo com nome único e as categorias selecionadas — **e nada 
 Lista de catálogos com contagem resolvida no momento da exibição e data da última geração. Tela de critério com seleção de categorias, exigindo ao menos uma.
 
 **Critério de aceite (testável):**
-- [ ] Salvar catálogo persiste nome e categorias *(CA-12)*
-- [ ] **Nenhuma tabela de itens de catálogo existe no esquema** *(RN-29)*
-- [ ] Catálogo sem categoria selecionada não pode ser salvo *(CA-13)*
-- [ ] Nome duplicado é recusado
-- [ ] Lista exibe contagem resolvida na hora e a última geração
-- [ ] Catálogo nunca gerado é marcado como tal
-- [ ] Excluir catálogo não afeta produto algum *(CA-20)*
+- [x] Salvar catálogo persiste nome e categorias *(CA-12)*
+- [x] **Nenhuma tabela de itens de catálogo existe no esquema** *(RN-29)*
+- [x] Catálogo sem categoria selecionada não pode ser salvo *(CA-13)*
+- [x] Nome duplicado é recusado
+- [x] Lista exibe contagem resolvida na hora e a última geração
+- [x] Catálogo nunca gerado é marcado como tal
+- [x] Excluir catálogo não afeta produto algum *(CA-20)*
 
 **Testes a escrever:**
 - *Integration:* salvar catálogo e verificar que só nome e categorias foram persistidos *(CA-12)*

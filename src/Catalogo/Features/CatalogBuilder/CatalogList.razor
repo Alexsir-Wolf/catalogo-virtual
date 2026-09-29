@@ -1,0 +1,144 @@
+@page "/painel/catalogos"
+@rendermode InteractiveServer
+@inject CatalogMaintenance Maintenance
+@inject NavigationManager Navigation
+
+@*
+    UI-07. Lista dos recortes salvos.
+
+    A contagem de cada cartão é **resolvida agora** (RN-30), e não guardada: um catálogo salvo
+    em março exibe o acervo de hoje, e o número muda entre duas visitas sem ninguém ter mexido
+    nele. É contraintuitivo o suficiente para a tela dizer isso em voz alta, em vez de deixar
+    o dono achar que perdeu produtos.
+*@
+
+<PageTitle>Catálogos</PageTitle>
+
+<div class="painel">
+    <h1>Catálogos</h1>
+    <div class="painel__sub">
+        Cada catálogo é um <b>critério salvo</b> — nome e categorias. A lista de produtos não
+        é guardada: ela é resolvida no momento de gerar.
+    </div>
+
+    <div class="painel__folha" data-estado="@StateId">
+        @if (catalogs is null)
+        {
+            <p>Carregando…</p>
+        }
+        else if (catalogs.Count == 0)
+        {
+            <div class="nada" data-estado="vazio">
+                <h2>Nenhum catálogo ainda</h2>
+                <p>
+                    Um catálogo é o recorte que você envia ou imprime: escolha um nome e as
+                    categorias que ele abrange. O mesmo catálogo, gerado meses depois, sai
+                    com o acervo daquele momento.
+                </p>
+                <a class="btn btn--primario" href="/painel/catalogos/novo">
+                    Criar o primeiro catálogo
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="painel-bloco__ft">
+                <a class="btn btn--primario" href="/painel/catalogos/novo">Novo catálogo</a>
+            </div>
+
+            <p class="campo__ajuda">
+                As contagens abaixo são <b>de agora</b>: mudam quando produtos entram no ar,
+                saem ou trocam de categoria, sem que o catálogo tenha sido alterado.
+            </p>
+
+            <div class="catalogos">
+                @foreach (var catalog in catalogs)
+                {
+                    <div class="catalogo" data-estado="@(catalog.WasGenerated ? "default" : "nuncaGerado")">
+                        <a class="catalogo__n" href="/painel/catalogos/@catalog.Id">
+                            @catalog.Name
+                        </a>
+
+                        <span class="catalogo__c">
+                            @foreach (var category in catalog.CategoryNames)
+                            {
+                                <span class="catalogo__t">@category</span>
+                            }
+                        </span>
+
+                        <span class="catalogo__q">
+                            <b>@catalog.PublishedProducts</b>
+                            <em>@(catalog.PublishedProducts == 1 ? "produto no ar agora" : "produtos no ar agora")</em>
+                        </span>
+
+                        @* RN-33: nunca gerado é **marcado**, não disfarçado com um traço. *@
+                        <span class="catalogo__g">
+                            @if (catalog.LastGeneratedAt is { } moment)
+                            {
+                                <text>Gerado em @moment.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</text>
+                            }
+                            else
+                            {
+                                <b>Nunca gerado</b>
+                            }
+                        </span>
+
+                        @if (removing == catalog.Id)
+                        {
+                            @* RN-34 dita o texto: a confirmação precisa dizer que nenhum
+                               produto é afetado, senão o dono hesita à toa. *@
+                            <span class="catalogo__x" data-estado="confirmarExclusao">
+                                <b>Excluir o catálogo “@catalog.Name”?</b>
+                                Remove apenas o critério salvo — <b>nenhum produto é
+                                afetado</b>, e o acervo fica exatamente como está.
+
+                                <button type="button" class="btn btn--perigo"
+                                        @onclick="() => DeleteAsync(catalog.Id)">
+                                    Excluir catálogo
+                                </button>
+
+                                <button type="button" class="btn btn--fantasma"
+                                        @onclick="() => removing = null">
+                                    Manter
+                                </button>
+                            </span>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn--pequeno"
+                                    @onclick="() => removing = catalog.Id">
+                                Excluir
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<CatalogSummary>? catalogs;
+    private int? removing;
+
+    private string StateId => catalogs switch
+    {
+        null => "carregando",
+        { Count: 0 } => "vazio",
+        _ => "default"
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        removing = null;
+        catalogs = await Maintenance.ListAsync();
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        await Maintenance.DeleteAsync(id);
+        await LoadAsync();
+    }
+}
