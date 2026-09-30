@@ -32,8 +32,10 @@ public enum ImageFormat
 public static class DerivativeSpecifications
 {
     /// <summary>
-    /// Lado maior da derivada de impressão. Os 800 px da ADR-005 são ponto de partida
-    /// declarado, a confirmar por impressão real em T-04 — não um número fechado.
+    /// Lado maior da derivada de impressão. **Número fechado por T-04**, contra impressão real: os
+    /// 800 px que a ADR-005 declarava como ponto de partida foram confirmados no papel e deixaram
+    /// de ser provisórios. Quem mexer aqui está mexendo numa medição, não numa estimativa — e o
+    /// efeito só aparece impresso, depois de o acervo inteiro já ter sido processado.
     /// </summary>
     public const int PrintLongestSide = 800;
 
