@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Catalogo.Tests;
@@ -71,6 +72,28 @@ public sealed class ApplicationSmokeTests(PostgresFixture postgres) : IDisposabl
         Assert.DoesNotContain("Password", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ServiceKey", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("supabase.co", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// O conjunto de campos que `/health` publica é **fechado**: `status`, `database` e `storage`,
+    /// e nada mais.
+    ///
+    /// Afirmar sobre o conjunto, e não sobre a ausência de um segredo específico, é o que resiste a
+    /// mutação: qualquer campo novo — mesmo de nome inocente, mesmo sem valor sensível hoje —
+    /// derruba este caso e obriga quem o acrescentou a justificá-lo. Foi assim que `failure`,
+    /// `cause` e `sqlState` voltaram a existir só no log.
+    /// </summary>
+    [Fact]
+    public async Task O_endpoint_de_saude_publica_um_conjunto_fechado_de_campos()
+    {
+        using var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/health");
+
+        using var published = JsonDocument.Parse(body);
+        var fields = published.RootElement.EnumerateObject().Select(field => field.Name).ToArray();
+
+        Assert.Equal(new[] { "status", "database", "storage" }, fields);
     }
 
     /// <summary>

@@ -54,6 +54,23 @@ public sealed class StorageHealthTests
     }
 
     /// <summary>
+    /// O detalhe da configuração fica no log: o rótulo público é opaco. Dizer `not configured` na
+    /// resposta informava a um anônimo, com precisão, que a credencial do armazenamento não foi
+    /// preenchida no painel — ou seja, em que estado o deploy está quebrado.
+    /// </summary>
+    [Fact]
+    public async Task Sem_credencial_o_rotulo_publico_nao_descreve_a_configuracao()
+    {
+        var status = await StorageHealth.CheckAsync(
+            new ThrowingStorage(new HttpRequestException("não deveria ser chamado")),
+            new ObjectStorageOptions(),
+            NullLogger.Instance);
+
+        Assert.Equal(StorageHealth.UnavailableLabel, status.Label);
+        Assert.DoesNotContain("configured", status.Label);
+    }
+
+    /// <summary>
     /// O serviço responde: saudável. A sonda procura um objeto que **não existe de propósito**, e
     /// `404` é a resposta esperada — o serviço respondeu, autenticou e procurou, que é tudo o que a
     /// verificação queria saber.
@@ -108,6 +125,47 @@ public sealed class StorageHealthTests
     }
 
     /// <summary>
+    /// E o **rótulo público** não carrega nem o tipo: o tipo da exceção descreve a causa da falha
+    /// a quem só tem a URL, e `/health` é anônimo. Quem investiga lê o `Detail` no log.
+    /// </summary>
+    [Fact]
+    public async Task O_rotulo_publico_da_falha_nao_carrega_o_tipo_da_excecao()
+    {
+        var status = await StorageHealth.CheckAsync(
+            new ThrowingStorage(new HttpRequestException("500 do serviço")),
+            Configured(),
+            NullLogger.Instance);
+
+        Assert.Equal(StorageHealth.UnavailableLabel, status.Label);
+        Assert.DoesNotContain(nameof(HttpRequestException), status.Label);
+    }
+
+    /// <summary>
+    /// **Pendura é degradação, não exceção.**
+    ///
+    /// Um armazenamento que não recusa a conexão e também não responde pendurava a sonda até os
+    /// 100 segundos do default do `HttpClient`, e a plataforma — que usa `/health` como
+    /// `healthCheckPath` — não recebe resposta, conclui que o processo travou e reinicia a
+    /// instância. O teto precisa voltar como **resultado**: deixar o cancelamento subir trocaria
+    /// o 200 com `degraded` por um 500, na rota que decide se a instância fica no ar.
+    /// </summary>
+    [Fact]
+    public async Task Sonda_pendurada_estoura_o_teto_e_volta_como_degradada()
+    {
+        var logger = new RecordingLogger();
+
+        var status = await StorageHealth.CheckAsync(
+            new HangingStorage(),
+            Configured(),
+            logger,
+            probeTimeout: TimeSpan.FromMilliseconds(50));
+
+        Assert.False(status.Healthy);
+        Assert.Equal("timeout", status.Detail);
+        Assert.Contains(LogLevel.Error, logger.Levels);
+    }
+
+    /// <summary>
     /// Cancelamento **não** é falha do armazenamento: a requisição de saúde foi abortada, e
     /// reportar degradado por isso produziria alarme a cada visitante que fechasse a aba.
     /// </summary>
@@ -148,6 +206,37 @@ public sealed class StorageHealthTests
             string bucket,
             string objectName,
             CancellationToken cancellationToken = default) => throw exception;
+
+        public string PublicUrlFor(string objectName) => objectName;
+    }
+
+    /// <summary>
+    /// O armazenamento que nunca responde — o estado que não é recusa nem erro, e que é o único
+    /// capaz de pendurar a rota de saúde. Só o cancelamento o solta.
+    /// </summary>
+    private sealed class HangingStorage : IObjectStorage
+    {
+        public Task UploadAsync(
+            string bucket,
+            string objectName,
+            byte[] content,
+            string contentType,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task DeleteAsync(
+            string bucket,
+            string objectName,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public async Task<byte[]> DownloadAsync(
+            string bucket,
+            string objectName,
+            CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+
+            return [];
+        }
 
         public string PublicUrlFor(string objectName) => objectName;
     }

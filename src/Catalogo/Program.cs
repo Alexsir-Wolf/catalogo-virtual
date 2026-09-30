@@ -118,9 +118,15 @@ app.MapRazorComponents<App>()
 // **É público**: quem monitora não tem credencial do painel. Por isso a resposta é pobre de
 // propósito — rótulos de estado e tipos de falha, nunca host, usuário, chave ou versão.
 //
+// **Cada verificação tem teto de tempo próprio** (`ProbeTimeout`, 5s), e não por economia: esta
+// rota é o `healthCheckPath` do `render.yaml`, e uma sonda pendurada não responde "não saudável" —
+// não responde nada, e a plataforma trata a instância como travada e reinicia. O estouro do teto
+// volta como resultado não saudável, nunca como exceção.
+//
 // As duas verificações vivem em peças próprias (`DatabaseHealth`, `StorageHealth`) porque o ramo
-// que interessa proteger é o de falha, e ele não é alcançável por este endpoint num teste: com um
-// banco inalcançável a aplicação nem sobe, já que aplica migrações na partida.
+// que interessa proteger é o de falha, e ele não é alcançável de dentro do `MapGet` num teste: com
+// um banco inalcançável a aplicação nem sobe, já que aplica migrações na partida. O corpo do 503
+// em si é exercitado por HTTP, trocando a cadeia da sonda depois da partida.
 app.MapGet("/health", async (
     IConfiguration configuration,
     IObjectStorage objectStorage,
@@ -138,15 +144,14 @@ app.MapGet("/health", async (
     if (!database.Healthy)
     {
         // Sem banco não há vitrine nem painel: aqui o 503 é o estado verdadeiro do serviço.
-        return Results.Json(
-            new
-            {
-                status = "unhealthy",
-                failure = database.Failure,
-                cause = database.Cause,
-                sqlState = database.SqlState
-            },
-            statusCode: 503);
+        //
+        // **E é só isso que o corpo diz.** O tipo da falha, o tipo da causa e o `SqlState` ficaram
+        // no `LogError` de `DatabaseHealth`, onde já estão como campos próprios: publicados aqui,
+        // eles distinguiam para um anônimo "não resolvi o host" de "senha recusada" (`28P01`) de
+        // "banco não existe" (`3D000`) — nenhum é segredo isolado, e juntos são a topologia interna
+        // que R-01 de REVIEW-T-02 pediu para não publicar. Quem monitora reage ao `unhealthy`; quem
+        // investiga tem o log (R-02 de REVIEW-T-28-2026-09-30).
+        return Results.Json(new { status = "unhealthy" }, statusCode: 503);
     }
 
     // O armazenamento de objeto é a segunda dependência externa (ADR-018), e uma falha nele é
@@ -168,9 +173,8 @@ app.MapGet("/health", async (
     // minuto de partida a frio (ADR-018). É o mesmo princípio que T-07 fixou: falha de uma parte
     // não tira a vitrine pública do ar.
     //
-    // Quem monitora continua vendo o problema — `status` diz `degraded` e `storage` diz o que
-    // aconteceu — e o log traz o detalhe. O que muda é quem decide o que fazer: uma pessoa, não o
-    // orquestrador.
+    // Quem monitora continua vendo o problema — `status` diz `degraded` — e o log traz o detalhe.
+    // O que muda é quem decide o que fazer: uma pessoa, não o orquestrador.
     if (!storage.Healthy)
     {
         logger.LogWarning(
@@ -179,12 +183,15 @@ app.MapGet("/health", async (
             storage.Detail);
     }
 
+    // O campo `storage` leva o **rótulo**, não o detalhe: `not configured` contava a um anônimo
+    // que a credencial do armazenamento não foi preenchida no painel, e o tipo da exceção contava
+    // por que o acesso falhou. É o mesmo critério do 503 acima — o detalhe é do log.
     return Results.Json(
         new
         {
             status = storage.Healthy ? "healthy" : "degraded",
             database = "reachable",
-            storage = storage.Detail
+            storage = storage.Label
         },
         statusCode: 200);
 });
