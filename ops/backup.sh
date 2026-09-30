@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-readonly BUCKETS=("produtos-web" "produtos-originais")
+readonly BUCKETS=("produtos-web" "produtos-print")
 readonly RETENCAO="${BACKUP_RETENCAO:-14}"
 readonly AGORA="$(date -u +%Y%m%dT%H%M%SZ)"
 

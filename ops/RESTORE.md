@@ -17,7 +17,7 @@ Uma execução de `backup.sh` produz um diretório com data e três coisas:
 |---|---|---|
 | `banco.dump` | raiz da cópia | Todo o acervo: categorias, produtos, catálogos salvos, configuração e a conta do dono |
 | `arquivos/produtos-web/` | bucket público | As três derivadas de tela de cada foto, e a capa do PDF |
-| `arquivos/produtos-originais/` | bucket privado | O original de cada foto e a derivada de impressão |
+| `arquivos/produtos-print/` | bucket privado | O original de cada foto e a derivada de impressão |
 | `MANIFESTO.txt` | raiz da cópia | Contagens para conferir que a cópia está completa **antes** de começar |
 
 **O dump não contém os arquivos.** Restaurar só o banco produz um catálogo cujos produtos
@@ -35,7 +35,7 @@ cat /caminho/da/copia/MANIFESTO.txt
 ```
 
 O número de arquivos em `produtos-web` deve ser próximo de **três vezes** o número de produtos
-com foto, mais um por capa enviada; em `produtos-originais`, **duas vezes**. Divergência grande
+com foto, mais um por capa enviada; em `produtos-print`, **duas vezes**. Divergência grande
 significa cópia incompleta — nesse caso, use a cópia anterior.
 
 Tenha em mão:
@@ -97,7 +97,7 @@ Os buckets precisam existir no destino, com a mesma visibilidade:
 | Bucket | Visibilidade | Razão |
 |---|---|---|
 | `produtos-web` | **público** | A vitrine serve as derivadas de tela por URL direta |
-| `produtos-originais` | **privado** | A derivada de impressão não pode ser acessível publicamente (RN-12) |
+| `produtos-print` | **privado** | A derivada de impressão não pode ser acessível publicamente (RN-12) |
 
 Errar a visibilidade do bucket privado expõe a derivada de impressão — é o que o CA-28 existe
 para impedir. Confira depois de criar:
@@ -105,7 +105,7 @@ para impedir. Confira depois de criar:
 ```bash
 # Deve responder erro de autorização, e não o arquivo
 curl -s -o /dev/null -w '%{http_code}\n' \
-  "$SUPABASE_URL/storage/v1/object/public/produtos-originais/qualquer-nome"
+  "$SUPABASE_URL/storage/v1/object/public/produtos-print/qualquer-nome"
 ```
 
 Envio dos arquivos:
@@ -113,7 +113,7 @@ Envio dos arquivos:
 ```bash
 cd /caminho/da/copia/arquivos
 
-for bucket in produtos-web produtos-originais; do
+for bucket in produtos-web produtos-print; do
   find "$bucket" -type f | while IFS= read -r arquivo; do
     nome="${arquivo#"$bucket"/}"
 
