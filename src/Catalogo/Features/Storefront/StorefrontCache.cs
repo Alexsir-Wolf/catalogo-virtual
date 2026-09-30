@@ -23,9 +23,16 @@ namespace Catalogo.Features.Storefront;
 public static class StorefrontCache
 {
     /// <summary>
-    /// A política aplicada às rotas públicas.
+    /// As chaves de query que fazem parte da identidade de uma página da vitrine: busca, filtro de
+    /// categoria e página (RN-56). São **elas**, e não toda a query.
+    ///
+    /// Variar por toda a query era o padrão e parecia inofensivo, mas cada `?utm_source=whatsapp`,
+    /// cada `?fbclid=…` e cada variante de link divulgado criava entrada própria — e com o teto de
+    /// memória do cache, algumas milhares de variantes despejam justamente a entrada quente da raiz,
+    /// que é o alvo da meta de tempo de resposta. Listar as três também torna a linha significativa:
+    /// removê-la passa a mudar comportamento, o que antes não acontecia.
     /// </summary>
-    public const string PolicyName = "vitrine";
+    public static readonly string[] NavigationQueryKeys = ["busca", "categoria", "pagina"];
 
     /// <summary>
     /// A tag única da vitrine. Toda escrita no painel invalida esta tag — produto, categoria,
@@ -50,9 +57,10 @@ public static class StorefrontCache
                 .Tag(Tag)
                 .Expire(Expiration)
 
-                // A chave inclui a query inteira: busca, categoria e página são estado de
-                // navegação na URL, e cada combinação é uma página diferente.
-                .SetVaryByQuery("*")));
+                // A chave inclui as três chaves de navegação — e só elas. Busca, categoria e página
+                // são estado de navegação na URL (RN-56), e cada combinação é uma página diferente;
+                // parâmetro de rastreamento não é.
+                .SetVaryByQuery(NavigationQueryKeys)));
 
     /// <summary>
     /// As rotas públicas: a listagem e o detalhe do produto. O painel **nunca** é cacheado — ele

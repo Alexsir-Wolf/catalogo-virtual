@@ -123,6 +123,25 @@ public sealed class ProductPublicationTests(PostgresFixture postgres)
         Assert.Equal([PublicationRequirement.Photo], state.Missing);
     }
 
+    /// <summary>
+    /// O estado carrega o **nome gravado**, e é dele que a confirmação de exclusão tira o texto.
+    ///
+    /// Antes, a confirmação usava o campo do formulário, ligado ao `oninput`: quem trocasse o nome
+    /// sem salvar lia o nome digitado e o clique apagava o produto de nome antigo. Aqui a afirmação
+    /// é sobre o mecanismo — o nome vem do banco —, porque o estado da confirmação vive no circuito
+    /// e o projeto não tem ferramenta para dirigi-lo por teste.
+    /// </summary>
+    [Fact]
+    public async Task RN_20_o_estado_carrega_o_nome_gravado_e_nao_o_que_esta_em_digitacao()
+    {
+        var publication = CreatePublication();
+        var product = await CreateProductAsync(withPhoto: true);
+
+        var state = await publication.FindStateAsync(product.Id);
+
+        Assert.Equal(product.Name, state!.Name);
+    }
+
     [Fact]
     public async Task Produto_inexistente_nao_e_recusa_de_publicacao()
     {

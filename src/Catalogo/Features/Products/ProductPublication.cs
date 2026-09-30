@@ -138,7 +138,7 @@ public sealed class ProductPublication(
 
         return product is null
             ? null
-            : new PublicationState(product.Status, MissingRequirements(product));
+            : new PublicationState(product.Status, product.Name, MissingRequirements(product));
     }
 
     /// <summary>
@@ -173,9 +173,17 @@ public sealed class ProductPublication(
     }
 }
 
-/// <summary>Situação gravada do produto e a distância que falta para publicá-lo.</summary>
+/// <summary>
+/// Situação gravada do produto e a distância que falta para publicá-lo.
+///
+/// Carrega também o **nome gravado**, e isso tem uma razão específica: a confirmação de exclusão
+/// afirma qual produto vai ser apagado, e usava o nome do campo em digitação. Quem tivesse trocado
+/// o nome sem salvar lia "Excluir “Cab HD” definitivamente?" e perdia o "Cabo HDMI Ugreen" — a tela
+/// mentindo no único momento em que o dono precisa confiar no que lê.
+/// </summary>
 public sealed record PublicationState(
     ProductStatus Status,
+    string Name,
     IReadOnlyList<PublicationRequirement> Missing)
 {
     public bool CanPublish => Missing.Count == 0;

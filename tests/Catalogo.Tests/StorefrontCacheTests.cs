@@ -145,6 +145,34 @@ public sealed class StorefrontCacheTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
+    /// Parâmetro de rastreamento **não** cria entrada nova.
+    ///
+    /// Variar por toda a query era o padrão, e transformava cada `?utm_source=whatsapp` e cada
+    /// `?fbclid=…` numa entrada própria. Com o teto de memória do cache, algumas milhares de
+    /// variantes de um link divulgado despejam justamente a entrada quente da raiz — que é a página
+    /// que a meta de tempo de resposta persegue.
+    ///
+    /// A verificação é a mesma técnica dos outros casos, ao contrário: o preço é alterado direto no
+    /// banco e a URL com o parâmetro de rastreamento **continua mostrando o valor antigo**, o que só
+    /// é possível se ela estiver sendo servida da mesma entrada da raiz.
+    /// </summary>
+    [Fact]
+    public async Task Parametro_de_rastreamento_nao_cria_entrada_nova()
+    {
+        var productId = await SeedPublishedAsync(price: 100m, name: "Produto rastreado");
+        using var client = factory.CreateClient();
+
+        Assert.Contains("100,00", await client.GetStringAsync("/"));
+
+        await SetPriceDirectlyAsync(productId, 999m);
+
+        var comRastreio = await client.GetStringAsync("/?utm_source=whatsapp");
+
+        Assert.Contains("100,00", comRastreio);
+        Assert.DoesNotContain("999,00", comRastreio);
+    }
+
+    /// <summary>
     /// Alterar o preço de um produto publicado reflete na vitrine **na requisição seguinte** — não
     /// em cinco minutos, não depois de reiniciar.
     ///

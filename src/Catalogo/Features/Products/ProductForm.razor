@@ -540,7 +540,11 @@
         }
 
         photo = await Maintenance.FindPhotoAsync(Id!.Value);
-        confirmedName = draft.Name;
+
+        // O nome vem do **gravado**, não do campo. `draft.Name` está ligado ao `oninput`: quem
+        // tivesse trocado o nome sem salvar veria a confirmação nomear o texto digitado e o clique
+        // apagaria outro produto — o que a própria documentação deste método promete não acontecer.
+        confirmedName = publication.Name;
         deletionAffectsStorefront = IsPublished;
         confirmingDeletion = true;
     }

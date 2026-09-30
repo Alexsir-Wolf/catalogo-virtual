@@ -255,7 +255,27 @@ public sealed class ProductMaintenance(
             photo is not null);
 
         // Excluir **remove** da vitrine, e o link compartilhado passa a não encontrar.
-        await cache.InvalidateAsync("produto excluído", cancellationToken);
+        //
+        // A invalidação tem `try` próprio porque acontece **depois** do commit, e quem chama trata
+        // exceção como "nada foi excluído": sem esta separação, uma falha ao evictar a tag fazia a
+        // tela dizer "não foi possível excluir" e "o produto continua no acervo" sobre um produto
+        // que já havia saído do banco — e as derivadas dele ficavam sem ninguém para apagar, porque
+        // o chamador abandonava a limpeza. Três afirmações falsas de uma vez.
+        //
+        // O dado velho na vitrine tem prazo de cinco minutos pela janela de validade; o registro
+        // fica no log para que a causa não desapareça.
+        try
+        {
+            await cache.InvalidateAsync("produto excluído", cancellationToken);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogError(
+                exception,
+                "Produto {Id} foi excluído, mas a invalidação do cache da vitrine falhou. A "
+                + "listagem pública pode exibir o produto até a janela de validade expirar.",
+                productId);
+        }
 
         return photo;
     }
