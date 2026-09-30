@@ -91,22 +91,130 @@ public static class StorefrontCache
     ///
     /// Medido antes e depois: com o cookie, a segunda requisição à mesma URL era recomposta do
     /// banco; sem ele, é servida do cache.
+    ///
+    /// **A remoção acontece no primeiro byte escrito, e não em `Response.OnStarting`.** Isso não é
+    /// detalhe de implementação: o cache de saída tira o retrato dos cabeçalhos dentro do shim de
+    /// stream que ele instala, no momento em que a aplicação começa a escrever o corpo — e os
+    /// `OnStarting` do Kestrel só rodam depois disso. Com a remoção ali, a resposta **servida** saía
+    /// limpa e a entrada **guardada** conservava o cookie do primeiro visitante, replicado em todo
+    /// acerto de cache. Este middleware roda depois de `UseOutputCache`, então o stream que ele
+    /// embrulha é o shim: remover o cabeçalho antes de repassar a escrita coloca a remoção **antes**
+    /// do retrato. Verificado por teste, que afirma a ausência do cabeçalho nas duas respostas.
     /// </summary>
     public static IApplicationBuilder UseStorefrontCacheableResponses(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
         {
-            if (IsCacheable(context))
+            if (!IsCacheable(context))
             {
-                context.Response.OnStarting(() =>
-                {
-                    context.Response.Headers.Remove(HeaderNames.SetCookie);
+                await next();
 
-                    return Task.CompletedTask;
-                });
+                return;
             }
 
-            await next();
+            var original = context.Response.Body;
+            context.Response.Body = new CookieStrippingStream(context.Response, original);
+
+            try
+            {
+                await next();
+            }
+            finally
+            {
+                context.Response.Body = original;
+            }
         });
+
+    /// <summary>
+    /// Remove o `Set-Cookie` no primeiro byte escrito e repassa tudo adiante.
+    ///
+    /// Existe por causa da ordem: é o único ponto que roda **antes** de o cache de saída copiar os
+    /// cabeçalhos e **depois** de o antiforgery tê-los escrito.
+    /// </summary>
+    private sealed class CookieStrippingStream(HttpResponse response, Stream inner) : Stream
+    {
+        private bool stripped;
+
+        public override bool CanRead => false;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => true;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+            Strip();
+            inner.Flush();
+        }
+
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            Strip();
+
+            return inner.FlushAsync(cancellationToken);
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            Strip();
+            inner.Write(buffer, offset, count);
+        }
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            Strip();
+            inner.Write(buffer);
+        }
+
+        public override Task WriteAsync(
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken)
+        {
+            Strip();
+
+            return inner.WriteAsync(buffer, offset, count, cancellationToken);
+        }
+
+        public override ValueTask WriteAsync(
+            ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            Strip();
+
+            return inner.WriteAsync(buffer, cancellationToken);
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        private void Strip()
+        {
+            if (stripped)
+            {
+                return;
+            }
+
+            stripped = true;
+
+            if (!response.HasStarted)
+            {
+                response.Headers.Remove(HeaderNames.SetCookie);
+            }
+        }
+    }
 }
 
 /// <summary>

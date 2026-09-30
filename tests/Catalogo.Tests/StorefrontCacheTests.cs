@@ -90,6 +90,36 @@ public sealed class StorefrontCacheTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
+    /// A resposta servida **do cache** não carrega `Set-Cookie`.
+    ///
+    /// A remoção acontece em `Response.OnStarting`, e a pergunta que este caso responde é se isso
+    /// acontece antes ou depois de o cache tirar o retrato dos cabeçalhos. Se for depois, a entrada
+    /// guardada conserva o cookie de antiforgery do **primeiro** visitante e o replica em todo
+    /// acerto — um cookie por visitante, compartilhado por todos, dentro de conteúdo cacheado, que
+    /// é exatamente o que a ADR-008 exclui.
+    /// </summary>
+    [Fact]
+    public async Task A_resposta_servida_do_cache_nao_carrega_cookie()
+    {
+        await SeedPublishedAsync(price: 100m, name: "Produto do cookie");
+        using var client = factory.CreateClient();
+
+        using var primeira = await client.GetAsync("/");
+        using var segunda = await client.GetAsync("/");
+
+        primeira.EnsureSuccessStatusCode();
+        segunda.EnsureSuccessStatusCode();
+
+        Assert.False(
+            primeira.Headers.Contains("Set-Cookie"),
+            "A primeira resposta pública traz Set-Cookie, então o cache não deveria tê-la guardado.");
+
+        Assert.False(
+            segunda.Headers.Contains("Set-Cookie"),
+            "A resposta servida do cache traz o Set-Cookie do primeiro visitante.");
+    }
+
+    /// <summary>
     /// URLs com filtros diferentes são **entradas distintas**: o estado de navegação vive na URL
     /// (RN-56), e uma chave que ignorasse a query serviria a listagem filtrada para quem pediu a
     /// completa.
