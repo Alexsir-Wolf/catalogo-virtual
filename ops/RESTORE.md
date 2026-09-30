@@ -44,6 +44,17 @@ Tenha em mão:
 - O endereço e a chave de serviço do Supabase **de destino**
 - `psql`, `pg_restore` e `curl` no `PATH`
 
+**Se `psql` e `pg_restore` não estiverem instalados** — o caso de uma máquina de desenvolvimento
+Windows comum —, rode-os de dentro da imagem oficial, que já os traz. O ensaio da seção 5 foi
+feito assim:
+
+```bash
+docker run --rm -i postgres:17-alpine \
+  pg_restore --no-owner --no-privileges --dbname="$DATABASE_URL" < /caminho/da/copia/banco.dump
+```
+
+Para conferir contagens, o mesmo caminho com `psql "$DATABASE_URL" -c '...'`.
+
 ---
 
 ## 3. Restaurar o banco
@@ -64,6 +75,13 @@ psql "$DATABASE_URL" -c \
   'select (select count(*) from "Categories") as categorias,
           (select count(*) from "Products") as produtos,
           (select count(*) from "Catalogs") as catalogos;'
+```
+
+Confira que o dump trouxe o histórico de migrações — sem ele a aplicação tentaria aplicar todas
+de novo sobre um esquema que já existe:
+
+```bash
+psql "$DATABASE_URL" -tAc 'select count(*) from "__EFMigrationsHistory";'
 ```
 
 **Não rode as migrations antes do `pg_restore`.** O dump traz o esquema; aplicar migrations
@@ -119,23 +137,34 @@ significa arquivo faltando, não banco errado.
 
 ## 5. Registro da restauração executada
 
-> ⚠️ **Não executado.** Esta seção precisa ser preenchida com uma restauração real, em ambiente
-> limpo, com o sistema funcionando ao final. Até lá, o critério de T-27 que exige a execução
-> **não está cumprido**, e o procedimento acima é hipótese fundamentada, não fato verificado.
-
-Quando acontecer, registre aqui:
+> ✅ **A metade do banco foi executada** — seção 3 inteira, em banco de destino vazio, com o
+> sistema funcionando ao final.
+>
+> ⚠️ **A metade dos arquivos (seção 4) não foi executada** e continua sendo hipótese: ela exige
+> credencial de um Supabase de destino, que o ensaio não tinha. O critério de T-27 fica cumprido
+> **pela metade**, e é assim que deve ser lido.
 
 | Campo | Valor |
 |---|---|
-| Data da execução | |
-| Cópia utilizada | |
-| Destino | |
-| Tempo total | |
-| O que não funcionou de primeira | |
-| Correções feitas neste documento | |
+| Data da execução | 2026-09-30 |
+| Cópia utilizada | Dump gerado no ensaio com `pg_dump --format=custom --no-owner --no-privileges` — 3 categorias, 12 produtos No ar, 1 catálogo com critério de 2 categorias, 10 migrações aplicadas |
+| Destino | PostgreSQL 17 em contêiner limpo, banco recém-criado, **sem** migrations aplicadas antes |
+| Tempo total | Cerca de 20 minutos, a maior parte gasta nos dois defeitos abaixo |
+| O que não funcionou de primeira | **Duas coisas, e as duas eram erro deste documento ou do ambiente.** (1) A seção 6 mandava alterar `OwnerAccount__Password`; **a seção de configuração é `Owner`**, então a variável é `Owner__Password`. Com o nome errado a aplicação sobe, registra `Conta do dono não semeada` como aviso e o painel fica inacessível — sem erro visível na tela, só um `warn` no log. (2) A conferência do destino vazio e a restauração precisam de `psql`/`pg_restore`, que **não** estão no `PATH` de uma máquina de desenvolvimento Windows comum; o ensaio os obteve de dentro da imagem `postgres:17-alpine`, e o documento não dizia como. |
+| Correções feitas neste documento | Nome da variável corrigido na seção 6; acrescentada a nota sobre `MustChangePassword`; acrescentada a alternativa de rodar as ferramentas por contêiner na seção 2; acrescentado à seção 3 o passo de conferir a versão restaurada em `__EFMigrationsHistory` |
 
-O campo "o que não funcionou de primeira" é o mais útil dos seis: é ele que transforma este
-documento de roteiro otimista em procedimento confiável.
+**O que o ensaio provou, na ordem em que foi feito:**
+
+1. `pg_restore` num banco de destino vazio traz esquema e dados — as contagens do destino conferiram com as da origem, incluindo a tabela de junção do critério
+2. `__EFMigrationsHistory` veio no dump com as 10 migrações, e **a aplicação subiu sem aplicar nenhuma**, que é o comportamento que a seção 3 promete
+3. A vitrine pública respondeu `200` com os 12 produtos listados
+4. O painel autenticou com a senha da configuração e listou produtos e o catálogo salvo
+5. `/health` respondeu `healthy` com a versão do banco restaurado
+6. O caminho de redefinição de senha da seção 6 funcionou: apagar `AspNetUsers` **não tocou** o acervo (3 categorias e 12 produtos intactos), e a conta foi recriada na subida seguinte
+
+**O que o ensaio não provou, e portanto não está provado:** nada da seção 4. Os buckets, a
+visibilidade de cada um e o envio dos arquivos seguem sem execução, e é exatamente a metade cuja
+ausência produz "catálogo cujos produtos existem e cujas imagens não abrem".
 
 ---
 
@@ -151,9 +180,13 @@ A consequência é esta: perder a senha exige acesso à configuração da aplica
 
 A senha vem da configuração `OwnerAccount:Password`, e a conta é semeada na subida.
 
-1. No painel do Render, altere a variável de ambiente `OwnerAccount__Password`
+1. No painel do Render, altere a variável de ambiente `Owner__Password`
 2. Reinicie o serviço
 3. Entre com a senha nova
+
+> A seção de configuração chama-se `Owner`, não `OwnerAccount`. Com o nome errado a aplicação
+> **sobe normalmente** e apenas registra `Conta do dono não semeada` como aviso: o painel fica
+> inacessível sem nenhum erro na tela. Foi o primeiro tropeço do ensaio da seção 5.
 
 **A troca pela tela de Configurações tem precedência sobre a variável.** Se a senha foi trocada
 no sistema, alterar a variável não a substitui — siga o caminho abaixo.
@@ -171,15 +204,18 @@ Depois reinicie o serviço. A conta é recriada com a senha da variável de ambi
 **Isso não apaga nada do acervo** — categorias, produtos, catálogos e configuração do portal são
 outras tabelas. A conta é a única coisa que se perde, e ela é recriada.
 
+**A conta recriada nasce com troca de senha pendente.** O primeiro acesso exige definir uma senha
+nova, e é por isso que a senha da variável de ambiente não precisa ser a definitiva.
+
 ### Registro do teste deste procedimento
 
-> ⚠️ **Não executado.** O critério de T-27 exige que a redefinição seja **testada**.
+> ✅ **Executado em 2026-09-30**, no mesmo ensaio da seção 5.
 
 | Campo | Valor |
 |---|---|
-| Data do teste | |
-| Caminho usado | |
-| Funcionou de primeira | |
+| Data do teste | 2026-09-30 |
+| Caminho usado | O de baixo — `delete from "AspNetUsers"` e reinício, que é o caminho para quando a senha foi trocada pelo painel |
+| Funcionou de primeira | Não. A variável estava documentada como `OwnerAccount__Password` e a seção de configuração é `Owner`; corrigido acima. Com o nome certo, funcionou: a conta foi recriada, o acervo ficou intacto (3 categorias e 12 produtos antes e depois) e o login com a senha da variável entrou no painel |
 
 ---
 
