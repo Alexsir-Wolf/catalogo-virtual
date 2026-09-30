@@ -125,7 +125,7 @@ public sealed class CatalogGeneration(
         // minutos — baixar até 250 imagens e concatenar leva tempo — em que um produto publicado
         // **não sai no PDF entregue** e ainda assim fica com `PublishedAt` anterior à data
         // gravada: nunca mais seria destacado em prévia alguma (RN-32, RN-33).
-        var momento = time.GetUtcNow();
+        var moment = time.GetUtcNow();
 
         var resolved = await resolution.ResolveAsync(catalogId, cancellationToken);
 
@@ -198,7 +198,7 @@ public sealed class CatalogGeneration(
             content,
             FileNameFor(resolved),
             resolved.ProductCount,
-            momento);
+            moment);
     }
 
     /// <summary>

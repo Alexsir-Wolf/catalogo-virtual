@@ -149,15 +149,15 @@ public sealed class CatalogMaintenance(
         // apagaria a informação que a RN-32 usa: uma categoria que está no critério desde março
         // não passou a integrar o catálogo neste salvamento, e destacar os produtos dela seria
         // alarme falso.
-        var agora = time.GetUtcNow();
-        var entradaAnterior = catalog.Categories
+        var now = time.GetUtcNow();
+        var previousEntry = catalog.Categories
             .ToDictionary(link => link.CategoryId, link => link.AddedAt);
 
         catalog.Categories.Clear();
         catalog.Categories.AddRange(categoryIds.Select(categoryId => new CatalogCategory
         {
             CategoryId = categoryId,
-            AddedAt = entradaAnterior.TryGetValue(categoryId, out var quando) ? quando : agora
+            AddedAt = previousEntry.TryGetValue(categoryId, out var previous) ? previous : now
         }));
 
         if (draft.Id is null)

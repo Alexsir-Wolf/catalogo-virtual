@@ -60,23 +60,23 @@
             <div class="painel-bloco">
                 <div class="painel-bloco__hd">
                     <h2>Acervo agora</h2>
-                    <span class="selo @(produtosNoAr > 0 ? "selo--no-ar" : "selo--rascunho")">
-                        @produtosNoAr no ar
+                    <span class="selo @(publishedCount > 0 ? "selo--no-ar" : "selo--rascunho")">
+                        @publishedCount no ar
                     </span>
                 </div>
 
                 <div class="painel-bloco__bd">
                     <div class="atalhos">
                         <a class="atalho" href="/painel/produtos">
-                            <span class="atalho__t">@totalDeProdutos @(totalDeProdutos == 1 ? "produto" : "produtos")</span>
+                            <span class="atalho__t">@productCount @(productCount == 1 ? "produto" : "produtos")</span>
                             <span class="atalho__d">
-                                @produtosNoAr no ar, @rascunhos em rascunho. A ordem aqui é a ordem
+                                @publishedCount no ar, @draftCount em rascunho. A ordem aqui é a ordem
                                 no PDF e na vitrine.
                             </span>
                         </a>
 
                         <a class="atalho" href="/painel/categorias">
-                            <span class="atalho__t">@totalDeCategorias @(totalDeCategorias == 1 ? "categoria" : "categorias")</span>
+                            <span class="atalho__t">@categoryCount @(categoryCount == 1 ? "categoria" : "categorias")</span>
                             <span class="atalho__d">
                                 Pré-requisito de qualquer produto — todo produto pertence a
                                 exatamente uma.
@@ -84,7 +84,7 @@
                         </a>
 
                         <a class="atalho" href="/painel/catalogos">
-                            <span class="atalho__t">@totalDeCatalogos @(totalDeCatalogos == 1 ? "catálogo" : "catálogos")</span>
+                            <span class="atalho__t">@catalogCount @(catalogCount == 1 ? "catálogo" : "catálogos")</span>
                             <span class="atalho__d">
                                 @(nuncaGerados == 0
                                     ? "Todos já foram gerados ao menos uma vez."
@@ -104,11 +104,11 @@
                 </div>
             </div>
 
-            @if (rascunhos > 0)
+            @if (draftCount > 0)
             {
                 <p class="campo__ajuda">
                     Produto em rascunho não aparece na vitrine nem sai no PDF (RN-15). São
-                    @rascunhos agora — confira a situação deles em
+                    @draftCount agora — confira a situação deles em
                     <a href="/painel/produtos">Produtos</a> se esperava vê-los publicados.
                 </p>
             }
@@ -119,19 +119,19 @@
 @code {
     private bool carregando = true;
 
-    private int totalDeProdutos;
-    private int produtosNoAr;
-    private int totalDeCategorias;
-    private int totalDeCatalogos;
+    private int productCount;
+    private int publishedCount;
+    private int categoryCount;
+    private int catalogCount;
     private int nuncaGerados;
     private bool temCapa;
 
-    private int rascunhos => totalDeProdutos - produtosNoAr;
+    private int draftCount => productCount - publishedCount;
 
     protected override async Task OnInitializedAsync()
     {
         var categorias = await Categories.ListAsync();
-        var catalogos = await Catalogs.ListAsync();
+        var savedCatalogs = await Catalogs.ListAsync();
         var configuracao = await Settings.LoadAsync();
 
         // A contagem vem da **mesma** consulta que a listagem do painel usa: um número próprio
@@ -140,11 +140,11 @@
         var grupos = await Products.ListAsync(ProductSituationFilter.All);
         var itens = grupos.SelectMany(grupo => grupo.Products).ToList();
 
-        totalDeProdutos = itens.Count;
-        produtosNoAr = itens.Count(product => product.Status == ProductStatus.Published);
-        totalDeCategorias = categorias.Count;
-        totalDeCatalogos = catalogos.Count;
-        nuncaGerados = catalogos.Count(catalog => !catalog.WasGenerated);
+        productCount = itens.Count;
+        publishedCount = itens.Count(product => product.Status == ProductStatus.Published);
+        categoryCount = categorias.Count;
+        catalogCount = savedCatalogs.Count;
+        nuncaGerados = savedCatalogs.Count(catalog => !catalog.WasGenerated);
         temCapa = configuracao.HasCover;
 
         carregando = false;

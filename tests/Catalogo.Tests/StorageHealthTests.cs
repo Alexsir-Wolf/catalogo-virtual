@@ -16,19 +16,40 @@ namespace Catalogo.Tests;
 public sealed class StorageHealthTests
 {
     /// <summary>
-    /// Sem credencial o armazenamento é **saudável**, não degradado. É o estado de um ambiente de
-    /// desenvolvimento ou de teste, e chamar isso de falha treinaria quem monitora a ignorar o
-    /// sinal — o que é pior que não ter sinal.
+    /// Sem credencial **em desenvolvimento** é saudável: é o estado normal de uma máquina de
+    /// trabalho, e chamar isso de falha treinaria quem monitora a ignorar o sinal.
     /// </summary>
     [Fact]
-    public async Task Sem_credencial_a_verificacao_e_saudavel_e_diz_que_nao_esta_configurada()
+    public async Task Sem_credencial_em_desenvolvimento_a_verificacao_e_saudavel()
+    {
+        var status = await StorageHealth.CheckAsync(
+            new ThrowingStorage(new HttpRequestException("não deveria ser chamado")),
+            new ObjectStorageOptions(),
+            NullLogger.Instance,
+            isDevelopment: true);
+
+        Assert.True(status.Healthy);
+        Assert.Contains("not configured", status.Detail);
+    }
+
+    /// <summary>
+    /// Sem credencial **fora** de desenvolvimento é falha de configuração — e uma das mais
+    /// silenciosas que existem.
+    ///
+    /// A chave de serviço é preenchida à mão no painel da plataforma, então basta esquecê-la num
+    /// serviço recriado. Antes, esse estado respondia `healthy`: o monitor ficava verde e nenhum
+    /// envio de foto ou capa funcionava — o "healthy com a vitrine quebrada" que esta verificação
+    /// existe justamente para impedir.
+    /// </summary>
+    [Fact]
+    public async Task Sem_credencial_fora_de_desenvolvimento_e_falha_de_configuracao()
     {
         var status = await StorageHealth.CheckAsync(
             new ThrowingStorage(new HttpRequestException("não deveria ser chamado")),
             new ObjectStorageOptions(),
             NullLogger.Instance);
 
-        Assert.True(status.Healthy);
+        Assert.False(status.Healthy);
         Assert.Equal("not configured", status.Detail);
     }
 

@@ -317,12 +317,36 @@
     /// o trabalho rodando e **o semáforo preso**: a próxima tentativa recebia "já existe uma
     /// geração em andamento" sem que houvesse ninguém esperando o resultado.
     /// </summary>
-    private CancellationTokenSource? cancelamento;
+    private CancellationTokenSource? cancellation;
 
     private bool generating;
     private GenerationProgress? stage;
     private GenerationOutcome? generated;
     private GenerationRefusal? refusal;
+
+    /// <summary>
+    /// Limpa tudo o que foi carregado do catálogo anterior.
+    ///
+    /// As duas rotas são do mesmo componente, então o roteador reaproveita a instância ao passar de
+    /// um catálogo para o cadastro em branco. Sem este reset, o ramo `Id is null` não limpava nada:
+    /// a tela dizia "Novo catálogo" com o nome e as categorias do catálogo anterior, e **Salvar
+    /// critério editaria aquele catálogo** em vez de criar outro, porque `draft.Id` sobrevivia.
+    ///
+    /// Hoje nenhum link produz essa transição — todos remontam o componente —, o que torna a
+    /// proteção acidental. É a mesma classe de defeito que R-01 de `REVIEW-T-14-2026-09-28`
+    /// encontrou em `ProductPage`, e lá ela deixou de ser acidental quando T-17 acrescentou um link.
+    /// </summary>
+    private void Reset()
+    {
+        draft = new CatalogDraft();
+        resolved = null;
+        notFound = false;
+        saved = false;
+        failure = null;
+        generated = null;
+        refusal = null;
+        stage = null;
+    }
 
     /// <summary>
     /// `semCategoria` é o estado que a UI-08 declara para critério sem categoria marcada: com
@@ -339,6 +363,11 @@
     protected override async Task OnParametersSetAsync()
     {
         categories = await Categories.ListAsync();
+
+        if (Id is null)
+        {
+            Reset();
+        }
 
         if (Id is { } id)
         {
@@ -402,9 +431,9 @@
                     StateHasChanged();
                 }));
 
-            cancelamento = new CancellationTokenSource();
+            cancellation = new CancellationTokenSource();
 
-            var outcome = await Generation.GenerateAsync(Id!.Value, report, cancelamento.Token);
+            var outcome = await Generation.GenerateAsync(Id!.Value, report, cancellation.Token);
 
             if (!outcome.Succeeded)
             {
@@ -438,8 +467,8 @@
         }
         finally
         {
-            cancelamento?.Dispose();
-            cancelamento = null;
+            cancellation?.Dispose();
+            cancellation = null;
             generating = false;
 
             // A data da última geração mudou: a prévia precisa refletir isso, porque o destaque
@@ -540,8 +569,8 @@
 
     public void Dispose()
     {
-        cancelamento?.Cancel();
-        cancelamento?.Dispose();
+        cancellation?.Cancel();
+        cancellation?.Dispose();
     }
 
     private static string MessageFor(CatalogFailure failure) => failure switch

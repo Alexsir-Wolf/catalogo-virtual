@@ -27,14 +27,24 @@ public static class StorageHealth
         IObjectStorage storage,
         ObjectStorageOptions options,
         ILogger logger,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isDevelopment = false)
     {
         if (!options.IsConfigured)
         {
-            // Sem credencial não há o que verificar, e isso **não** é falha: é o estado de um
-            // ambiente de desenvolvimento ou de teste. Dizer "degraded" aqui treinaria quem
-            // monitora a ignorar o sinal.
-            return new StorageStatus(Healthy: true, "not configured");
+            // Sem credencial não há o que verificar, e **em desenvolvimento isso não é falha**: é o
+            // estado normal de uma máquina de trabalho ou de um ambiente de teste, e dizer
+            // "degraded" ali treinaria quem monitora a ignorar o sinal.
+            //
+            // Fora de desenvolvimento é falha de configuração, e uma das mais silenciosas que
+            // existem: a chave de serviço é preenchida à mão no painel da plataforma (`sync: false`
+            // no blueprint), então basta esquecê-la num serviço recriado. Antes, esse estado
+            // respondia `healthy` com `not configured`, o monitor ficava verde e nenhum envio de
+            // foto ou capa funcionava — que é literalmente o "healthy com a vitrine quebrada" que
+            // esta verificação existe para impedir.
+            return isDevelopment
+                ? new StorageStatus(Healthy: true, "not configured (development)")
+                : new StorageStatus(Healthy: false, "not configured");
         }
 
         try

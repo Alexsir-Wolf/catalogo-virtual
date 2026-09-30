@@ -156,7 +156,8 @@ app.MapGet("/health", async (
         objectStorage,
         storageOptions.Value,
         logger,
-        cancellationToken);
+        cancellationToken,
+        app.Environment.IsDevelopment());
 
     // **O armazenamento degradado não derruba o endpoint, e isso é decisão, não descuido.**
     //

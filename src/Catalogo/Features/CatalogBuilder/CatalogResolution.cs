@@ -117,7 +117,7 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
         }
 
         var categoryIds = catalog.Criterion.Select(link => link.CategoryId).ToList();
-        var entradaNoCriterio = catalog.Criterion.ToDictionary(
+        var criterionEntry = catalog.Criterion.ToDictionary(
             link => link.CategoryId,
             link => link.AddedAt);
 
@@ -170,7 +170,7 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
                     IsNew(
                         product.PublishedAt,
                         product.CategorizedAt,
-                        entradaNoCriterio.GetValueOrDefault(product.CategoryId),
+                        criterionEntry.GetValueOrDefault(product.CategoryId),
                         catalog.LastGeneratedAt))).ToList()))
             .ToList();
 
