@@ -88,18 +88,25 @@
                         {
                             @* RN-34 dita o texto: a confirmação precisa dizer que nenhum
                                produto é afetado, senão o dono hesita à toa. *@
-                            <span class="catalogo__x" data-estado="confirmarExclusao">
+                            @* `ConfirmacaoDestrutiva.processando`: enquanto a ida ao banco
+                               acontece, a tela precisa mudar. Diante de uma ação irreversível
+                               já confirmada, um botão que parece não ter funcionado convida ao
+                               segundo clique — e é no pior momento possível. *@
+                            <span class="catalogo__x"
+                                  data-estado="@(deleting ? "processando" : "confirmarExclusao")">
                                 <b>Excluir o catálogo “@catalog.Name”?</b>
                                 Remove apenas o critério salvo — <b>nenhum produto é
                                 afetado</b>, e o acervo fica exatamente como está.
 
                                 <button type="button" class="btn btn--perigo"
-                                        @onclick="() => DeleteAsync(catalog.Id)">
-                                    Excluir catálogo
+                                        @onclick="() => DeleteAsync(catalog.Id)"
+                                        disabled="@deleting"
+                                        role="@(deleting ? "status" : null)">
+                                    @(deleting ? "Excluindo…" : "Excluir catálogo")
                                 </button>
 
                                 <button type="button" class="btn btn--fantasma"
-                                        @onclick="() => removing = null">
+                                        @onclick="() => removing = null" disabled="@deleting">
                                     Manter
                                 </button>
                             </span>
@@ -122,6 +129,12 @@
     private IReadOnlyList<CatalogSummary>? catalogs;
     private int? removing;
 
+    /// <summary>
+    /// A exclusão em curso. `removing` diz **qual** linha está confirmando; este diz que a ida ao
+    /// banco já começou, e é ele que desabilita os botões e pinta o estado `processando`.
+    /// </summary>
+    private bool deleting;
+
     private string StateId => catalogs switch
     {
         null => "carregando",
@@ -139,7 +152,23 @@
 
     private async Task DeleteAsync(int id)
     {
-        await Maintenance.DeleteAsync(id);
-        await LoadAsync();
+        if (deleting)
+        {
+            return;
+        }
+
+        deleting = true;
+
+        try
+        {
+            await Maintenance.DeleteAsync(id);
+            await LoadAsync();
+        }
+        finally
+        {
+            // No `finally` porque uma falha na ida ao banco não pode deixar a lista congelada:
+            // sem isso, o erro travaria a tela num "Excluindo…" que nunca termina.
+            deleting = false;
+        }
     }
 }

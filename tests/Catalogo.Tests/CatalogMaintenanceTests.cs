@@ -250,6 +250,98 @@ public sealed class CatalogMaintenanceTests(PostgresFixture postgres)
         Assert.False(await CreateMaintenance().DeleteAsync(987654));
     }
 
+    /// <summary>
+    /// Categoria excluída em outra aba entre abrir a tela e salvar vira **recusa**, não exceção.
+    ///
+    /// O que este caso protege não é a mensagem: é o circuito. A `DbUpdateException` crua subia
+    /// pelo manipulador de evento do Blazor e derrubava o painel — o dono perdia a tela e o
+    /// critério digitado. `Assert.Equal` aqui só é alcançado se nada tiver sido lançado, que é a
+    /// metade importante da asserção.
+    /// </summary>
+    [Fact]
+    public async Task Categoria_excluida_em_outra_aba_vira_recusa_sem_lancar()
+    {
+        var outcome = await CreateMaintenance().SaveAsync(new CatalogDraft
+        {
+            Name = NameFor("Categoria fantasma"),
+            CategoryIds = [987654]
+        });
+
+        Assert.Equal(CatalogFailure.CategoryNoLongerExists, outcome.Failure);
+    }
+
+    /// <summary>
+    /// O caso real tem categorias válidas junto da que sumiu — é assim que a corrida acontece: o
+    /// dono marcou quatro, uma foi excluída em outra aba. A recusa precisa valer para o critério
+    /// inteiro, e nada pode ter sido gravado pela metade.
+    /// </summary>
+    [Fact]
+    public async Task Uma_categoria_ausente_recusa_o_criterio_inteiro_sem_gravar()
+    {
+        var maintenance = CreateMaintenance();
+        var category = await CreateCategoryAsync();
+        var name = NameFor("Parcial");
+
+        var outcome = await maintenance.SaveAsync(new CatalogDraft
+        {
+            Name = name,
+            CategoryIds = [category.Id, 987654]
+        });
+
+        Assert.Equal(CatalogFailure.CategoryNoLongerExists, outcome.Failure);
+        Assert.DoesNotContain(await maintenance.ListAsync(), catalog => catalog.Name == name);
+    }
+
+    /// <summary>
+    /// A recusa por categoria ausente não pode engolir a de nome repetido: as duas chegam como
+    /// violação de restrição do Postgres, e qualificar o `catch` largo demais faria o conflito de
+    /// nome sair como "categoria excluída em outra aba", mandando o dono procurar o problema
+    /// errado.
+    /// </summary>
+    [Fact]
+    public async Task Nome_repetido_continua_sendo_recusa_de_nome_e_nao_de_categoria()
+    {
+        var maintenance = CreateMaintenance();
+        var category = await CreateCategoryAsync();
+        var name = NameFor("Disputado");
+
+        await maintenance.SaveAsync(new CatalogDraft { Name = name, CategoryIds = [category.Id] });
+
+        var outcome = await maintenance.SaveAsync(
+            new CatalogDraft { Name = name, CategoryIds = [category.Id] });
+
+        Assert.Equal(CatalogFailure.NameAlreadyInUse, outcome.Failure);
+    }
+
+    /// <summary>
+    /// Catálogo excluído em outra aba devolve `NotFound` — é o retorno que a tela passou a
+    /// converter no estado `naoEncontrado`, em vez de deixar o clique em Salvar sem resposta
+    /// alguma.
+    /// </summary>
+    [Fact]
+    public async Task Salvar_catalogo_excluido_em_outra_aba_devolve_nao_encontrado()
+    {
+        var maintenance = CreateMaintenance();
+        var category = await CreateCategoryAsync();
+
+        var created = await maintenance.SaveAsync(new CatalogDraft
+        {
+            Name = NameFor("Excluído no meio"),
+            CategoryIds = [category.Id]
+        });
+
+        await maintenance.DeleteAsync(created.Id!.Value);
+
+        var outcome = await maintenance.SaveAsync(new CatalogDraft
+        {
+            Id = created.Id,
+            Name = NameFor("Excluído no meio"),
+            CategoryIds = [category.Id]
+        });
+
+        Assert.Equal(CatalogFailure.NotFound, outcome.Failure);
+    }
+
     private static CatalogSummary Single(IReadOnlyList<CatalogSummary> catalogs, string name) =>
         catalogs.Single(catalog => catalog.Name == name);
 

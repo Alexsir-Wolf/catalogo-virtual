@@ -105,6 +105,15 @@
                                 @MessageFor(failure.Value)
                             </span>
                         }
+                        else if (failure is CatalogFailure.CategoryNoLongerExists
+                            or CatalogFailure.ConcurrentChange)
+                        {
+                            @* As duas recusas de corrida entre abas nascem no critério e é aqui
+                               que o dono está olhando quando elas acontecem. Sem ponto de
+                               renderização, elas só teriam a saída que tinham antes: derrubar o
+                               circuito. *@
+                            <span class="campo__erro" role="alert">@MessageFor(failure.Value)</span>
+                        }
                     </fieldset>
                 </div>
 
@@ -146,11 +155,11 @@
                     </div>
 
                     <div class="painel-bloco__bd">
-                        @if (resolved is null)
-                        {
-                            <p class="campo__ajuda">Salve o critério para ver a prévia.</p>
-                        }
-                        else if (draft.CategoryIds.Count == 0)
+                        @* A ordem dos ramos é deliberada: desmarcar a última categoria também
+                           invalida `resolved`, e sem o teste de seleção vazia vir primeiro o
+                           estado `semCategoria` que a UI-08 desenha seria engolido pelo convite
+                           genérico a salvar. *@
+                        @if (draft.CategoryIds.Count == 0)
                         {
                             @* `UI-08.semCategoria`: a prévia dá lugar à orientação, porque o que
                                ela mostraria é o critério **anterior** — e mostrar a lista antiga
@@ -162,6 +171,15 @@
                                     prévia nem geração — a lista de antes não vale mais.
                                 </span>
                             </p>
+                        }
+                        else if (resolved is null)
+                        {
+                            @* Duas situações chegam aqui e a frase serve às duas: o catálogo novo,
+                               que ainda não tem critério gravado, e o critério alterado em tela e
+                               não salvo. A prévia é sempre a do que está **gravado** — dizer isso
+                               é mais honesto do que manter um retrato que discorda das caixas
+                               marcadas logo acima. *@
+                            <p class="campo__ajuda">Salve o critério para ver a prévia.</p>
                         }
                         else if (resolved.IsEmpty)
                         {
@@ -179,6 +197,24 @@
                         }
                         else
                         {
+                            @* Categoria marcada que resolve vazio **não vira faixa** e não consome
+                               número — se consumisse, o papel sairia com salto na numeração. O que
+                               faltava era dizer isso: o dono marcou três categorias, o selo acima
+                               diz duas, e ele descobria a ausência no papel, ou no cliente. É a
+                               RN-46 aplicada a **uma** categoria em vez do catálogo inteiro —
+                               "sumiu" sem razão na tela é lido como defeito do sistema. *@
+                            @if (resolved.EmptyCategoryNames.Count > 0)
+                            {
+                                <p class="campo__erro" role="status" data-estado="categoriaVazia">
+                                    <b>@MissingCategoriesLabel(resolved.EmptyCategoryNames)</b><br />
+                                    <span class="campo__ajuda">
+                                        O critério segue salvo como está. Ponha algum produto No ar
+                                        nessa categoria para que ela volte à prévia — a numeração
+                                        das faixas ignora quem não sai.
+                                    </span>
+                                </p>
+                            }
+
                             @if (resolved.HasNewProducts)
                             {
                                 @* RN-32: o destaque é a mitigação do risco central do sistema.
@@ -403,6 +439,11 @@
         // então o dono que desmarcou tudo para refazer o recorte gerava o PDF **antigo** com a tela
         // dizendo que não havia critério. O estado que a UI-08 desenhou como bloqueio era o estado
         // em que a geração continuava liberada.
+        //
+        // A condição que fecha o caso comum, porém, é `resolved` não ser nulo: trocar uma
+        // categoria por outra mantinha a seleção não vazia e passava por aqui. Hoje `Toggle`
+        // invalida a prévia, e é isso que desabilita Gerar enquanto o critério em tela discordar
+        // do gravado — desmarcar todas é só o caso raro do mesmo mecanismo.
         && draft.CategoryIds.Count > 0
         && resolved is { IsEmpty: false } preview
         && preview.ProductCount <= CatalogGeneration.MaxProducts;
@@ -486,11 +527,26 @@
 
     /// <summary>
     /// O número de categorias do recorte. A SPEC-UI o pede ao lado do total, e ele é o que diz ao
-    /// dono se o critério é o que ele acha que é: um recorte que resolve cinco categorias quando
-    /// ele marcou duas significa que alguém mexeu no acervo.
+    /// dono se o critério é o que ele acha que é.
+    ///
+    /// A divergência que ele revela tem **um** sentido só: a resolução parte dos produtos, então
+    /// ela só devolve um subconjunto do que foi marcado. Resolver cinco quando ele marcou duas é
+    /// impossível; resolver duas quando ele marcou três acontece toda vez que uma categoria está
+    /// inteira em Rascunho — e é por isso que o selo sozinho não basta, e o aviso que nomeia as
+    /// ausentes vem logo abaixo.
     /// </summary>
     private static string CategoryLabel(int count) =>
         $"{count} {(count == 1 ? "categoria" : "categorias")}";
+
+    /// <summary>
+    /// Nomeia as categorias que ficaram de fora. O **nome** é a informação: "uma categoria do
+    /// critério está vazia" obriga o dono a conferir todas para descobrir qual, e um aviso que
+    /// não poupa esse trabalho não vale o espaço que ocupa acima da prévia.
+    /// </summary>
+    private static string MissingCategoriesLabel(IReadOnlyList<string> names) =>
+        names.Count == 1
+            ? $"{names[0]} não tem nenhum produto No ar e não sai neste catálogo."
+            : $"{string.Join(", ", names)} não têm nenhum produto No ar e não saem neste catálogo.";
 
     /// <summary>
     /// A estimativa leva o til: a contagem exata só existe depois de compor, porque célula que não
@@ -529,6 +585,16 @@
         failure = null;
         saved = false;
 
+        // A prévia é do critério **gravado**, e mudar a marcação a deixava retratando o recorte
+        // anterior: quatro caixas marcadas ao lado de uma lista de três, com Gerar habilitado
+        // porque a única condição sobre a seleção em tela era haver alguma. O dono confirmava um
+        // conteúdo na tela e recebia outro no PDF, sem nada estar tecnicamente errado — a única
+        // forma de o aceite em papel discordar do pedido.
+        //
+        // Invalidar é melhor do que recalcular: resolver o que ainda não está gravado desenharia
+        // uma prévia que o botão Gerar não produz, porque a geração parte do critério do banco.
+        resolved = null;
+
         if (change.Value is true)
         {
             if (!draft.CategoryIds.Contains(categoryId))
@@ -551,6 +617,29 @@
         if (!outcome.Succeeded)
         {
             failure = outcome.Failure;
+
+            // `NotFound` não pertence a campo nenhum — nem o nome nem as categorias estão erradas,
+            // o catálogo é que deixou de existir —, e os dois pontos de erro da tela são
+            // condicionados a falhas de campo. A mensagem existia e não tinha onde aparecer: o
+            // clique em "Salvar critério" terminava em tela idêntica, indistinguível de um clique
+            // que não registrou, e o dono clicava de novo. `naoEncontrado` é a resposta honesta —
+            // a tela para de oferecer a edição de um critério que não tem mais onde ser gravado, e
+            // oferece o caminho de volta.
+            notFound = outcome.Failure == CatalogFailure.NotFound;
+
+            if (outcome.Failure == CatalogFailure.CategoryNoLongerExists)
+            {
+                // A lista de categorias em tela é de quando ela foi carregada, e uma delas foi
+                // excluída desde então. Recarregar é parte da recusa: sem isso a caixa da categoria
+                // morta continua marcada e o próximo clique em Salvar recusa de novo, pelo mesmo
+                // motivo, sem que nada na tela tenha mudado. A seleção é reduzida ao que sobrou
+                // para que refazer o recorte parta do estado real do acervo.
+                categories = await Categories.ListAsync();
+                draft.CategoryIds = draft.CategoryIds
+                    .Where(id => categories.Any(category => category.Id == id))
+                    .ToList();
+            }
+
             return;
         }
 
@@ -580,6 +669,12 @@
         CatalogFailure.NoCategorySelected =>
             "Selecione pelo menos uma categoria. Para abranger o acervo inteiro, marque todas.",
         CatalogFailure.NotFound => "O catálogo não existe mais.",
+        CatalogFailure.CategoryNoLongerExists =>
+            "Uma das categorias marcadas foi excluída em outra aba. A lista acima já está "
+            + "atualizada — confira o recorte e salve de novo.",
+        CatalogFailure.ConcurrentChange =>
+            "Este catálogo foi alterado em outra aba enquanto você salvava. Recarregue a página "
+            + "para ver o critério gravado antes de refazer a alteração.",
         _ => string.Empty
     };
 }

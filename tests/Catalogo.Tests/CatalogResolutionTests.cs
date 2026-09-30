@@ -287,6 +287,47 @@ public sealed class CatalogResolutionTests(PostgresFixture postgres)
         Assert.DoesNotContain(resolved.Categories, category => category.Id == vazia.Id);
     }
 
+    /// <summary>
+    /// A contrapartida do caso acima: a categoria que não consome número precisa ser **nomeada**.
+    ///
+    /// Sumir da prévia é o comportamento certo — a numeração sairia com salto se não fosse assim —,
+    /// e é justamente por isso que o silêncio é o defeito: o dono marca três categorias, o selo diz
+    /// duas, e sem o nome ele descobre a ausência no papel. É a RN-46 aplicada a uma categoria.
+    /// </summary>
+    [Fact]
+    public async Task Categoria_sem_produto_no_ar_e_nomeada_na_resolucao()
+    {
+        var comProduto = await CreateCategoryAsync("Com produto", position: 1);
+        var vazia = await CreateCategoryAsync("Impressoras", position: 2);
+
+        await PublishProductAsync(comProduto.Id, "Um");
+        await CreateDraftAsync(vazia.Id, "Só rascunho");
+
+        var resolved = await CreateResolution()
+            .ResolveAsync(await SaveCatalogAsync([comProduto.Id, vazia.Id]));
+
+        Assert.Equal([vazia.Name], resolved!.EmptyCategoryNames);
+    }
+
+    /// <summary>
+    /// A contraprova: critério em que todas as categorias resolvem não anuncia ausência nenhuma.
+    /// Sem este caso, um aviso que sempre aparece passaria pelo teste acima.
+    /// </summary>
+    [Fact]
+    public async Task Criterio_que_resolve_inteiro_nao_anuncia_categoria_ausente()
+    {
+        var primeira = await CreateCategoryAsync("Alfa", position: 1);
+        var segunda = await CreateCategoryAsync("Beta", position: 2);
+
+        await PublishProductAsync(primeira.Id, "A");
+        await PublishProductAsync(segunda.Id, "B");
+
+        var resolved = await CreateResolution()
+            .ResolveAsync(await SaveCatalogAsync([primeira.Id, segunda.Id]));
+
+        Assert.Empty(resolved!.EmptyCategoryNames);
+    }
+
     [Fact]
     public async Task A_estimativa_de_paginas_acompanha_a_contagem()
     {

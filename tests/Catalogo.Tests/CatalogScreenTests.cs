@@ -151,6 +151,83 @@ public sealed class CatalogScreenTests : IDisposable
         Assert.Contains("3 produtos", bloco[..120]);
     }
 
+    /// <summary>
+    /// UI-08.categoriaVazia: categoria marcada que não resolve nenhum produto No ar é **nomeada**
+    /// acima da prévia, com a razão.
+    ///
+    /// O que este caso protege é a diferença entre o selo e a verdade: o dono marcou duas
+    /// categorias e o selo diz uma. A asserção exige o **nome** da ausente, porque é ele que
+    /// poupa o dono de conferir categoria por categoria — um aviso genérico passaria por um teste
+    /// que se contentasse com o `data-estado`.
+    /// </summary>
+    [Fact]
+    public async Task UI_08_categoria_que_resolve_vazio_e_nomeada_acima_da_previa()
+    {
+        using var client = await SignedInClientAsync();
+        var (catalogId, emptyCategoryName) = await SeedCatalogWithEmptyCategoryAsync();
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/painel/catalogos/{catalogId}"));
+
+        Assert.Contains("""data-estado="categoriaVazia" """.TrimEnd(), html);
+        Assert.Contains($"{emptyCategoryName} não tem nenhum produto No ar", html);
+
+        // O selo continua contando só o que sai: o aviso existe porque os dois números discordam.
+        Assert.Equal("1 categoria", SeloIn(html, "categorias"));
+    }
+
+    /// <summary>
+    /// Um critério de duas categorias em que só uma resolve: a outra tem apenas rascunho, que é o
+    /// caminho pelo qual uma categoria some da prévia sem ninguém ter mexido no catálogo.
+    /// </summary>
+    private async Task<(int CatalogId, string EmptyCategoryName)> SeedCatalogWithEmptyCategoryAsync()
+    {
+        await using var context = postgres.CreateContext();
+
+        var comProduto = new Category { Name = $"Tintas {Guid.NewGuid():N}", Position = 1 };
+        var vazia = new Category { Name = $"Impressoras {Guid.NewGuid():N}", Position = 2 };
+
+        context.Categories.AddRange(comProduto, vazia);
+        await context.SaveChangesAsync();
+
+        context.Products.Add(new Product
+        {
+            Name = "Cartucho",
+            Summary = "Resumo do produto",
+            Price = 99.90m,
+            CategoryId = comProduto.Id,
+            Position = 1,
+            Status = ProductStatus.Published,
+            PublishedAt = DateTimeOffset.UtcNow
+        });
+
+        context.Products.Add(new Product
+        {
+            Name = "Multifuncional",
+            Summary = "Resumo do produto",
+            Price = 1299.90m,
+            CategoryId = vazia.Id,
+            Position = 1,
+            Status = ProductStatus.Draft
+        });
+
+        await context.SaveChangesAsync();
+
+        var catalog = new Catalog
+        {
+            Name = $"Catálogo {Guid.NewGuid():N}",
+            Categories =
+            [
+                new CatalogCategory { CategoryId = comProduto.Id },
+                new CatalogCategory { CategoryId = vazia.Id }
+            ]
+        };
+
+        context.Catalogs.Add(catalog);
+        await context.SaveChangesAsync();
+
+        return (catalog.Id, vazia.Name);
+    }
+
     private async Task<(int CatalogId, int CategoryId)> SeedCatalogWithCategoryAsync(int products)
     {
         await using var context = postgres.CreateContext();

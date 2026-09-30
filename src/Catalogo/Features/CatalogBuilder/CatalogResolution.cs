@@ -44,6 +44,18 @@ public sealed record ResolvedCatalog(
     IReadOnlyList<ResolvedCategory> Categories,
     DateTimeOffset? LastGeneratedAt)
 {
+    /// <summary>
+    /// Categorias do critério **gravado** que não resolveram nenhum produto No ar, na ordem
+    /// global do cadastro.
+    ///
+    /// Elas não viram grupo e não consomem número — se consumissem, o papel sairia com salto na
+    /// numeração —, e é justamente por sumirem em silêncio que precisam ser nomeadas: o dono
+    /// marcou três categorias, o selo diz duas, e sem esta lista ele descobre a ausência no
+    /// papel. É a RN-46 aplicada a **uma** categoria em vez do catálogo inteiro: a razão de não
+    /// haver nada precisa estar na tela, senão "sumiu" é lido como defeito.
+    /// </summary>
+    public IReadOnlyList<string> EmptyCategoryNames { get; init; } = [];
+
     public int ProductCount => Categories.Sum(category => category.Products.Count);
 
     public int NewSinceLastGeneration =>
@@ -106,7 +118,17 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
                 candidate.Name,
                 candidate.LastGeneratedAt,
                 Criterion = candidate.Categories
-                    .Select(link => new { link.CategoryId, link.AddedAt })
+                    .Select(link => new
+                    {
+                        link.CategoryId,
+                        link.AddedAt,
+
+                        // O nome e a posição são do critério, não do resultado: são eles que
+                        // permitem nomear a categoria que resolveu vazio, que por definição não
+                        // aparece entre os produtos.
+                        CategoryName = link.Category!.Name,
+                        CategoryPosition = link.Category.Position
+                    })
                     .ToList()
             })
             .SingleOrDefaultAsync(cancellationToken);
@@ -174,7 +196,22 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
                         catalog.LastGeneratedAt))).ToList()))
             .ToList();
 
-        return new ResolvedCatalog(catalog.Id, catalog.Name, categories, catalog.LastGeneratedAt);
+        // A diferença entre o que foi marcado e o que resolveu. A resolução parte dos produtos,
+        // então ela só pode devolver um **subconjunto** do critério: o que falta aqui é sempre
+        // categoria sem nenhum produto No ar, e nunca o contrário.
+        var resolvedIds = categories.Select(category => category.Id).ToHashSet();
+
+        var emptyCategoryNames = catalog.Criterion
+            .Where(link => !resolvedIds.Contains(link.CategoryId))
+            .OrderBy(link => link.CategoryPosition)
+            .ThenBy(link => link.CategoryName)
+            .Select(link => link.CategoryName)
+            .ToList();
+
+        return new ResolvedCatalog(catalog.Id, catalog.Name, categories, catalog.LastGeneratedAt)
+        {
+            EmptyCategoryNames = emptyCategoryNames
+        };
     }
 
     /// <summary>

@@ -11,7 +11,27 @@ public enum CatalogFailure
     NameRequired,
     NameAlreadyInUse,
     NoCategorySelected,
-    NotFound
+    NotFound,
+
+    /// <summary>
+    /// Alguma categoria marcada não existe mais: outra aba a excluiu entre o carregamento da tela
+    /// e o salvamento. É recusa **própria**, e não <see cref="NoCategorySelected"/>, porque o dono
+    /// marcou categorias — o que sumiu foi a categoria, e o próximo passo dele é recarregar a
+    /// lista e refazer o recorte, não "marcar ao menos uma".
+    /// </summary>
+    CategoryNoLongerExists,
+
+    /// <summary>
+    /// O banco recusou a gravação do critério e a reconsulta não encontrou categoria faltando — o
+    /// caso restante é o conflito na chave da tabela de junção, com duas abas salvando o mesmo
+    /// catálogo ao mesmo tempo.
+    ///
+    /// Não vira <see cref="NameAlreadyInUse"/>, que mandaria o dono procurar um problema de nome
+    /// inexistente, nem <see cref="CategoryNoLongerExists"/>, que afirmaria uma exclusão que a
+    /// reconsulta não viu. O que resta de verdadeiro é que outra aba mexeu neste catálogo, e o
+    /// próximo passo é recarregar e reler o critério gravado.
+    /// </summary>
+    ConcurrentChange
 }
 
 public sealed record CatalogOutcome(CatalogFailure Failure, int? Id = null)
@@ -111,7 +131,8 @@ public sealed class CatalogMaintenance(
     /// </summary>
     public async Task<CatalogOutcome> SaveAsync(
         CatalogDraft draft,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool retrying = false)
     {
         var name = draft.Name?.Trim() ?? string.Empty;
 
@@ -181,6 +202,39 @@ public sealed class CatalogMaintenance(
             // catálogo — viraria a mensagem "já existe um catálogo com este nome", que manda o
             // dono procurar um problema de nome que não existe.
             return new CatalogOutcome(CatalogFailure.NameAlreadyInUse);
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.ForeignKeyViolation or PostgresErrorCodes.UniqueViolation
+            })
+        {
+            // O que sobra depois do filtro acima são as duas corridas entre abas: a categoria
+            // marcada foi excluída em outra aba — violação de chave estrangeira na junção — ou
+            // duas abas gravaram o mesmo catálogo ao mesmo tempo, e a segunda bateu na chave da
+            // junção. Sem este braço, as duas saíam como exceção crua, e exceção crua vinda de um
+            // manipulador de evento do Blazor **derruba o circuito**: o dono perde a tela e o
+            // critério que acabou de digitar. É o mesmo sintoma que o review de T-16 corrigiu nos
+            // produtos.
+            //
+            // A recusa é **reconsultada em vez de inventada**, como em `CategoryMaintenance`: só se
+            // afirma que uma categoria sumiu depois de perguntar ao banco quais das marcadas ainda
+            // existem. Dizer "categoria excluída" sem conferir rotularia de exclusão o conflito de
+            // duas abas, que tem outro próximo passo.
+            var surviving = await context.Categories
+                .CountAsync(category => categoryIds.Contains(category.Id), cancellationToken);
+
+            if (surviving < categoryIds.Count)
+            {
+                return new CatalogOutcome(CatalogFailure.CategoryNoLongerExists);
+            }
+
+            // **Uma tentativa só.** Se a corrida se resolveu entre o erro e a reconsulta, refazer
+            // grava e o dono não vê nada; se não, ele recebe a recusa e decide. Pior que isso seria
+            // repetir indefinidamente dentro de uma requisição.
+            return retrying
+                ? new CatalogOutcome(CatalogFailure.ConcurrentChange)
+                : await SaveAsync(draft, cancellationToken, retrying: true);
         }
 
         return CatalogOutcome.Saved(catalog.Id);
