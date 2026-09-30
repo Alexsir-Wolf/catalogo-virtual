@@ -1,6 +1,7 @@
 using Catalogo.Data;
 using Catalogo.Features.Account;
 using Catalogo.Features.Media;
+using Catalogo.Features.Storefront;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -65,6 +66,7 @@ public sealed class PortalSettingsService(
     IOptions<ObjectStorageOptions> storageOptions,
     UserManager<OwnerAccount> users,
     PasswordAttemptLimiter attempts,
+    StorefrontInvalidation cache,
     ILogger<PortalSettingsService> logger)
 {
     private readonly ObjectStorageOptions options = storageOptions.Value;
@@ -120,6 +122,10 @@ public sealed class PortalSettingsService(
         settings.Email = Blank(draft.Email);
 
         await context.SaveChangesAsync(cancellationToken);
+
+        // O contato aparece no rodapé da vitrine e na página de cada produto (RN-67, RN-68): sem
+        // invalidar, a alteração "imediata" que o CA-38 exige esperaria a expiração da janela.
+        await cache.InvalidateAsync("contato alterado", cancellationToken);
 
         return ContactOutcome.Saved();
     }

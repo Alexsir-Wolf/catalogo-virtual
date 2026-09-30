@@ -199,6 +199,7 @@ public sealed class ProductPublicationTests(PostgresFixture postgres)
         new(
             new ContextFactory(postgres.ConnectionString),
             TimeProvider.System,
+            TestCache.Silent(),
             NullLogger<ProductPublication>.Instance);
 
     private sealed class ContextFactory(string connectionString) : IDbContextFactory<CatalogDbContext>

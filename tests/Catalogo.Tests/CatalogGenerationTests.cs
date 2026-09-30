@@ -384,6 +384,7 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
             options,
             scope.ServiceProvider.GetRequiredService<UserManager<OwnerAccount>>(),
             new PasswordAttemptLimiter(),
+            TestCache.Silent(),
             NullLogger<PortalSettingsService>.Instance);
 
         return new CatalogGeneration(

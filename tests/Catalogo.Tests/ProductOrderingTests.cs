@@ -197,7 +197,8 @@ public sealed class ProductOrderingTests(PostgresFixture postgres)
             .ToListAsync();
     }
 
-    private ProductOrdering CreateOrdering() => new(new ContextFactory(postgres.ConnectionString));
+    private ProductOrdering CreateOrdering() =>
+        new(new ContextFactory(postgres.ConnectionString), TestCache.Silent());
 
     private sealed class ContextFactory(string connectionString) : IDbContextFactory<CatalogDbContext>
     {

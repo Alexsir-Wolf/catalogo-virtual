@@ -119,7 +119,7 @@ public sealed class CategoryMaintenanceTests(PostgresFixture postgres)
     }
 
     private CategoryMaintenance CreateMaintenance() =>
-        new(new PooledContextFactory(postgres.ConnectionString));
+        new(new PooledContextFactory(postgres.ConnectionString), TestCache.Silent());
 
     private static string UniqueName(string prefix) => $"{prefix} {Guid.NewGuid():N}";
 

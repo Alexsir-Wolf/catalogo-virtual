@@ -1,5 +1,6 @@
 using Catalogo.Data;
 using Catalogo.Features.Categories;
+using Catalogo.Features.Storefront;
 using Microsoft.EntityFrameworkCore;
 
 namespace Catalogo.Features.Products;
@@ -10,7 +11,9 @@ namespace Catalogo.Features.Products;
 /// sequência impressa no PDF, e nenhum catálogo define ordem própria (RN-22, ADR-015).
 /// Mover um produto, portanto, move em todos os recortes onde ele aparece.
 /// </summary>
-public sealed class ProductOrdering(IDbContextFactory<CatalogDbContext> contextFactory)
+public sealed class ProductOrdering(
+    IDbContextFactory<CatalogDbContext> contextFactory,
+    StorefrontInvalidation cache)
 {
     /// <summary>
     /// Troca o produto de lugar com o vizinho da mesma categoria na direção pedida.
@@ -68,5 +71,9 @@ public sealed class ProductOrdering(IDbContextFactory<CatalogDbContext> contextF
         }
 
         await context.SaveChangesAsync(cancellationToken);
+
+        // A ordem impressa e a da vitrine são a mesma (RN-21, RN-22): reordenar muda a página
+        // pública. É o esquecimento típico que o plano de T-21 aponta.
+        await cache.InvalidateAsync("ordem de produto alterada", cancellationToken);
     }
 }

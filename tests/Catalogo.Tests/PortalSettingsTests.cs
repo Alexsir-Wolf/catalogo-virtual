@@ -573,6 +573,7 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
             }),
             scope.ServiceProvider.GetRequiredService<UserManager<OwnerAccount>>(),
             scope.ServiceProvider.GetRequiredService<PasswordAttemptLimiter>(),
+            TestCache.Silent(),
             NullLogger<PortalSettingsService>.Instance);
     }
 

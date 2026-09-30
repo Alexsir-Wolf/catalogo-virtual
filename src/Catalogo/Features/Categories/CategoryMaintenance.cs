@@ -1,4 +1,5 @@
 using Catalogo.Data;
+using Catalogo.Features.Storefront;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -56,7 +57,9 @@ public sealed record CategoryDeletionOutcome(
 /// banco, não por uma consulta prévia: duas abas abertas ao mesmo tempo contornariam a
 /// verificação em memória, e o índice não tem como ser contornado.
 /// </summary>
-public sealed class CategoryMaintenance(IDbContextFactory<CatalogDbContext> contextFactory)
+public sealed class CategoryMaintenance(
+    IDbContextFactory<CatalogDbContext> contextFactory,
+    StorefrontInvalidation cache)
 {
     public async Task<IReadOnlyList<Category>> ListAsync(CancellationToken cancellationToken = default)
     {
@@ -156,6 +159,9 @@ public sealed class CategoryMaintenance(IDbContextFactory<CatalogDbContext> cont
         }
 
         await context.SaveChangesAsync(cancellationToken);
+
+        // A ordem das categorias é a ordem do filtro da vitrine (RN-24).
+        await cache.InvalidateAsync("ordem de categoria alterada", cancellationToken);
     }
 
     /// <summary>
@@ -206,16 +212,22 @@ public sealed class CategoryMaintenance(IDbContextFactory<CatalogDbContext> cont
         context.Categories.Remove(category);
         await context.SaveChangesAsync(cancellationToken);
 
+        await cache.InvalidateAsync("categoria excluída", cancellationToken);
+
         return CategoryDeletionOutcome.Success;
     }
 
-    private static async Task<CategoryOutcome> SaveAsync(
+    private async Task<CategoryOutcome> SaveAsync(
         CatalogDbContext context,
         CancellationToken cancellationToken)
     {
         try
         {
             await context.SaveChangesAsync(cancellationToken);
+
+            // O nome da categoria e a ordem dela aparecem na vitrine, no filtro e no título da
+            // listagem: criar e renomear mudam a página pública.
+            await cache.InvalidateAsync("categoria criada ou renomeada", cancellationToken);
 
             return CategoryOutcome.Success;
         }

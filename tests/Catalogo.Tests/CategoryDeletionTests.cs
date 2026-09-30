@@ -195,7 +195,7 @@ public sealed class CategoryDeletionTests(PostgresFixture postgres)
     }
 
     private CategoryMaintenance CreateMaintenance() =>
-        new(new ContextFactory(postgres.ConnectionString));
+        new(new ContextFactory(postgres.ConnectionString), TestCache.Silent());
 
     private sealed class ContextFactory(string connectionString) : IDbContextFactory<CatalogDbContext>
     {

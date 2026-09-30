@@ -1,5 +1,6 @@
 using Catalogo.Data;
 using Catalogo.Features.Categories;
+using Catalogo.Features.Storefront;
 using Microsoft.EntityFrameworkCore;
 
 namespace Catalogo.Features.Products;
@@ -44,6 +45,7 @@ public sealed record ProductOutcome(int? Id, IReadOnlyDictionary<ProductField, s
 /// </summary>
 public sealed class ProductMaintenance(
     IDbContextFactory<CatalogDbContext> contextFactory,
+    StorefrontInvalidation cache,
     ILogger<ProductMaintenance> logger)
 {
     public async Task<IReadOnlyList<Category>> ListCategoriesAsync(
@@ -127,6 +129,11 @@ public sealed class ProductMaintenance(
 
         await context.SaveChangesAsync(cancellationToken);
 
+        // Preço, nome e resumo aparecem na vitrine: alterar um produto **publicado** precisa
+        // refletir na requisição seguinte (CA-15). Invalida-se mesmo para rascunho, porque
+        // descobrir se o produto está no ar custaria mais que recompor uma página.
+        await cache.InvalidateAsync("produto salvo", cancellationToken);
+
         return ProductOutcome.Saved(product.Id);
     }
 
@@ -166,6 +173,9 @@ public sealed class ProductMaintenance(
                 productId,
                 string.Join(", ", ReplacedNames(replaced)));
         }
+
+        // A foto é o que a vitrine mostra em primeiro lugar.
+        await cache.InvalidateAsync("foto de produto alterada", cancellationToken);
 
         return photo;
     }
@@ -235,6 +245,9 @@ public sealed class ProductMaintenance(
             "Produto {Id} excluído definitivamente. Tinha foto: {TinhaFoto}.",
             productId,
             photo is not null);
+
+        // Excluir **remove** da vitrine, e o link compartilhado passa a não encontrar.
+        await cache.InvalidateAsync("produto excluído", cancellationToken);
 
         return photo;
     }

@@ -829,7 +829,7 @@ Contato por WhatsApp, telefone e e-mail, com a mensagem do WhatsApp pré-preench
 
 #### T-21 — Cache de saída e invalidação
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Alta
 - **Depende de:** T-19, T-20
 - **Implementa:** —
@@ -846,12 +846,12 @@ Cache de saída sobre as rotas da vitrine, com chave derivada da URL completa e 
 É o elo entre as duas áreas da aplicação, e o único acoplamento entre elas.
 
 **Critério de aceite (testável):**
-- [ ] Segunda requisição à mesma URL é servida do cache, sem consulta ao banco
-- [ ] URLs com filtros diferentes são entradas distintas
-- [ ] Alterar preço de produto publicado reflete na vitrine na requisição seguinte *(CA-15)*
-- [ ] Publicar produto reflete na listagem na requisição seguinte
-- [ ] Reordenar reflete na ordem exibida
-- [ ] Excluir ou despublicar remove o produto da vitrine
+- [x] Segunda requisição à mesma URL é servida do cache, sem consulta ao banco
+- [x] URLs com filtros diferentes são entradas distintas
+- [x] Alterar preço de produto publicado reflete na vitrine na requisição seguinte *(CA-15)*
+- [x] Publicar produto reflete na listagem na requisição seguinte
+- [x] Reordenar reflete na ordem exibida
+- [x] Excluir ou despublicar remove o produto da vitrine
 
 **Testes a escrever:**
 - *Integration:* duas requisições iguais, verificando que a segunda não consulta o banco

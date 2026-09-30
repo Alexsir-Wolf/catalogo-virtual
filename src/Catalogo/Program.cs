@@ -56,6 +56,9 @@ builder.Services.AddScoped<StorefrontQuery>();
 builder.Services.AddSingleton<PasswordAttemptLimiter>();
 builder.Services.AddScoped<PortalSettingsService>();
 
+builder.Services.AddStorefrontCache();
+builder.Services.AddScoped<StorefrontInvalidation>();
+
 builder.Services.AddPanelAuthentication(builder.Configuration);
 builder.Services.AddCascadingAuthenticationState();
 
@@ -94,7 +97,16 @@ app.UsePanelAuthorization();
 
 // Depois da autenticação: é o que permite ao antiforgery vincular o token à identidade
 // do usuário. Antes dela, `HttpContext.User` ainda é anônimo e a vinculação não ocorre.
+//
 app.UseAntiforgery();
+
+// Depois do antiforgery e antes do mapeamento: o cache de saída serve as rotas públicas da
+// vitrine (ADR-008). O painel não passa por aqui — a política é aplicada por rota.
+app.UseOutputCache();
+
+// Depois do cache e antes do mapeamento: limpa o `Set-Cookie` de antiforgery das respostas
+// públicas anônimas, sem o qual o cache acima não guardaria nada.
+app.UseStorefrontCacheableResponses();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

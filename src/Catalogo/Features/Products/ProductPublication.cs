@@ -1,4 +1,5 @@
 using Catalogo.Data;
+using Catalogo.Features.Storefront;
 using Microsoft.EntityFrameworkCore;
 
 namespace Catalogo.Features.Products;
@@ -47,6 +48,7 @@ public sealed record PublicationOutcome(
 public sealed class ProductPublication(
     IDbContextFactory<CatalogDbContext> contextFactory,
     TimeProvider time,
+    StorefrontInvalidation cache,
     ILogger<ProductPublication> logger)
 {
     /// <returns><c>null</c> quando o produto não existe mais — quem chama mostra isso em
@@ -84,6 +86,10 @@ public sealed class ProductPublication(
 
         await context.SaveChangesAsync(cancellationToken);
 
+        // Publicar acrescenta o produto à vitrine — a página pública tem de mudar na próxima
+        // requisição, não em cinco minutos.
+        await cache.InvalidateAsync("produto publicado", cancellationToken);
+
         return PublicationOutcome.Published();
     }
 
@@ -107,6 +113,11 @@ public sealed class ProductPublication(
 
         product.Status = ProductStatus.Draft;
         await context.SaveChangesAsync(cancellationToken);
+
+        // Despublicar **remove** o produto da vitrine, e o link que alguém compartilhou passa a
+        // responder não encontrado. Servir isso de cache velho é o pior caso: o produto sai do
+        // ar para o dono e continua no ar para o visitante.
+        await cache.InvalidateAsync("produto despublicado", cancellationToken);
 
         return PublicationOutcome.Withdrawn();
     }
