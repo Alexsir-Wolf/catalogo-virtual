@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using System.Net;
 using Catalogo.Data;
 using Catalogo.Features.Account;
@@ -251,6 +253,112 @@ public sealed class StorefrontCacheTests : IAsyncLifetime, IDisposable
         Assert.False(StorefrontCache.IsStorefront("/painel/produtos"));
         Assert.False(StorefrontCache.IsStorefront("/painel/catalogos"));
         Assert.False(StorefrontCache.IsStorefront("/painel/configuracoes"));
+    }
+
+    /// <summary>
+    /// O painel não é cacheado **pelo pipeline**, e não só pelo predicado.
+    ///
+    /// A verificação usa a mesma técnica dos casos da vitrine, ao contrário: o nome do produto é
+    /// alterado **direto no banco**, sem passar por nenhum serviço que invalide, e a listagem do
+    /// painel já mostra o valor novo na requisição seguinte. Se o painel estivesse cacheado, ela
+    /// mostraria o antigo — e o dono editaria contra um retrato do passado, que é exatamente o
+    /// que a ADR-008 exclui.
+    /// </summary>
+    [Fact]
+    public async Task O_painel_reflete_a_escrita_na_requisicao_seguinte()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var productId = await SeedDraftAsync("Nome antigo do painel", categoryId);
+
+        using var client = await SignedInClientAsync();
+
+        Assert.Contains("Nome antigo do painel", await client.GetStringAsync("/painel/produtos"));
+
+        await RenameDirectlyAsync(productId, "Nome novo do painel");
+
+        var depois = await client.GetStringAsync("/painel/produtos");
+
+        Assert.Contains("Nome novo do painel", depois);
+        Assert.DoesNotContain("Nome antigo do painel", depois);
+    }
+
+    /// <summary>
+    /// A vitrine requisitada **por quem está autenticado** não é cacheável, e nem tem o
+    /// `Set-Cookie` removido: a renovação do cookie de sessão do dono seria descartada, e ele
+    /// perderia a sessão navegando pela própria vitrine.
+    /// </summary>
+    [Fact]
+    public void Vitrine_autenticada_nao_e_cacheavel()
+    {
+        Assert.True(StorefrontCache.IsCacheable(ContextFor("/", authenticated: false)));
+        Assert.False(StorefrontCache.IsCacheable(ContextFor("/", authenticated: true)));
+    }
+
+    /// <summary>
+    /// Método que não é de leitura não é cacheável. O cache de saída já ignoraria um `POST`, mas
+    /// o predicado também decide de quais respostas o `Set-Cookie` é removido — e removê-lo de
+    /// uma resposta a `POST` descartaria em silêncio o cookie que um fluxo futuro emitisse ali.
+    /// </summary>
+    [Fact]
+    public void Metodo_que_nao_e_de_leitura_nao_e_cacheavel()
+    {
+        Assert.True(StorefrontCache.IsCacheable(ContextFor("/", method: HttpMethods.Get)));
+        Assert.True(StorefrontCache.IsCacheable(ContextFor("/", method: HttpMethods.Head)));
+
+        Assert.False(StorefrontCache.IsCacheable(ContextFor("/", method: HttpMethods.Post)));
+        Assert.False(StorefrontCache.IsCacheable(ContextFor("/", method: HttpMethods.Delete)));
+    }
+
+    private static HttpContext ContextFor(
+        string path,
+        bool authenticated = false,
+        string method = "GET")
+    {
+        var context = new DefaultHttpContext();
+
+        context.Request.Path = path;
+        context.Request.Method = method;
+
+        if (authenticated)
+        {
+            context.User = new ClaimsPrincipal(
+                new ClaimsIdentity([new Claim(ClaimTypes.Name, "dono")], "teste"));
+        }
+
+        return context;
+    }
+
+    private async Task RenameDirectlyAsync(int productId, string name)
+    {
+        await using var context = CreateContext();
+
+        await context.Products
+            .Where(product => product.Id == productId)
+            .ExecuteUpdateAsync(update => update.SetProperty(product => product.Name, name));
+    }
+
+    private async Task<HttpClient> SignedInClientAsync()
+    {
+        var client = factory.CreateDefaultClient(new Uri("https://localhost"), new CookieHandler());
+
+        var page = await client.GetStringAsync(PanelAuthentication.LoginPath);
+        var token = System.Text.RegularExpressions.Regex.Match(
+            page,
+            """name="__RequestVerificationToken"[^>]*value="([^"]+)""").Groups[1].Value;
+
+        using var response = await client.PostAsync(
+            PanelAuthentication.LoginPath,
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["_handler"] = "acesso",
+                ["Input.UserName"] = OwnerUserName,
+                ["Input.Password"] = OwnerPassword,
+                ["__RequestVerificationToken"] = token
+            }));
+
+        response.EnsureSuccessStatusCode();
+
+        return client;
     }
 
     /// <summary>

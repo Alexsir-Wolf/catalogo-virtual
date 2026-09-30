@@ -164,15 +164,22 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
         Assert.Equal(0, storage.Downloads);
     }
 
+    /// <summary>
+    /// RN-45 na borda: **exatamente** no teto a geração acontece. O caso semeia os 250 produtos
+    /// de verdade, e não uma amostra — o que se verifica aqui é a comparação, e `>` contra `>=` é
+    /// o erro de um caractere que só aparece neste número. Com três produtos, o teste passava
+    /// dizendo algo que não tinha medido.
+    /// </summary>
     [Fact]
     public async Task No_teto_exato_a_geracao_acontece()
     {
-        var catalogId = await SeedAsync(products: 3);
+        var catalogId = await SeedAsync(products: CatalogGeneration.MaxProducts);
         await SetCoverAsync();
 
         var outcome = await CreateGeneration().GenerateAsync(catalogId);
 
         Assert.True(outcome.Succeeded);
+        Assert.Equal(CatalogGeneration.MaxProducts, outcome.ProductCount);
     }
 
     /// <summary>
@@ -430,7 +437,20 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
                 CategoryId = category.Id,
                 Position = index + 1,
                 Status = published ? ProductStatus.Published : ProductStatus.Draft,
-                PublishedAt = published ? DateTimeOffset.UtcNow : null
+                PublishedAt = published ? DateTimeOffset.UtcNow : null,
+
+                // Cada produto tem foto, e isso não é enfeite do fixture: sem a foto o compositor
+                // não tem nada para baixar, e `Downloads == 0` passaria a valer também quando a
+                // composição **acontece** — os casos que afirmam "recusado antes de compor"
+                // deixariam de provar qualquer coisa.
+                Photo = new ProductPhoto
+                {
+                    OriginalFileName = $"original/{index}.webp",
+                    ThumbnailFileName = $"miniatura/{index}.webp",
+                    CardFileName = $"cartao/{index}.webp",
+                    LargeFileName = $"grande/{index}.webp",
+                    PrintFileName = $"impressao/{index}.webp"
+                }
             });
         }
 
@@ -538,10 +558,18 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
         {
             Downloads++;
 
-            return Task.FromResult<byte[]>([]);
+            return Task.FromResult(SinglePixelPng);
         }
 
         public string PublicUrlFor(string objectName) => objectName;
+
+        /// <summary>
+        /// Uma imagem **válida** de um pixel. Um vetor vazio seria mais curto, mas o compositor
+        /// decodifica o que baixa: devolver nada transformaria todo caso de sucesso em falha de
+        /// decodificação, e a asserção `Succeeded` passaria a medir o fixture.
+        /// </summary>
+        private static byte[] SinglePixelPng => Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==");
     }
 
     private sealed class FailingComposerStorage : CountingStorage

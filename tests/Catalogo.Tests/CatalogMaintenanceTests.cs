@@ -302,6 +302,47 @@ public sealed class CatalogMaintenanceTests(PostgresFixture postgres)
         return category;
     }
 
+    /// <summary>
+    /// RN-29 afirmada contra o **banco**, e não contra o modelo do EF.
+    ///
+    /// O caso acima já verifica o modelo, e isso não é a mesma coisa: uma coluna acrescentada por
+    /// migração escrita à mão, ou uma tabela criada fora do modelo, não aparece lá. O banco é onde
+    /// a ausência que a ADR-014 decide pode de fato ser desfeita — e ela seria desfeita assim: não
+    /// por alguém discordar da decisão, mas por alguém acrescentar a tabela "para performance",
+    /// deixá-la vazia, e todo o resto continuar verde. O catálogo que envelhece sozinho é
+    /// exatamente a dor que o projeto veio resolver.
+    /// </summary>
+    [Fact]
+    public async Task RN_29_o_banco_nao_tem_tabela_nem_coluna_que_ligue_catalogo_a_produto()
+    {
+        await using var context = postgres.CreateContext();
+        var connection = context.Database.GetDbConnection();
+
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            select table_name || '.' || column_name
+            from information_schema.columns
+            where table_schema = 'public'
+              and (
+                    (lower(table_name) like '%catalog%' and lower(column_name) like '%product%')
+                 or (lower(table_name) like '%catalog%' and lower(table_name) like '%product%')
+              )
+            """;
+
+        var encontrados = new List<string>();
+
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            encontrados.Add(reader.GetString(0));
+        }
+
+        Assert.Empty(encontrados);
+    }
+
     private CatalogMaintenance CreateMaintenance() =>
         new(new ContextFactory(postgres.ConnectionString), TimeProvider.System);
 

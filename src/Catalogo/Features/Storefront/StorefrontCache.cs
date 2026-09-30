@@ -69,9 +69,16 @@ public static class StorefrontCache
     /// traga `Set-Cookie`**, e uma requisição autenticada carrega a renovação do cookie de sessão.
     /// Cachear essa resposta descartaria a renovação; não cachear mantém a sessão do dono intacta
     /// e não muda nada para o visitante, que é quem gera a carga.
+    ///
+    /// O método precisa ser de leitura, e isso importa por causa do segundo uso deste predicado:
+    /// ele também decide de quais respostas o `Set-Cookie` é removido. O cache de saída já
+    /// ignoraria um `POST` por conta própria, mas a remoção do cookie não — e tirar `Set-Cookie`
+    /// de uma resposta a `POST` num caminho público descartaria em silêncio qualquer cookie que
+    /// um fluxo futuro emitisse ali.
     /// </summary>
     public static bool IsCacheable(HttpContext context) =>
-        IsStorefront(context.Request.Path)
+        (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method))
+        && IsStorefront(context.Request.Path)
         && context.User.Identity?.IsAuthenticated != true;
 
     /// <summary>
