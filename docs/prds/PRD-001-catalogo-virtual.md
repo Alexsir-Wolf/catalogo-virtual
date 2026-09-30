@@ -540,7 +540,7 @@ Funcionalidade: Configurações do portal
 |------|-------------------|------------|
 | Navegar na vitrine, buscar, filtrar e ver detalhe | Qualquer visitante, anônimo | Sem login em nenhuma hipótese *(RN-47)* |
 | Cadastrar, editar, publicar e excluir produto | Dono do catálogo | Usuário único autenticado *(RN-57)* |
-| Cadastrar, ordenar e excluir categoria | Dono do catálogo | Exclusão condicionada a não haver produtos *(RN-25)* |
+| Cadastrar, ordenar e excluir categoria | Dono do catálogo | Exclusão condicionada a não haver produtos *(RN-25)* nem catálogo que a use no critério *(RN-25.1)* |
 | Criar, editar e excluir catálogo salvo | Dono do catálogo | — |
 | Gerar e baixar o PDF | Dono do catálogo | Não há geração pública do documento |
 
@@ -642,12 +642,12 @@ Detalhe completo, com as 15 ADRs e os diagramas C4, em [`../architecture/propost
 
 ## 16. Questões em aberto
 
-- [ ] Qual o limite de comprimento do resumo, em caracteres? — *responsável: definido no piloto de impressão*
-- [ ] Qual o teto de produtos por catálogo? — *responsável: definido na medição de geração*
+- [x] ~~Qual o limite de comprimento do resumo, em caracteres?~~ — **120**, fixado em T-04 contra impressão real *(RN-03)*. ⚠️ A conta escrita ao lado do número, em três arquivos, produz ~96 e não 120 — a divergência segue sem explicação registrada *(R-02 de `REVIEW-T-04-2026-09-30`)*
+- [~] Qual o teto de produtos por catálogo? — **250 em vigor**, e o número é **conservador e provisório, não derivado de medição**: a meta da arquitetura cobre 100 produtos em 15 segundos, e a única medição existente é de composição pura, sem o download das fotos do bucket, que é o passo que domina a geração real. A medição com acervo real no Render fecha o número — cabe em T-29 ou T-30 *(R-03 de `REVIEW-T-04-2026-09-30`)*
 - [ ] O texto institucional da capa é exatamente o do gabarito, ou muda? — *responsável: cliente*
 - [ ] A lista fechada do rótulo de preço tem apenas `PREÇO` e `PREÇO/UND`, ou há outros casos no acervo real? — *responsável: cliente*
 - [ ] A vitrine terá tema escuro? O protótipo assume que não — decisão que muda o trabalho de frontend — *responsável: cliente*
-- [ ] O que acontece com um catálogo salvo quando a única categoria dele é excluída? A RN-25 bloqueia a exclusão enquanto houver produtos, mas uma categoria vazia pode ser excluída e deixar um catálogo órfão — *responsável: a definir antes da Feature 3*
+- [x] ~~O que acontece com um catálogo salvo quando a única categoria dele é excluída?~~ — **decidido**: a categoria fica retida enquanto integrar o critério de algum catálogo, ainda que esteja vazia, e a recusa **nomeia** os catálogos que a seguram *(RN-25.1)*. O catálogo órfão deixa de ser possível. Implementado em T-26 e registrado como lacuna 8 da SPEC-UI
 - [x] ~~Divergência com o protótipo da vitrine sobre filtro por faixa de preço e por marca~~ — **decidido em 2026-09-14**: a vitrine oferece apenas busca por nome e filtro por categoria. Não haverá faixa de preço nem campo marca. Os controles correspondentes do protótipo de referência foram descartados *(RN-49, RN-50)*
 
 ## 17. Referências
