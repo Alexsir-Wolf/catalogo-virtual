@@ -48,7 +48,7 @@ public sealed class ApplicationSmokeTests(PostgresFixture postgres) : IDisposabl
         response.EnsureSuccessStatusCode();
 
         Assert.Contains("\"status\":\"healthy\"", body);
-        Assert.Contains("\"database\":", body);
+        Assert.Contains("\"database\":\"reachable\"", body);
 
         // Sem credencial do Supabase o armazenamento reporta `not configured` e **não** derruba
         // a saúde: é o estado de um ambiente de teste, e chamar isso de degradado treinaria quem
@@ -71,6 +71,21 @@ public sealed class ApplicationSmokeTests(PostgresFixture postgres) : IDisposabl
         Assert.DoesNotContain("Password", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ServiceKey", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("supabase.co", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// A versão exata do banco **não** sai na resposta. Ela não serve a quem monitora — um
+    /// indicador de alcançabilidade basta — e serve a quem procura falha conhecida de versão numa
+    /// rota pública.
+    /// </summary>
+    [Fact]
+    public async Task O_endpoint_de_saude_nao_publica_a_versao_do_banco()
+    {
+        using var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/health");
+
+        Assert.DoesNotMatch(@"""database"":""\d+\.\d+", body);
     }
 
     /// <summary>

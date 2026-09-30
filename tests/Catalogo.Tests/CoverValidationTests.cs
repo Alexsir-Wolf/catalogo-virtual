@@ -252,6 +252,34 @@ public sealed class CoverValidationTests
     }
 
     /// <summary>
+    /// Os três contornos do guarda léxico, no caminho completo.
+    ///
+    /// O review de segundo round reproduziu cada um deles: bastava acrescentar lixo numa região que
+    /// o parser nem visita para a varredura medir zero e o arquivo profundo chegar ao parser. Com
+    /// `]` em excesso o contador ia a -6000 e comprava folga; com `stream` sem `endstream`, ou com
+    /// **um** `(` sem fechamento, a varredura pulava até o fim do arquivo.
+    ///
+    /// **Estes casos ou devolvem a recusa ou derrubam o processo de teste** — `StackOverflowException`
+    /// não é capturável, então não existe o meio termo de "falhou a asserção". É o formato mais
+    /// honesto de verificação disponível para este defeito.
+    /// </summary>
+    [Theory]
+    [InlineData("]]]]]]]]]]")]
+    [InlineData("stream")]
+    [InlineData("(")]
+    public void Lixo_que_desligava_a_varredura_nao_deixa_o_arquivo_profundo_chegar_ao_parser(string lixo)
+    {
+        var nested = new string('[', 5_000) + new string(']', 5_000);
+
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            $"<</Type/Pages/Kids[3 0 R]/Count 1>> {lixo}",
+            $"<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Lixo {nested}>>"));
+
+        Assert.Equal(CoverRejection.MalformedStructure, inspection.Rejection);
+    }
+
+    /// <summary>
     /// O teto de nós contava só os que têm identidade de objeto, e era cego para dicionários
     /// **diretos** — uma árvore de centenas de milhares de páginas diretas cabia no limite de
     /// tamanho, nunca tocava o teto, e a fila sozinha custava centenas de megabytes.

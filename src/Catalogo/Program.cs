@@ -113,6 +113,14 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+// A saúde do serviço, para quem monitora e para a plataforma (T-28).
+//
+// **É público**: quem monitora não tem credencial do painel. Por isso a resposta é pobre de
+// propósito — rótulos de estado e tipos de falha, nunca host, usuário, chave ou versão.
+//
+// As duas verificações vivem em peças próprias (`DatabaseHealth`, `StorageHealth`) porque o ramo
+// que interessa proteger é o de falha, e ele não é alcançável por este endpoint num teste: com um
+// banco inalcançável a aplicação nem sobe, já que aplica migrações na partida.
 app.MapGet("/health", async (
     IConfiguration configuration,
     IObjectStorage objectStorage,
@@ -120,62 +128,64 @@ app.MapGet("/health", async (
     ILoggerFactory loggerFactory,
     CancellationToken cancellationToken) =>
 {
-    var configured = configuration.GetConnectionString("Default");
-    if (string.IsNullOrWhiteSpace(configured))
+    var logger = loggerFactory.CreateLogger("Health");
+
+    var database = await DatabaseHealth.CheckAsync(
+        configuration.GetConnectionString("Default"),
+        logger,
+        cancellationToken);
+
+    if (!database.Healthy)
     {
-        return Results.Problem("Connection string 'Default' is not configured.", statusCode: 503);
-    }
-
-    try
-    {
-        await using var connection = new NpgsqlConnection(DatabaseConnectionString.Normalize(configured));
-        await connection.OpenAsync(cancellationToken);
-
-        await using var command = new NpgsqlCommand("select 1", connection);
-        var result = await command.ExecuteScalarAsync(cancellationToken);
-
-        // O armazenamento de objeto é a segunda dependência externa (ADR-018), e uma falha nele
-        // é invisível no banco: as páginas respondem e as imagens não abrem. Verificar só o
-        // banco daria "healthy" com a vitrine quebrada.
-        var storage = await StorageHealth.CheckAsync(
-            objectStorage,
-            storageOptions.Value,
-            loggerFactory.CreateLogger("Health"),
-            cancellationToken);
-
+        // Sem banco não há vitrine nem painel: aqui o 503 é o estado verdadeiro do serviço.
         return Results.Json(
             new
             {
-                status = storage.Healthy ? "healthy" : "degraded",
-                database = connection.PostgreSqlVersion.ToString(),
-                query = result,
-                storage = storage.Detail
+                status = "unhealthy",
+                failure = database.Failure,
+                cause = database.Cause,
+                sqlState = database.SqlState
             },
-            statusCode: storage.Healthy ? 200 : 503);
+            statusCode: 503);
     }
-    catch (Exception exception)
-    {
-        // A mensagem da exceção carrega **host e usuário** do banco, e a forma da cadeia de
-        // conexão carrega o host: as duas ficam só no log. O endpoint é público — quem monitora
-        // não tem credencial do painel —, então a resposta leva apenas o que identifica a causa
-        // sem descrever a infraestrutura.
-        //
-        // Antes desta correção o `detail` devolvia a mensagem do Postgres (que num erro `28P01`
-        // nomeia o usuário) e o `shape` devolvia o host, contrariando o próprio comentário que
-        // dizia ficarem no log.
-        loggerFactory.CreateLogger("Health").LogError(
-            exception,
-            "Falha ao conectar no banco. Forma da cadeia: {Forma}.",
-            DatabaseConnectionStringShape.Describe(configured));
 
-        return Results.Json(new
-        {
-            status = "unhealthy",
-            failure = exception.GetType().Name,
-            cause = exception.InnerException?.GetType().Name,
-            sqlState = (exception as PostgresException)?.SqlState
-        }, statusCode: 503);
+    // O armazenamento de objeto é a segunda dependência externa (ADR-018), e uma falha nele é
+    // invisível no banco: as páginas respondem e as imagens não abrem. Verificar só o banco daria
+    // "healthy" com a vitrine quebrada.
+    var storage = await StorageHealth.CheckAsync(
+        objectStorage,
+        storageOptions.Value,
+        logger,
+        cancellationToken);
+
+    // **O armazenamento degradado não derruba o endpoint, e isso é decisão, não descuido.**
+    //
+    // Esta rota é o `healthCheckPath` do serviço (`render.yaml`), então um 503 aqui não é um aviso:
+    // é a plataforma tirando a instância de serviço e barrando o próximo deploy. Com o Supabase
+    // Storage fora do ar, o banco responde, a vitrine renderiza e só as fotos quebram — devolver
+    // 503 nesse estado trocaria fotos quebradas por site fora do ar, cada reinício custando um
+    // minuto de partida a frio (ADR-018). É o mesmo princípio que T-07 fixou: falha de uma parte
+    // não tira a vitrine pública do ar.
+    //
+    // Quem monitora continua vendo o problema — `status` diz `degraded` e `storage` diz o que
+    // aconteceu — e o log traz o detalhe. O que muda é quem decide o que fazer: uma pessoa, não o
+    // orquestrador.
+    if (!storage.Healthy)
+    {
+        logger.LogWarning(
+            "Armazenamento degradado: {Detalhe}. A resposta segue 200 porque esta rota é o health "
+            + "check da plataforma e o banco está respondendo.",
+            storage.Detail);
     }
+
+    return Results.Json(
+        new
+        {
+            status = storage.Healthy ? "healthy" : "degraded",
+            database = "reachable",
+            storage = storage.Detail
+        },
+        statusCode: 200);
 });
 
 app.Run();

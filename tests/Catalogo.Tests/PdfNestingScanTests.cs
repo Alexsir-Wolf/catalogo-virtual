@@ -15,12 +15,73 @@ namespace Catalogo.Tests;
 public sealed class PdfNestingScanTests
 {
     [Fact]
-    public void Documento_raso_tem_profundidade_pequena()
+    public void Documento_raso_e_seguro()
     {
-        var depth = PdfNestingScan.MaxDepthOf(Ascii(
+        var verdict = PdfNestingScan.Scan(Ascii(
             "<</Type/Catalog/Pages 2 0 R>> <</Type/Page/MediaBox[0 0 595 842]>>"));
 
-        Assert.Equal(2, depth);
+        Assert.Equal(PdfScanVerdict.Safe, verdict);
+    }
+
+    /// <summary>
+    /// **O contorno de um byte.** Um `(` sem fechamento fazia a varredura pular até o fim do
+    /// arquivo e medir zero: os 5.000 níveis reais que vinham depois não eram vistos, o arquivo
+    /// chegava ao parser e o processo morria por estouro de pilha — que não é capturável.
+    ///
+    /// O que se afirma aqui é que o guarda **recusa o que não consegue medir**, em vez de aceitar
+    /// por omissão. Um PDF bem formado não tem string sem fim, então a recusa não custa capa
+    /// legítima nenhuma.
+    /// </summary>
+    [Fact]
+    public void String_literal_sem_fechamento_e_recusada()
+    {
+        var content = Ascii($"/Titulo (sem fim {Nested('[', ']', PdfNestingScan.MaxDepth + 10)}");
+
+        Assert.Equal(PdfScanVerdict.UnterminatedToken, PdfNestingScan.Scan(content));
+        Assert.True(PdfNestingScan.IsUnsafeToParse(content));
+    }
+
+    /// <summary>
+    /// A palavra `stream` sem `endstream` desligava a varredura pelo mesmo mecanismo, com seis
+    /// bytes em vez de um.
+    /// </summary>
+    [Fact]
+    public void Stream_sem_endstream_e_recusado()
+    {
+        var content = Ascii($"<</Length 9>>stream\n{Nested('[', ']', PdfNestingScan.MaxDepth + 10)}");
+
+        Assert.Equal(PdfScanVerdict.UnterminatedToken, PdfNestingScan.Scan(content));
+    }
+
+    [Fact]
+    public void String_hexadecimal_sem_fechamento_e_recusada()
+    {
+        var content = Ascii($"<</Id <48656C6C6F {Nested('[', ']', PdfNestingScan.MaxDepth + 10)}");
+
+        Assert.Equal(PdfScanVerdict.UnterminatedToken, PdfNestingScan.Scan(content));
+    }
+
+    /// <summary>
+    /// O terceiro contorno, e o mais barato de todos: fechamento em excesso numa região que o
+    /// parser nem visita. Sem piso no contador, seis mil `]` levavam a profundidade a -6000 e
+    /// **compravam folga** para o aninhamento real que vinha depois.
+    /// </summary>
+    [Fact]
+    public void Fechamento_em_excesso_e_recusado_em_vez_de_comprar_folga()
+    {
+        var content = Ascii(
+            new string(']', 6000) + Nested('[', ']', PdfNestingScan.MaxDepth + 10));
+
+        Assert.Equal(PdfScanVerdict.UnbalancedDelimiters, PdfNestingScan.Scan(content));
+        Assert.True(PdfNestingScan.IsUnsafeToParse(content));
+    }
+
+    [Fact]
+    public void Fechamento_de_dicionario_em_excesso_e_recusado()
+    {
+        Assert.Equal(
+            PdfScanVerdict.UnbalancedDelimiters,
+            PdfNestingScan.Scan(Ascii("<</Type/Page>> >>")));
     }
 
     [Fact]
@@ -28,7 +89,7 @@ public sealed class PdfNestingScanTests
     {
         var content = Ascii(Nested('[', ']', PdfNestingScan.MaxDepth + 10));
 
-        Assert.True(PdfNestingScan.ExceedsMaxDepth(content));
+        Assert.True(PdfNestingScan.IsUnsafeToParse(content));
     }
 
     [Fact]
@@ -36,7 +97,7 @@ public sealed class PdfNestingScanTests
     {
         var content = Ascii(Nested("<<", ">>", PdfNestingScan.MaxDepth + 10));
 
-        Assert.True(PdfNestingScan.ExceedsMaxDepth(content));
+        Assert.True(PdfNestingScan.IsUnsafeToParse(content));
     }
 
     [Fact]
@@ -44,7 +105,7 @@ public sealed class PdfNestingScanTests
     {
         var content = Ascii(Nested('[', ']', PdfNestingScan.MaxDepth));
 
-        Assert.False(PdfNestingScan.ExceedsMaxDepth(content));
+        Assert.False(PdfNestingScan.IsUnsafeToParse(content));
     }
 
     /// <summary>
@@ -56,7 +117,7 @@ public sealed class PdfNestingScanTests
     {
         var content = Ascii($"/Titulo ({Nested('[', ']', 500)})");
 
-        Assert.False(PdfNestingScan.ExceedsMaxDepth(content));
+        Assert.False(PdfNestingScan.IsUnsafeToParse(content));
     }
 
     /// <summary>
@@ -68,7 +129,7 @@ public sealed class PdfNestingScanTests
     {
         var content = Ascii($"/Titulo (fecha \\) e segue {Nested('[', ']', 500)})");
 
-        Assert.False(PdfNestingScan.ExceedsMaxDepth(content));
+        Assert.False(PdfNestingScan.IsUnsafeToParse(content));
     }
 
     [Fact]
@@ -76,7 +137,7 @@ public sealed class PdfNestingScanTests
     {
         var content = Ascii($"% {Nested('[', ']', 500)}\n<</Type/Page>>");
 
-        Assert.False(PdfNestingScan.ExceedsMaxDepth(content));
+        Assert.False(PdfNestingScan.IsUnsafeToParse(content));
     }
 
     /// <summary>
@@ -88,7 +149,7 @@ public sealed class PdfNestingScanTests
     {
         var content = Ascii($"<</Length 9>>stream\n{Nested('[', ']', 500)}\nendstream");
 
-        Assert.False(PdfNestingScan.ExceedsMaxDepth(content));
+        Assert.False(PdfNestingScan.IsUnsafeToParse(content));
     }
 
     [Fact]
@@ -96,13 +157,25 @@ public sealed class PdfNestingScanTests
     {
         var content = Ascii("<</Id <48656C6C6F>>>");
 
-        Assert.False(PdfNestingScan.ExceedsMaxDepth(content));
+        Assert.False(PdfNestingScan.IsUnsafeToParse(content));
     }
 
     [Fact]
-    public void Arquivo_vazio_nao_tem_profundidade()
+    public void Arquivo_vazio_e_seguro()
     {
-        Assert.Equal(0, PdfNestingScan.MaxDepthOf([]));
+        Assert.Equal(PdfScanVerdict.Safe, PdfNestingScan.Scan([]));
+    }
+
+    /// <summary>
+    /// Acima do teto o veredito diz **qual** motivo, e não só que é inseguro: os três motivos
+    /// levam à mesma recusa na tela, mas confundi-los na investigação custaria uma hora.
+    /// </summary>
+    [Fact]
+    public void Aninhamento_acima_do_teto_e_reportado_como_profundo()
+    {
+        Assert.Equal(
+            PdfScanVerdict.TooDeep,
+            PdfNestingScan.Scan(Ascii(Nested('[', ']', PdfNestingScan.MaxDepth + 10))));
     }
 
     private static string Nested(char open, char close, int depth) =>

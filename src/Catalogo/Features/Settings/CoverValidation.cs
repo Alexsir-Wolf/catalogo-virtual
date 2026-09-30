@@ -118,7 +118,7 @@ public static class CoverValidation
         // dicionários e arrays, e 10 KB com 5.000 níveis de aninhamento esgotam a pilha e
         // matam o processo. A caminhada iterativa abaixo protege a travessia da árvore de
         // páginas; ela não protege o parse, que acontece antes (R-01, segunda rodada).
-        if (PdfNestingScan.ExceedsMaxDepth(content))
+        if (PdfNestingScan.IsUnsafeToParse(content))
         {
             return new CoverInspection(CoverRejection.MalformedStructure);
         }

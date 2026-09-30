@@ -1,8 +1,10 @@
 @page "/painel/sair"
 @layout PanelLayout
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Identity
 @inject SignInManager<OwnerAccount> SignInManager
+@inject UserManager<OwnerAccount> UserManager
 @inject NavigationManager Navigation
 
 @*
@@ -53,8 +55,30 @@
 </div>
 
 @code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
     private async Task SignOutAsync()
     {
+        // O selo é renovado **antes** de sair, e é isso que faz a saída alcançar as abas abertas.
+        //
+        // `SignOutAsync` apaga os cookies desta resposta e nada mais. Um circuito interativo já
+        // aberto em outra aba não passa mais por cookie nenhum: quem decide se ele continua é o
+        // `SecurityStampValidator`, e o critério dele é o selo — que a saída não tocava. O
+        // resultado era uma aba que seguia salvando contato e trocando a capa pública depois de o
+        // dono ter encerrado a sessão, inclusive num computador que não é dele, que é o cenário
+        // que esta tela existe para atender (R-02 de `REVIEW-T-31-2026-09-29-round2`).
+        if (AuthenticationState is { } state)
+        {
+            var identity = (await state).User.Identity;
+
+            if (identity is { IsAuthenticated: true, Name: { } userName }
+                && await UserManager.FindByNameAsync(userName) is { } owner)
+            {
+                await UserManager.UpdateSecurityStampAsync(owner);
+            }
+        }
+
         await SignInManager.SignOutAsync();
 
         // Para a tela de acesso, e não para a vitrine: quem acabou de sair do painel

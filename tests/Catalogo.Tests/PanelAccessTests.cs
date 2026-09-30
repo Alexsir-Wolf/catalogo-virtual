@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Catalogo.Features.Account;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Catalogo.Tests;
@@ -111,6 +113,52 @@ public sealed class PanelAccessTests : IDisposable
         Assert.Contains(
             PanelAuthentication.LoginPath,
             afterwards.RequestMessage!.RequestUri!.AbsolutePath);
+    }
+
+    /// <summary>
+    /// A saída **renova o selo de segurança**, e é isso que faz uma aba já aberta parar de
+    /// funcionar.
+    ///
+    /// `SignOutAsync` apaga os cookies da resposta e nada mais. Um circuito interativo aberto em
+    /// outra aba não passa mais por cookie nenhum: quem decide se ele segue é o
+    /// `SecurityStampValidator`, cujo critério é o selo. Sem renová-lo, a aba continuava salvando
+    /// contato e trocando a capa pública depois de o dono ter encerrado a sessão — num computador
+    /// que não é dele, que é o cenário que a tela de saída existe para atender.
+    ///
+    /// O selo é o que se afirma porque é o mecanismo: verificar apenas que o cookie morreu não
+    /// diria nada sobre a aba que já não usa cookie.
+    /// </summary>
+    [Fact]
+    public async Task RN_58_a_saida_renova_o_selo_de_seguranca()
+    {
+        using var client = await SignedInClientAsync();
+
+        var antes = await SecurityStampAsync();
+
+        using var page = await client.GetAsync(PanelAuthentication.LogoutPath);
+        var token = AntiforgeryTokenIn(await page.Content.ReadAsStringAsync());
+
+        using var response = await client.PostAsync(
+            PanelAuthentication.LogoutPath,
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["_handler"] = "sair",
+                ["__RequestVerificationToken"] = token
+            }));
+
+        response.EnsureSuccessStatusCode();
+
+        Assert.NotEqual(antes, await SecurityStampAsync());
+    }
+
+    private async Task<string?> SecurityStampAsync()
+    {
+        using var scope = factory.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<OwnerAccount>>();
+
+        var owner = await users.FindByNameAsync(OwnerUserName);
+
+        return owner is null ? null : await users.GetSecurityStampAsync(owner);
     }
 
     /// <summary>

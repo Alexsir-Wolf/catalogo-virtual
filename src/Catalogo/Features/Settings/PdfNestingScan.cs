@@ -1,6 +1,31 @@
 namespace Catalogo.Features.Settings;
 
 /// <summary>
+/// O motivo pelo qual um arquivo é considerado inseguro para entregar ao parser.
+/// </summary>
+public enum PdfScanVerdict
+{
+    /// <summary>A varredura terminou e a profundidade ficou dentro do teto.</summary>
+    Safe,
+
+    /// <summary>Aninhamento acima de <see cref="PdfNestingScan.MaxDepth"/>.</summary>
+    TooDeep,
+
+    /// <summary>
+    /// Mais fechamentos que aberturas. Sozinho isso seria só um arquivo torto — o que torna a
+    /// recusa necessária é que um contador sem piso desce para valores negativos e **cancela** a
+    /// medição do aninhamento que vem depois.
+    /// </summary>
+    UnbalancedDelimiters,
+
+    /// <summary>
+    /// Uma string, uma string hexadecimal ou um stream que começa e não termina. A varredura pula
+    /// até o fim do arquivo e mede zero — ou seja, o guarda se desliga.
+    /// </summary>
+    UnterminatedToken
+}
+
+/// <summary>
 /// Mede a profundidade de aninhamento sintático de um PDF **antes** de entregá-lo ao
 /// PdfSharp.
 ///
@@ -14,6 +39,19 @@ namespace Catalogo.Features.Settings;
 /// A varredura é léxica e de passada única: conta os delimitadores fora de strings,
 /// comentários e streams. Não interpreta o arquivo, e é justamente por isso que é segura —
 /// não tem recursão para estourar.
+///
+/// **O que a segunda rodada de review provou, e o que mudou por causa disso:** um guarda que
+/// mede e não recusa o que não consegue medir é um guarda que se desliga. A versão anterior
+/// tinha três saídas silenciosas, e cada uma bastava para o processo voltar a morrer:
+///
+/// - `depth--` sem piso. Seis mil `]` de lixo numa região que o parser nem visita levavam o
+///   contador a -6000, e os 5.000 níveis reais depois disso nunca passavam do teto.
+/// - `stream` sem `endstream`. A varredura pulava até o fim do arquivo e media zero.
+/// - `(` sem `)`. **Um byte** e a varredura media zero.
+///
+/// Por isso o resultado agora não é um número, é um veredito: o que a varredura não consegue
+/// medir com confiança é **recusado**, e não aceito por omissão. Um PDF bem formado não tem
+/// delimitador desbalanceado nem token sem fim — recusar isso não custa capa legítima nenhuma.
 ///
 /// **Limite conhecido, declarado:** objetos dentro de `/ObjStm` comprimido não são
 /// alcançados, porque a varredura não descomprime nada. Fechar esse vetor pede a leitura
@@ -31,16 +69,19 @@ public static class PdfNestingScan
 
     private const byte Backslash = (byte)'\\';
 
-    public static bool ExceedsMaxDepth(byte[] content) => MaxDepthOf(content) > MaxDepth;
+    /// <summary>
+    /// Verdadeiro quando o arquivo **não** deve ser entregue ao parser — por aninhamento acima do
+    /// teto ou por a varredura não ter conseguido medi-lo.
+    /// </summary>
+    public static bool IsUnsafeToParse(byte[] content) => Scan(content) != PdfScanVerdict.Safe;
 
     /// <summary>
-    /// A maior profundidade de `&lt;&lt;` e `[` encontrada. Para de contar assim que passa do
-    /// teto: saber o quanto passou não muda a decisão.
+    /// O veredito da varredura. Público para que cada motivo tenha caso de teste próprio: os três
+    /// que foram acrescentados nesta rodada eram, antes, o mesmo silêncio.
     /// </summary>
-    public static int MaxDepthOf(byte[] content)
+    public static PdfScanVerdict Scan(byte[] content)
     {
         var depth = 0;
-        var deepest = 0;
         var index = 0;
 
         while (index < content.Length)
@@ -54,7 +95,11 @@ public static class PdfNestingScan
                     continue;
 
                 case (byte)'(':
-                    index = SkipLiteralString(content, index);
+                    if (!TrySkipLiteralString(content, index, out index))
+                    {
+                        return PdfScanVerdict.UnterminatedToken;
+                    }
+
                     continue;
 
                 case (byte)'<' when Next(content, index) == '<':
@@ -63,7 +108,11 @@ public static class PdfNestingScan
                     break;
 
                 case (byte)'<':
-                    index = SkipHexString(content, index);
+                    if (!TrySkipHexString(content, index, out index))
+                    {
+                        return PdfScanVerdict.UnterminatedToken;
+                    }
+
                     continue;
 
                 case (byte)'>' when Next(content, index) == '>':
@@ -82,7 +131,11 @@ public static class PdfNestingScan
                     break;
 
                 case (byte)'s' when StartsWith(content, index, "stream"):
-                    index = SkipStream(content, index);
+                    if (!TrySkipStream(content, index, out index))
+                    {
+                        return PdfScanVerdict.UnterminatedToken;
+                    }
+
                     continue;
 
                 default:
@@ -90,18 +143,20 @@ public static class PdfNestingScan
                     break;
             }
 
-            if (depth > deepest)
+            // O piso é a correção que fecha o contorno de um byte: sem ela, fechamento em excesso
+            // empurrava o contador para baixo e comprava folga para o aninhamento seguinte.
+            if (depth < 0)
             {
-                deepest = depth;
+                return PdfScanVerdict.UnbalancedDelimiters;
+            }
 
-                if (deepest > MaxDepth)
-                {
-                    return deepest;
-                }
+            if (depth > MaxDepth)
+            {
+                return PdfScanVerdict.TooDeep;
             }
         }
 
-        return deepest;
+        return PdfScanVerdict.Safe;
     }
 
     private static char Next(byte[] content, int index) =>
@@ -121,8 +176,10 @@ public static class PdfNestingScan
     /// String literal. Os parênteses podem aninhar, e a barra invertida escapa o próximo
     /// byte — sem tratar isso, um `\)` terminaria a string cedo e delimitadores de dentro
     /// dela passariam a ser contados.
+    ///
+    /// Devolve falso quando a string não termina: é o contorno de um byte.
     /// </summary>
-    private static int SkipLiteralString(byte[] content, int index)
+    private static bool TrySkipLiteralString(byte[] content, int index, out int next)
     {
         var open = 0;
 
@@ -146,33 +203,49 @@ public static class PdfNestingScan
 
                 if (open == 0)
                 {
-                    return index + 1;
+                    next = index + 1;
+
+                    return true;
                 }
             }
 
             index++;
         }
 
-        return index;
+        next = content.Length;
+
+        return false;
     }
 
-    private static int SkipHexString(byte[] content, int index)
+    private static bool TrySkipHexString(byte[] content, int index, out int next)
     {
         index++;
 
-        while (index < content.Length && content[index] != (byte)'>')
+        while (index < content.Length)
         {
+            if (content[index] == (byte)'>')
+            {
+                next = index + 1;
+
+                return true;
+            }
+
             index++;
         }
 
-        return index + 1;
+        next = content.Length;
+
+        return false;
     }
 
     /// <summary>
     /// Dados de stream são binários e podem conter qualquer byte, inclusive sequências que
     /// pareçam delimitadores. Contá-los produziria profundidade inventada.
+    ///
+    /// Devolve falso quando não há `endstream`: sem isso, os seis bytes da palavra `stream`
+    /// desligavam a varredura.
     /// </summary>
-    private static int SkipStream(byte[] content, int index)
+    private static bool TrySkipStream(byte[] content, int index, out int next)
     {
         index += "stream".Length;
 
@@ -180,13 +253,17 @@ public static class PdfNestingScan
         {
             if (content[index] == (byte)'e' && StartsWith(content, index, "endstream"))
             {
-                return index + "endstream".Length;
+                next = index + "endstream".Length;
+
+                return true;
             }
 
             index++;
         }
 
-        return index;
+        next = content.Length;
+
+        return false;
     }
 
     private static bool StartsWith(byte[] content, int index, string word)

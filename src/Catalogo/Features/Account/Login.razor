@@ -2,6 +2,7 @@
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Identity
 @inject SignInManager<OwnerAccount> SignInManager
+@inject ILogger<Login> Logger
 @inject NavigationManager Navigation
 
 <PageTitle>Acesso ao Painel</PageTitle>
@@ -164,18 +165,40 @@
 
         if (result.Succeeded)
         {
+            // O sistema tem **um único usuário** e nenhuma recuperação de senha (ADR-006), então
+            // este log é o único rastro de acesso que existe. Sem ele, "alguém entrou no painel"
+            // é uma pergunta sem resposta possível.
+            //
+            // O nome entra, a senha nunca: é o critério de T-28 nas duas metades.
+            Logger.LogInformation(
+                "Acesso ao painel concedido a {Usuario}.",
+                Input.UserName);
+
             Navigation.NavigateTo(ReturnUrl ?? PanelAuthentication.PanelPathPrefix);
             return;
         }
 
         if (result.IsLockedOut)
         {
+            // Aviso, e não informação: bloqueio por tentativas é o sinal de que alguém está
+            // adivinhando, e é o que precisa aparecer num log filtrado por severidade.
+            Logger.LogWarning(
+                "Acesso ao painel bloqueado por tentativas para {Usuario}.",
+                Input.UserName);
+
             lockedOutMinutes = (int)Math.Ceiling(PanelAuthentication.LockoutDuration.TotalMinutes);
             return;
         }
 
+        Logger.LogWarning(
+            "Tentativa de acesso ao painel recusada para {Usuario}.",
+            Input.UserName);
+
         // A mensagem não distingue usuário inexistente de senha errada: dizer qual dos
         // dois falhou entrega metade da credencial a quem tenta adivinhar (UI-03).
+        //
+        // O **log** também não distingue, e pela mesma razão: ele vai para a plataforma, e um
+        // registro que dissesse "usuário não existe" entregaria a mesma metade a quem o lesse.
         failed = true;
     }
 
