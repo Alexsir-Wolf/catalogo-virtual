@@ -118,6 +118,19 @@ else
                                 catálogo ficaria sem critério resolvível.
                             </p>
                         }
+
+                        @* A recusa que **não tem o que nomear** (RN-25.1): o banco barrou a
+                           exclusão e a reconsulta não achou o impedimento, porque ele apareceu e
+                           sumiu em outra aba. Os dois blocos acima dependem de payload, então sem
+                           este a recusa chegaria como silêncio — o dono clicaria de novo e
+                           repetiria a mesma corrida. Aqui o próximo passo não é mover produto nem
+                           editar critério: é ler o estado novo, que a lista já recarregou. *@
+                        @if (blockedId == category.Id && blockedWithoutPayload)
+                        {
+                            <p class="categorias__erro" role="alert" data-estado="bloqueadaPorConcorrencia">
+                                @ConcurrentChangeMessage
+                            </p>
+                        }
                     </td>
                 </tr>
             }
@@ -176,6 +189,25 @@ else
     private int? blockedId;
     private int blockingProducts;
     private IReadOnlyList<string> blockingCatalogs = [];
+    private bool blockedWithoutPayload;
+
+    /// <summary>
+    /// Texto da recusa que não consegue nomear quem bloqueia. Fica em constante, e não no meio do
+    /// markup, porque é o único trecho da tela que o teste consegue morder sem bUnit — e é
+    /// justamente o que não pode voltar a ser silêncio.
+    /// </summary>
+    public const string ConcurrentChangeMessage =
+        "Não deu para excluir: a categoria passou a ser usada enquanto você confirmava, " +
+        "provavelmente em outra aba. A lista acima já foi recarregada — confira o estado " +
+        "atual e tente de novo.";
+
+    /// <summary>
+    /// Recusa sem nada a nomear: nem produto para contar, nem catálogo para citar. É o que os dois
+    /// blocos de payload não conseguem desenhar, e por isso precisa de bloco próprio — nenhum
+    /// resultado sem sucesso pode chegar à tela sem texto.
+    /// </summary>
+    public static bool RequiresGenericRefusal(CategoryDeletionOutcome outcome) =>
+        !outcome.Succeeded && outcome.BlockingProducts == 0 && outcome.Catalogs.Count == 0;
 
     /// <summary>
     /// A exclusão é definitiva, então exige um segundo clique deliberado. Nunca
@@ -202,6 +234,11 @@ else
         blockedId = id;
         blockingProducts = outcome.BlockingProducts;
         blockingCatalogs = outcome.Catalogs;
+        blockedWithoutPayload = RequiresGenericRefusal(outcome);
+
+        // Recarregar também na recusa: se a exclusão foi barrada, a lista em tela descreve um
+        // estado que o banco já não confirma — no caso da corrida, por definição.
+        await ReloadAsync();
     }
 
     private async Task MoveAsync(int id, MoveDirection direction)

@@ -205,6 +205,68 @@ public sealed class CategoryDeletionTests(PostgresFixture postgres)
         Assert.True((await CreateMaintenance().DeleteAsync(retida.Id)).Succeeded);
     }
 
+    /// <summary>
+    /// A corrida de verdade: o impedimento não existe quando `DeleteAsync` consulta e já existe
+    /// quando ele grava. O `Restrict` da FK barra o commit, e o `catch` reconsulta — a recusa que
+    /// chega ao dono nomeia a causa **reconsultada**, e não uma exceção crua, que num manipulador
+    /// de evento do Blazor derrubaria o circuito do painel.
+    /// </summary>
+    [Fact]
+    public async Task RN_25_1_impedimento_que_surge_no_commit_e_reconsultado_na_retentativa()
+    {
+        var category = await CreateCategoryAsync(CreateMaintenance());
+        var maintenance = CreateRacingMaintenance(category.Id);
+
+        var outcome = await maintenance.DeleteAsync(category.Id);
+
+        Assert.Equal(CategoryFailure.HasProducts, outcome.Failure);
+        Assert.Equal(1, outcome.BlockingProducts);
+
+        await using var context = postgres.CreateContext();
+        Assert.True(await context.Categories.AnyAsync(saved => saved.Id == category.Id));
+    }
+
+    /// <summary>
+    /// Retentativa esgotada: o banco recusou e não há o que nomear. A recusa precisa chegar à tela
+    /// **com texto** — os dois blocos de payload não a desenham, e silêncio numa tela de exclusão
+    /// convida ao segundo clique, que repete a mesma corrida.
+    /// </summary>
+    [Fact]
+    public async Task RN_25_1_recusa_de_ultima_instancia_chega_a_tela_com_texto()
+    {
+        var category = await CreateCategoryAsync(CreateMaintenance());
+        var maintenance = CreateRacingMaintenance(category.Id);
+
+        var outcome = await maintenance.DeleteAsync(category.Id, retrying: true);
+
+        Assert.Equal(CategoryFailure.ConcurrentChange, outcome.Failure);
+        Assert.True(CategoryList.RequiresGenericRefusal(outcome));
+        Assert.NotEmpty(CategoryList.ConcurrentChangeMessage);
+    }
+
+    /// <summary>
+    /// O bloco genérico é o último recurso e não pode roubar a vez de quem sabe nomear: recusa com
+    /// catálogo continua sendo desenhada pelo bloco que cita o catálogo.
+    /// </summary>
+    [Fact]
+    public async Task Recusa_que_sabe_nomear_nao_cai_no_texto_generico()
+    {
+        var category = await CreateCategoryAsync(CreateMaintenance());
+        await SaveCatalogAsync(category.Id);
+
+        var outcome = await CreateMaintenance().DeleteAsync(category.Id);
+
+        Assert.False(CategoryList.RequiresGenericRefusal(outcome));
+        Assert.False(CategoryList.RequiresGenericRefusal(CategoryDeletionOutcome.Success));
+    }
+
+    private CategoryMaintenance CreateRacingMaintenance(int categoryId) =>
+        new(
+            new RacingContextFactory(
+                postgres.ConnectionString,
+                () => AddProductsAsync(categoryId, ProductStatus.Published, count: 1)),
+            TestCache.Silent());
+
     private async Task<string> SaveCatalogAsync(int categoryId)
     {
         var name = $"Catálogo {Guid.NewGuid():N}";
@@ -224,5 +286,39 @@ public sealed class CategoryDeletionTests(PostgresFixture postgres)
     {
         public CatalogDbContext CreateDbContext() =>
             new(new DbContextOptionsBuilder<CatalogDbContext>().UseNpgsql(connectionString).Options);
+    }
+
+    /// <summary>
+    /// Fábrica de contexto que abre a janela da corrida: o impedimento é gravado **por fora**, em
+    /// outra conexão, no instante entre a verificação de `DeleteAsync` e o commit dela. É a única
+    /// forma de fazer a FK estourar de verdade sem depender de duas threads se cruzarem na hora
+    /// certa — e sem isso o `catch` e a retentativa seriam código que nenhum teste morde.
+    /// </summary>
+    private sealed class RacingContextFactory(string connectionString, Func<Task> sabotage)
+        : IDbContextFactory<CatalogDbContext>
+    {
+        public CatalogDbContext CreateDbContext() =>
+            new RacingContext(
+                new DbContextOptionsBuilder<CatalogDbContext>().UseNpgsql(connectionString).Options,
+                sabotage);
+    }
+
+    private sealed class RacingContext(DbContextOptions<CatalogDbContext> options, Func<Task> sabotage)
+        : CatalogDbContext(options)
+    {
+        private bool raced;
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            // Uma vez por contexto: a retentativa cria o seu próprio e precisa enxergar o
+            // impedimento já gravado, não um segundo impedimento surgindo de novo.
+            if (!raced)
+            {
+                raced = true;
+                await sabotage();
+            }
+
+            return await base.SaveChangesAsync(cancellationToken);
+        }
     }
 }

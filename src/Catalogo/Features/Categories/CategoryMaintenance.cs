@@ -24,7 +24,20 @@ public enum CategoryFailure
     /// no outro ele edita o critério de um catálogo. Unificar em "categoria em uso" deixaria a
     /// pessoa sem saber o que fazer.
     /// </summary>
-    UsedByCatalogs
+    UsedByCatalogs,
+
+    /// <summary>
+    /// O banco recusou a exclusão e a reconsulta não conseguiu explicar por quê — o impedimento
+    /// apareceu, sumiu e reapareceu entre a verificação e o commit, em outra aba.
+    ///
+    /// É causa **própria**, e não <see cref="UsedByCatalogs"/> com payload vazio: rotular toda
+    /// violação de chave estrangeira como catálogo mentiria sobre a causa quando quem segura é um
+    /// produto, e uma recusa sem nome nenhum não tem como ser desenhada pelos blocos que dependem
+    /// de payload — chegaria à tela como **silêncio**, que numa tela de exclusão é a pior resposta
+    /// possível porque convida ao segundo clique. Sem poder nomear quem bloqueia, o próximo passo
+    /// que a RN-25.1 exige passa a ser outro: recarregar a lista e ler o estado novo.
+    /// </summary>
+    ConcurrentChange
 }
 
 public sealed record CategoryOutcome(CategoryFailure Failure)
@@ -236,8 +249,12 @@ public sealed class CategoryMaintenance(
             // **Uma tentativa só.** Se a corrida se resolver entre o erro e a reconsulta, o dono
             // recebe a recusa e clica de novo — pior que isso seria repetir indefinidamente dentro
             // de uma requisição.
+            //
+            // Esgotada a retentativa, a recusa é <see cref="CategoryFailure.ConcurrentChange"/> e
+            // não uma recusa por catálogo sem catálogo nenhum: quem consome decide pela causa, e
+            // uma recusa de payload vazio rotulada de catálogo não era desenhável nem verdadeira.
             return retrying
-                ? new CategoryDeletionOutcome(CategoryFailure.UsedByCatalogs, BlockingProducts: 0)
+                ? new CategoryDeletionOutcome(CategoryFailure.ConcurrentChange, BlockingProducts: 0)
                 : await DeleteAsync(id, cancellationToken, retrying: true);
         }
 
