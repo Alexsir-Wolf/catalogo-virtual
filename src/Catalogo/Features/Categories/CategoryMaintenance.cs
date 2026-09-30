@@ -170,17 +170,13 @@ public sealed class CategoryMaintenance(
     /// </summary>
     public async Task<CategoryDeletionOutcome> DeleteAsync(
         int id,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool retrying = false)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
         var blockingProducts = await context.Products
             .CountAsync(product => product.CategoryId == id, cancellationToken);
-
-        if (blockingProducts > 0)
-        {
-            return new CategoryDeletionOutcome(CategoryFailure.HasProducts, blockingProducts);
-        }
 
         // RN-25.1: a categoria também fica retida enquanto integrar algum catálogo salvo, ainda
         // que esteja **vazia**. Sem isso, excluir uma categoria sem produtos deixaria um
@@ -193,11 +189,18 @@ public sealed class CategoryMaintenance(
             .Select(catalog => catalog.Name)
             .ToListAsync(cancellationToken);
 
-        if (blockingCatalogs.Count > 0)
+        // **As duas causas voltam juntas**, e não a primeira que aparecer.
+        //
+        // Antes, produtos tinham precedência e a recusa por catálogo só aparecia depois: o dono de
+        // uma categoria com vinte produtos que também integra um catálogo movia os vinte, voltava, e
+        // **só então** descobria o segundo impedimento. A tela já sabe mostrar os dois parágrafos;
+        // era a consulta que parava na primeira. O `Failure` continua sendo o de produtos quando
+        // há produtos, porque é a causa que o dono resolve primeiro de qualquer jeito.
+        if (blockingProducts > 0 || blockingCatalogs.Count > 0)
         {
             return new CategoryDeletionOutcome(
-                CategoryFailure.UsedByCatalogs,
-                BlockingProducts: 0,
+                blockingProducts > 0 ? CategoryFailure.HasProducts : CategoryFailure.UsedByCatalogs,
+                blockingProducts,
                 blockingCatalogs);
         }
 
@@ -210,7 +213,33 @@ public sealed class CategoryMaintenance(
         }
 
         context.Categories.Remove(category);
-        await context.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.ForeignKeyViolation
+            })
+        {
+            // A verificação acima e este commit não são atômicos: entre um e outro, outra aba pode
+            // ter cadastrado um produto na categoria ou acrescentado ela ao critério de um catálogo.
+            // O `Restrict` da FK impede a exclusão no banco, mas como exceção crua — e exceção crua
+            // saindo de um manipulador de evento do Blazor **derruba o circuito** do painel, que é o
+            // mesmo sintoma que o review de T-16 corrigiu.
+            //
+            // A recusa é reconsultada em vez de inventada: dizer "categoria em uso" sem nomear
+            // quem a usa deixaria o dono sem o próximo passo, que é o que a RN-25.1 exige.
+            //
+            // **Uma tentativa só.** Se a corrida se resolver entre o erro e a reconsulta, o dono
+            // recebe a recusa e clica de novo — pior que isso seria repetir indefinidamente dentro
+            // de uma requisição.
+            return retrying
+                ? new CategoryDeletionOutcome(CategoryFailure.UsedByCatalogs, BlockingProducts: 0)
+                : await DeleteAsync(id, cancellationToken, retrying: true);
+        }
 
         await cache.InvalidateAsync("categoria excluída", cancellationToken);
 

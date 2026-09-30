@@ -25,8 +25,16 @@ public enum CoverRejection
 /// Resultado da validação. <see cref="PagesFound"/> só é preenchido quando a recusa é por
 /// número de páginas — a RN-63 exige informar **quantas** foram encontradas, e uma
 /// mensagem genérica não cumpre isso.
+///
+/// <see cref="PageCountTruncated"/> diz que a contagem **parou no teto**. Sem essa distinção o teto
+/// entrava na mensagem como se fosse o total: um PDF de 300 páginas produzia "este arquivo tem 65",
+/// e o cenário é o erro mais provável desta tela — o dono envia o catálogo inteiro no lugar da capa
+/// e recebe um número inventado, que é o oposto do que a RN-63 pede.
 /// </summary>
-public sealed record CoverInspection(CoverRejection Rejection, int PagesFound = 0)
+public sealed record CoverInspection(
+    CoverRejection Rejection,
+    int PagesFound = 0,
+    bool PageCountTruncated = false)
 {
     public bool Accepted => Rejection == CoverRejection.None;
 
@@ -55,11 +63,22 @@ public sealed record CoverInspection(CoverRejection Rejection, int PagesFound = 
 public static class CoverValidation
 {
     /// <summary>
-    /// 12 MB. A capa é uma página, e uma página de marketing com imagens vetoriais e
-    /// fontes embutidas cabe com folga — o limite existe para barrar o acidente, não para
-    /// apertar o uso legítimo.
+    /// 4 MB. A capa é **uma página**, e uma folha de marketing com imagem de fundo em alta e fontes
+    /// embutidas fica bem abaixo disso — o limite existe para barrar o acidente, não para apertar o
+    /// uso legítimo.
+    ///
+    /// **Era 12 MB, e o limite de tamanho não é limite de custo.** O review mediu: um PDF válido de
+    /// 11,5 MB com cento e cinquenta mil dicionários triviais é **aceito**, e a leitura custa dois
+    /// segundos de CPU e 202 MB de pico de memória — porque o modo de abertura materializa todos os
+    /// objetos indiretos antes de qualquer decisão. Num contêiner pequeno (ADR-018) o encerramento
+    /// por falta de memória não gera exceção nem log: o sintoma é indistinguível de um reinício
+    /// qualquer, e leva a vitrine pública com ele.
+    ///
+    /// Reduzir o teto não resolve a classe do problema, e não finge resolver: a saída definitiva é
+    /// ler o arquivo fora do processo que serve requisições, e isso está registrado como pendência.
+    /// O que este número faz é diminuir a janela pelo fator que está ao alcance.
     /// </summary>
-    public const int MaxBytes = 12 * 1024 * 1024;
+    public const int MaxBytes = 4 * 1024 * 1024;
 
     /// <summary>
     /// As páginas de conteúdo são A4 retrato, cuja proporção é ~0,707 (210 por 297 mm).
@@ -161,7 +180,7 @@ public static class CoverValidation
 
             if (survey.Pages != 1)
             {
-                return new CoverInspection(CoverRejection.PageCount, survey.Pages);
+                return new CoverInspection(CoverRejection.PageCount, survey.Pages, survey.Truncated);
             }
 
             var width = survey.Width;
@@ -200,7 +219,14 @@ public static class CoverValidation
         int Pages,
         double Width,
         double Height,
-        bool Malformed)
+        bool Malformed,
+
+        /// <summary>
+        /// Verdadeiro quando a contagem parou no teto em vez de terminar. Sem esta marca, o teto
+        /// entrava na mensagem como se fosse o total real — um PDF de 300 páginas produzia "este
+        /// arquivo tem 65", que é o oposto do que a RN-63 pede.
+        /// </summary>
+        bool Truncated = false)
     {
         public static PageSurvey Broken() => new(0, 0, 0, Malformed: true);
     }
@@ -245,7 +271,14 @@ public static class CoverValidation
                 return PageSurvey.Broken();
             }
 
-            var box = node.Elements.GetRectangle(MediaBoxKey) is { Width: > 0 } own
+            // A presença da caixa é medida em **valor absoluto**, como `Oriented` já fazia: o
+            // formato permite os cantos em qualquer ordem, e `MediaBox[595 0 0 842]` tem largura
+            // negativa. Exigir `Width > 0` descartava essa caixa como ausente, a herança devolvia
+            // nulo, e a página caía no ramo de dimensão inválida — recusada com "o arquivo não é um
+            // PDF que possamos ler", que é a mensagem enganosa que o próprio comentário de
+            // `Oriented` diz ter corrigido. Com X **e** Y invertidos já funcionava, o que deixava o
+            // defeito parecendo tratado.
+            var box = node.Elements.GetRectangle(MediaBoxKey) is { } own && HasArea(own)
                 ? own
                 : inheritedBox;
 
@@ -272,7 +305,12 @@ public static class CoverValidation
                 // contagem exata não entra na mensagem quando passa do teto.
                 if (pages > MaxPagesToCount)
                 {
-                    return new PageSurvey(pages, first.Width, first.Height, Malformed: false);
+                    return new PageSurvey(
+                        pages,
+                        first.Width,
+                        first.Height,
+                        Malformed: false,
+                        Truncated: true);
                 }
 
                 continue;
@@ -300,6 +338,14 @@ public static class CoverValidation
     /// isso um A4 retrato girado passaria por retrato quando o papel sai em paisagem
     /// (RN-64).
     /// </summary>
+    /// <summary>
+    /// A caixa tem área, medida em valor absoluto. É o mesmo critério que <see cref="Oriented"/>
+    /// aplica, e ter os dois divergindo foi o que produziu a recusa enganosa: um exigia largura
+    /// positiva para reconhecer a caixa, o outro lia a dimensão em módulo.
+    /// </summary>
+    private static bool HasArea(PdfRectangle box) =>
+        Math.Abs(box.Width) > 0 && Math.Abs(box.Height) > 0;
+
     private static (double Width, double Height) Oriented(PdfRectangle box, int rotation)
     {
         // Os cantos da caixa podem vir em qualquer ordem — o formato permite, e ler a
@@ -333,6 +379,9 @@ public static class CoverValidation
     {
         CoverRejection.NotAPdf =>
             "O arquivo não é um PDF que possamos ler. Envie o PDF original da capa.",
+        CoverRejection.PageCount when inspection.PageCountTruncated =>
+            $"A capa precisa ter exatamente uma página, e este arquivo tem mais de "
+            + $"{MaxPagesToCount}. Envie só a folha da capa, não o catálogo inteiro.",
         CoverRejection.PageCount =>
             $"A capa precisa ter exatamente uma página, e este arquivo tem {inspection.PagesFound}.",
         CoverRejection.Landscape =>

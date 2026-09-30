@@ -300,6 +300,72 @@ public sealed class CoverValidationTests
     }
 
     /// <summary>
+    /// Acima do teto, a mensagem diz **"mais de"** em vez de inventar um número.
+    ///
+    /// A contagem para no teto, e o valor em que parou ia para a mensagem como se fosse o total: um
+    /// PDF de 300 páginas produzia "este arquivo tem 65". O cenário é o erro mais provável desta
+    /// tela — o dono envia o catálogo inteiro no lugar da capa — e a RN-63 pede justamente que a
+    /// recusa informe **quantas** foram encontradas. Um número inventado é pior que nenhum.
+    /// </summary>
+    [Fact]
+    public void RN_63_acima_do_teto_a_mensagem_nao_inventa_a_contagem()
+    {
+        var kids = string.Concat(
+            Enumerable.Repeat("<</Type/Page/MediaBox[0 0 595 842]>>", 300));
+
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            $"<</Type/Pages/Count 1/Kids[{kids}]>>"));
+
+        Assert.Equal(CoverRejection.PageCount, inspection.Rejection);
+        Assert.True(inspection.PageCountTruncated);
+
+        var message = CoverValidation.MessageFor(inspection);
+
+        Assert.Contains($"mais de {CoverValidation.MaxPagesToCount}", message);
+    }
+
+    /// <summary>
+    /// Abaixo do teto a contagem é exata: é isso que a RN-63 pede, e o "mais de" existe só para o
+    /// caso em que o número seria inventado.
+    /// </summary>
+    [Fact]
+    public void RN_63_abaixo_do_teto_a_contagem_e_exata()
+    {
+        var kids = string.Concat(
+            Enumerable.Repeat("<</Type/Page/MediaBox[0 0 595 842]>>", 3));
+
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            $"<</Type/Pages/Count 3/Kids[{kids}]>>"));
+
+        Assert.Equal(CoverRejection.PageCount, inspection.Rejection);
+        Assert.False(inspection.PageCountTruncated);
+        Assert.Equal(3, inspection.PagesFound);
+        Assert.Contains("tem 3", CoverValidation.MessageFor(inspection));
+    }
+
+    /// <summary>
+    /// `MediaBox` com os cantos invertidos **só no eixo X** era recusada com "o arquivo não é um PDF
+    /// que possamos ler".
+    ///
+    /// O formato permite os cantos em qualquer ordem, e a leitura da dimensão já usava valor
+    /// absoluto — mas a seleção da caixa exigia largura positiva, então a caixa era descartada como
+    /// ausente e a página caía no ramo de dimensão inválida. Com os **dois** eixos invertidos
+    /// funcionava, o que deixava o defeito parecendo tratado.
+    /// </summary>
+    [Fact]
+    public void MediaBox_com_cantos_invertidos_no_eixo_x_e_aceita()
+    {
+        var inspection = CoverValidation.Inspect(RawPdf(
+            "<</Type/Catalog/Pages 2 0 R>>",
+            "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+            "<</Type/Page/Parent 2 0 R/MediaBox[595 0 0 842]>>"));
+
+        Assert.True(inspection.Accepted);
+    }
+
+    /// <summary>
     /// `/Rotate` é definido em múltiplos de 90. Fora disso, a divisão inteira tratava o valor
     /// como zero: `/Rotate 45` passava como retrato.
     /// </summary>

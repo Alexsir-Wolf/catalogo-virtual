@@ -90,6 +90,25 @@ public sealed class PortalSettingsTests(PostgresFixture postgres) : IAsyncLifeti
     }
 
     /// <summary>
+    /// A **folha** carrega o estado que a SPEC-UI declara, e não só o elemento do campo.
+    ///
+    /// A verificação por estado é a convenção do projeto — `LoginScreenStatesTests`,
+    /// `ProductListScreenTests`, `StorefrontScreenTests` todas a usam —, e aqui ela não existia:
+    /// renomear o literal de um estado, ou apagar o ramo que o produz, mantinha a suíte verde. Este
+    /// caso ancora os dois estados que se pode alcançar por requisição sem dirigir o circuito.
+    /// </summary>
+    [Fact]
+    public async Task UI_10_a_folha_declara_o_estado_da_tela()
+    {
+        using var client = await SignedInClientAsync();
+
+        var html = await client.GetStringAsync("/painel/configuracoes");
+
+        // Sem capa configurada, o estado da folha é `semCapa` — e é a folha, não o parágrafo.
+        Assert.Matches("""class="painel__folha"[^>]*data-estado="semCapa"[^>]*>""", html);
+    }
+
+    /// <summary>
     /// O caminho completo passa pelo armazenamento real, como os testes de T-08: gravar a
     /// capa é metade do critério, e simular o armazenamento provaria a outra metade só.
     /// </summary>

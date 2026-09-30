@@ -123,6 +123,29 @@ public sealed class CategoryDeletionTests(PostgresFixture postgres)
     }
 
     /// <summary>
+    /// Categoria nas **duas** condições devolve as duas causas de uma vez.
+    ///
+    /// Antes, produtos tinham precedência e a segunda causa só aparecia depois: o dono de uma
+    /// categoria com vinte produtos que também integra um catálogo movia os vinte, voltava para
+    /// excluir, e **só então** descobria o segundo impedimento. A tela já sabia renderizar os dois
+    /// parágrafos — era a consulta que parava na primeira causa, e nada no teste registrava qual dos
+    /// dois caminhos era o pretendido.
+    /// </summary>
+    [Fact]
+    public async Task RN_25_1_categoria_com_produto_e_catalogo_reporta_as_duas_causas()
+    {
+        var category = await CreateCategoryAsync(CreateMaintenance());
+        await AddProductsAsync(category.Id, ProductStatus.Published, count: 3);
+        var catalogName = await SaveCatalogAsync(category.Id);
+
+        var outcome = await CreateMaintenance().DeleteAsync(category.Id);
+
+        Assert.False(outcome.Succeeded);
+        Assert.Equal(3, outcome.BlockingProducts);
+        Assert.Contains(catalogName, outcome.Catalogs);
+    }
+
+    /// <summary>
     /// Todos os catálogos que retêm a categoria são nomeados, não apenas o primeiro: o dono
     /// precisa saber quantos critérios editar antes de conseguir excluir.
     /// </summary>

@@ -255,6 +255,13 @@
         { settings: null } => "carregando",
         { uploading: true } => "enviando",
         { coverError: not null } => "capaRecusada",
+
+        // `contatoRecusado` entra **antes** de `salvo`, pela mesma razão que `capaRecusada`: a
+        // recusa é o estado em que o dono está, e é sobre ela que ele precisa agir. Ficou fora do
+        // `StateId` quando foi criado, que é exatamente o problema que o round 1 cobrou para
+        // `salvo` — a SPEC declarava um estado que a folha nunca assumia.
+        { contactRejection.Rejected: not null } => "contatoRecusado",
+
         { passwordFailure: PasswordFailure.CurrentPasswordWrong } => "senhaIncorreta",
         { coverSaved: true } or { contactSaved: true } or { passwordChanged: true } => "salvo",
         { settings.HasCover: false } => "semCapa",
@@ -301,10 +308,15 @@
             // O limite do leitor é explícito: o padrão do Blazor é 512 KB, e quem decide a
             // recusa por tamanho é a validação da capa, não o transporte.
             await using var content = change.File.OpenReadStream(CoverValidation.MaxBytes);
-            using var buffer = new MemoryStream();
-            await content.CopyToAsync(buffer);
 
-            var inspection = await Settings.SaveCoverAsync(buffer.ToArray());
+            // Uma cópia só, do tamanho exato. Antes eram duas — o `MemoryStream` que crescia por
+            // dobras mais o `ToArray()` —, então no pior caso o dobro do arquivo coexistia em
+            // memória **antes** de o parse começar, que é justamente o ponto de maior pressão deste
+            // caminho (R-05 de `REVIEW-T-31-2026-09-29-round2`).
+            var upload = new byte[(int)change.File.Size];
+            await content.ReadExactlyAsync(upload);
+
+            var inspection = await Settings.SaveCoverAsync(upload);
 
             if (inspection.Accepted)
             {
@@ -320,7 +332,7 @@
         catch (IOException exception)
         {
             // Com o tamanho já conferido acima, o que chega aqui é envio interrompido no
-            // meio — e dizer "o arquivo passa de 12 MB" nesse caso manda o dono procurar um
+            // meio — e dizer que o arquivo passa do limite nesse caso manda o dono procurar um
             // problema que não existe. Mesma separação de T-13, cobrada em R-06 de
             // `REVIEW-T-13-2026-09-24`.
             Logger.LogWarning(exception, "Falha de transporte no envio da capa.");
