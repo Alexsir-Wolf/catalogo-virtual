@@ -107,6 +107,62 @@ public sealed class CatalogScreenTests : IDisposable
         Assert.Contains("Rascunho", html);
     }
 
+    /// <summary>
+    /// UI-08: a prévia mostra a contagem **por categoria**, com a unidade.
+    ///
+    /// O total sozinho não serve para a decisão que o dono toma quando o critério passa do teto:
+    /// ele precisa saber qual categoria tirar. E a contagem precisa dizer "produtos" — um número
+    /// solto ao lado do nome da categoria é lido como código, preço ou posição.
+    /// </summary>
+    [Fact]
+    public async Task UI_08_a_previa_conta_os_produtos_de_cada_categoria()
+    {
+        using var client = await SignedInClientAsync();
+        var (catalogId, categoryId) = await SeedCatalogWithCategoryAsync(products: 3);
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/painel/catalogos/{catalogId}"));
+
+        var bloco = html[html.IndexOf($"""data-contagem="{categoryId}" """.TrimEnd(), StringComparison.Ordinal)..];
+
+        Assert.Contains("3 produtos", bloco[..120]);
+    }
+
+    private async Task<(int CatalogId, int CategoryId)> SeedCatalogWithCategoryAsync(int products)
+    {
+        await using var context = postgres.CreateContext();
+
+        var category = new Category { Name = $"Categoria {Guid.NewGuid():N}", Position = 1 };
+        context.Categories.Add(category);
+        await context.SaveChangesAsync();
+
+        for (var index = 0; index < products; index++)
+        {
+            context.Products.Add(new Product
+            {
+                Name = $"Produto contado {index}",
+                Summary = "Resumo do produto",
+                Price = 99.90m,
+                CategoryId = category.Id,
+                Position = index + 1,
+                Status = ProductStatus.Published,
+                PublishedAt = DateTimeOffset.UtcNow
+            });
+        }
+
+        await context.SaveChangesAsync();
+
+        var catalog = new Catalog
+        {
+            Name = $"Catálogo {Guid.NewGuid():N}",
+            Categories = [new CatalogCategory { CategoryId = category.Id }]
+        };
+
+        context.Catalogs.Add(catalog);
+        await context.SaveChangesAsync();
+
+        return (catalog.Id, category.Id);
+    }
+
     private async Task<int> SeedCatalogAsync(int products = 2, bool published = true)
     {
         await using var context = postgres.CreateContext();

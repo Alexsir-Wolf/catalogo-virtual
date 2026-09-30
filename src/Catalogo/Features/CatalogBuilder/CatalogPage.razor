@@ -207,7 +207,11 @@
                                     <div class="previa__h">
                                         <span class="mono previa__n">@category.Label</span>
                                         <b>@category.Name</b>
-                                        <em>@category.Products.Count</em>
+                                        @* A contagem por categoria diz a unidade. Um número solto
+                                           ao lado do nome é lido como código, preço ou posição —
+                                           e é justamente por categoria que o dono decide o que
+                                           tirar do recorte quando passa do teto. *@
+                                        <em data-contagem="@category.Id">@CountLabel(category.Products.Count)</em>
                                     </div>
 
                                     <ul class="previa__l">
@@ -422,6 +426,13 @@
             await ResolveAsync();
         }
     }
+
+    /// <summary>
+    /// A contagem com a unidade, em **uma** expressão. Duas expressões seguidas no Razor saem
+    /// separadas por quebra de linha no HTML, e "3" numa linha com "produtos" na seguinte não é o
+    /// mesmo texto para quem lê a página nem para quem a verifica.
+    /// </summary>
+    private static string CountLabel(int count) => $"{count} {(count == 1 ? "produto" : "produtos")}";
 
     private static string Size(int bytes) => bytes switch
     {
