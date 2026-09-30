@@ -2,6 +2,7 @@ using Catalogo.Data;
 using Catalogo.Features.CatalogBuilder;
 using Catalogo.Features.Categories;
 using Catalogo.Features.Products;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Catalogo.Tests;
@@ -180,6 +181,54 @@ public sealed class CatalogResolutionTests(PostgresFixture postgres)
     }
 
     /// <summary>
+    /// RN-32 pela **terceira** porta, que é a mais cega das três: nem o produto nem a categoria são
+    /// novos — o produto é que se mudou para dentro do critério.
+    ///
+    /// O produto foi publicado há sessenta dias, na categoria Ferramentas, que não está no
+    /// catálogo. Impressoras está no critério desde antes da última geração. Hoje o dono edita o
+    /// produto e o move para Impressoras: `PublishedAt` é antigo, `CatalogCategory.AddedAt` é
+    /// antigo, e o produto **passa a integrar o catálogo agora**. Sem a data de entrada na
+    /// categoria, os dois primeiros caminhos não veem nada e o produto sai no PDF entregue sem
+    /// destaque — o dono descobre no cliente, que é o risco que a RN-32 existe para mitigar.
+    /// </summary>
+    [Fact]
+    public async Task RN_32_produto_movido_para_dentro_do_criterio_depois_da_geracao_e_destacado()
+    {
+        var impressoras = await CreateCategoryAsync("Impressoras", position: 1);
+        var ferramentas = await CreateCategoryAsync("Ferramentas", position: 2);
+
+        var jaEstava = await PublishProductAsync(impressoras.Id, "Impressora de sempre");
+        var mudou = await PublishProductAsync(ferramentas.Id, "Produto que se mudou", position: 2);
+
+        // Nenhum dos dois é novo por publicação.
+        await BackdatePublicationAsync(jaEstava, Days(-60));
+        await BackdatePublicationAsync(mudou, Days(-60));
+        await BackdateCategorizationAsync(jaEstava, Days(-60));
+        await BackdateCategorizationAsync(mudou, Days(-60));
+
+        var catalogId = await SaveCatalogAsync([impressoras.Id]);
+        await BackdateCriterionAsync(catalogId, Days(-45));
+        await CreateMaintenance().MarkGeneratedAsync(catalogId, Days(-30));
+
+        // A mudança de categoria acontece **agora**, pelo caminho real do painel.
+        var maintenance = CreateProductMaintenance();
+        var draft = await maintenance.FindAsync(mudou);
+        var outcome = await maintenance.SaveAsync(draft! with { CategoryId = impressoras.Id });
+
+        Assert.True(outcome.Succeeded);
+
+        var resolved = await CreateResolution().ResolveAsync(catalogId);
+        var produtos = resolved!.Categories.SelectMany(category => category.Products).ToList();
+
+        Assert.Equal(1, resolved.NewSinceLastGeneration);
+        Assert.True(produtos.Single(product => product.Name == "Produto que se mudou").IsNewSinceLastGeneration);
+
+        // Quem já estava não é destacado: nada mudou para ele, e destacar o catálogo inteiro a cada
+        // edição devolveria o ruído que a RN-32 combate.
+        Assert.False(produtos.Single(product => product.Name == "Impressora de sempre").IsNewSinceLastGeneration);
+    }
+
+    /// <summary>
     /// Catálogo nunca gerado não destaca nada: se tudo é novo, destacar tudo não informa nada —
     /// e o dono não tem expectativa anterior a ser contrariada.
     /// </summary>
@@ -278,6 +327,29 @@ public sealed class CatalogResolutionTests(PostgresFixture postgres)
             .Where(link => link.CatalogId == catalogId)
             .ExecuteUpdateAsync(update => update.SetProperty(link => link.AddedAt, moment));
     }
+
+    /// <summary>
+    /// Recua a entrada do produto na categoria atual. Todo produto criado pelo fixture entra na
+    /// categoria agora, e sem recuar isso os casos que datam a geração para trás teriam **todos** os
+    /// produtos recém-movidos — a mesma linha do tempo impossível que `BackdateCriterionAsync`
+    /// corrige para o critério.
+    /// </summary>
+    private async Task BackdateCategorizationAsync(int productId, DateTimeOffset moment)
+    {
+        await using var context = postgres.CreateContext();
+
+        await context.Products
+            .Where(product => product.Id == productId)
+            .ExecuteUpdateAsync(update =>
+                update.SetProperty(product => product.CategorizedAt, moment));
+    }
+
+    private ProductMaintenance CreateProductMaintenance() =>
+        new(
+            new ContextFactory(postgres.ConnectionString),
+            TestCache.Silent(),
+            TimeProvider.System,
+            NullLogger<ProductMaintenance>.Instance);
 
     private async Task BackdatePublicationAsync(int productId, DateTimeOffset moment)
     {

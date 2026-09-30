@@ -46,6 +46,7 @@ public sealed record ProductOutcome(int? Id, IReadOnlyDictionary<ProductField, s
 public sealed class ProductMaintenance(
     IDbContextFactory<CatalogDbContext> contextFactory,
     StorefrontInvalidation cache,
+    TimeProvider time,
     ILogger<ProductMaintenance> logger)
 {
     public async Task<IReadOnlyList<Category>> ListCategoriesAsync(
@@ -125,6 +126,13 @@ public sealed class ProductMaintenance(
         {
             product.CategoryId = draft.CategoryId.Value;
             product.Position = await NextPositionAsync(context, product.CategoryId, cancellationToken);
+
+            // A data de entrada na categoria é o que fecha a **terceira porta** da RN-32: mover um
+            // produto já publicado para uma categoria que já estava no critério de um catálogo o
+            // faz passar a integrar aquele catálogo agora, com `PublishedAt` antigo e `AddedAt`
+            // antigo. Sem esta data ele sai no PDF entregue sem destaque nenhum, e o dono descobre
+            // no cliente — o risco que a RN-32 existe para mitigar.
+            product.CategorizedAt = time.GetUtcNow();
         }
 
         await context.SaveChangesAsync(cancellationToken);

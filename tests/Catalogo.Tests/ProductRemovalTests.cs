@@ -201,7 +201,7 @@ public sealed class ProductRemovalTests(PostgresFixture postgres)
     }
 
     private ProductMaintenance CreateMaintenance() =>
-        new(new ContextFactory(postgres.ConnectionString), TestCache.Silent(), NullLogger<ProductMaintenance>.Instance);
+        new(new ContextFactory(postgres.ConnectionString), TestCache.Silent(), TimeProvider.System, NullLogger<ProductMaintenance>.Instance);
 
     private sealed class ContextFactory(string connectionString) : IDbContextFactory<CatalogDbContext>
     {

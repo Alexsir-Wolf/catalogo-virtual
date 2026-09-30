@@ -77,6 +77,12 @@ public sealed class CatalogScreenTests : IDisposable
     /// A prévia mostra o que a RN-31 exige: a lista resolvida, a contagem e a estimativa de
     /// páginas. Faltar a contagem deixaria o dono confirmando um conteúdo que ele não mediu.
     /// </summary>
+    /// <summary>
+    /// As asserções são **ancoradas nos selos**, e isso é a correção de um teste que não mordia:
+    /// procurar "4 produtos" no HTML encontrava também a contagem por categoria, e "página"
+    /// encontrava o parágrafo que explica que o número é estimativa. Apagar o total e a estimativa
+    /// da tela mantinha o caso verde — ou seja, o critério de T-23 não estava verificado.
+    /// </summary>
     [Fact]
     public async Task CA_16_a_previa_mostra_contagem_e_estimativa_de_paginas()
     {
@@ -85,9 +91,27 @@ public sealed class CatalogScreenTests : IDisposable
 
         var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/painel/catalogos/{catalogId}"));
 
-        Assert.Contains("4 produtos", html);
-        Assert.Contains("página", html);
+        Assert.Equal("4 produtos", SeloIn(html, "total"));
+        Assert.Equal("1 categoria", SeloIn(html, "categorias"));
+        Assert.Equal("~1 página", SeloIn(html, "paginas"));
+
+        // A lista resolvida também: contagem sem lista não é prévia.
         Assert.Contains("Produto 0", html);
+    }
+
+    /// <summary>
+    /// O conteúdo do selo identificado por `data-previa`. Ler o elemento, e não o documento, é o
+    /// que separa "a tela mostra este número" de "este número aparece em algum lugar da página".
+    /// </summary>
+    private static string SeloIn(string html, string marker)
+    {
+        var match = Regex.Match(
+            html,
+            $"""data-previa="{Regex.Escape(marker)}"[^>]*>(?<conteudo>[^<]*)<""");
+
+        Assert.True(match.Success, $"O selo '{marker}' não está na tela.");
+
+        return match.Groups["conteudo"].Value.Trim();
     }
 
     /// <summary>

@@ -34,6 +34,7 @@ public sealed class StorefrontInvalidationPointsTests(PostgresFixture postgres)
         var maintenance = new ProductMaintenance(
             Factory(),
             invalidation,
+            TimeProvider.System,
             NullLogger<ProductMaintenance>.Instance);
 
         await maintenance.AttachPhotoAsync(productId, PhotoFor("nova"));

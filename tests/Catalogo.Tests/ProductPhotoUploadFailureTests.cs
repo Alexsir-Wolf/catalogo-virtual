@@ -140,7 +140,7 @@ public sealed class ProductPhotoUploadFailureTests(PostgresFixture postgres)
     }
 
     private ProductMaintenance CreateMaintenance() =>
-        new(new ContextFactory(postgres.ConnectionString), TestCache.Silent(), NullLogger<ProductMaintenance>.Instance);
+        new(new ContextFactory(postgres.ConnectionString), TestCache.Silent(), TimeProvider.System, NullLogger<ProductMaintenance>.Instance);
 
     /// <summary>
     /// CA-08, a metade dos arquivos: a exclusão remove o original **e as quatro derivadas**,

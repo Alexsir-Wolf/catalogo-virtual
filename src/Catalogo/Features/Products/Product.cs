@@ -56,6 +56,20 @@ public class Product
     public DateTimeOffset? PublishedAt { get; set; }
 
     /// <summary>
+    /// Quando este produto entrou na categoria em que está agora.
+    ///
+    /// Existe pela **terceira porta** da RN-32, que a data de publicação e a data de entrada da
+    /// categoria no critério não cobrem: um produto já publicado que é movido para uma categoria
+    /// que já estava no critério. Nesse caminho `PublishedAt` é antigo, `CatalogCategory.AddedAt`
+    /// é antigo, e o produto **passa a integrar o catálogo agora** — que é a única coisa que a
+    /// RN-32 fala. Sem esta data ele entra no PDF entregue sem aviso nenhum.
+    ///
+    /// **Não é lista de produtos por catálogo** — a ADR-014 fica intacta: o que se data é onde o
+    /// produto está, que é propriedade dele, não resultado de um recorte.
+    /// </summary>
+    public DateTimeOffset CategorizedAt { get; set; }
+
+    /// <summary>
     /// Nomes imutáveis das derivadas da foto. Substituir a foto gera nomes novos em vez
     /// de sobrescrever os anteriores (RN-11, RN-13, ADR-005). A derivada de impressão
     /// nunca é exposta publicamente (RN-12).

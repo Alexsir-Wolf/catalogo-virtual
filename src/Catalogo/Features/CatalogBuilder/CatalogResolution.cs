@@ -143,7 +143,8 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
                 CategoryPosition = product.Category.Position,
                 Thumbnail = product.Photo!.ThumbnailFileName,
                 Print = product.Photo.PrintFileName,
-                product.PublishedAt
+                product.PublishedAt,
+                product.CategorizedAt
             })
             .ToListAsync(cancellationToken);
 
@@ -168,6 +169,7 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
                     product.Print,
                     IsNew(
                         product.PublishedAt,
+                        product.CategorizedAt,
                         entradaNoCriterio.GetValueOrDefault(product.CategoryId),
                         catalog.LastGeneratedAt))).ToList()))
             .ToList();
@@ -180,15 +182,24 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
     /// tudo é novo, destacar tudo não informa nada, e o dono nunca gerou este recorte — ele
     /// não tem expectativa anterior a contrariar.
     ///
-    /// Há **dois** caminhos para um produto passar a integrar o catálogo, e a RN-32 fala do
-    /// resultado, não do caminho: o produto foi publicado depois da última geração, **ou** a
-    /// categoria dele entrou no critério depois dela. Olhar só a publicação deixa o segundo caso
-    /// invisível — acrescentar uma categoria com trinta produtos publicados em julho não
-    /// destacaria nenhum, e o dono descobriria o crescimento no cliente, que é exatamente o
-    /// risco que a RN-32 existe para mitigar.
+    /// Há **três** caminhos para um produto passar a integrar o catálogo, e a RN-32 fala do
+    /// resultado, não do caminho. Cada um deles foi descoberto custando um review:
+    ///
+    /// 1. O produto foi **publicado** depois da última geração. É o caminho óbvio, e o único que a
+    ///    primeira versão cobria.
+    /// 2. A **categoria entrou no critério** depois dela. Acrescentar uma categoria com trinta
+    ///    produtos publicados em julho traz os trinta de uma vez, e comparar só a publicação não
+    ///    destacaria nenhum.
+    /// 3. O produto **mudou de categoria** para dentro do critério depois dela. Aqui a publicação é
+    ///    antiga **e** a categoria está no critério desde sempre: os dois primeiros caminhos são
+    ///    cegos, e o produto entra no PDF entregue sem aviso nenhum.
+    ///
+    /// Os três levam ao mesmo lugar, que é o risco central do sistema: o dono gera um catálogo
+    /// achando que conhece o conteúdo e descobre no cliente que algo entrou.
     /// </summary>
     private static bool IsNew(
         DateTimeOffset? publishedAt,
+        DateTimeOffset categorizedAt,
         DateTimeOffset categoryAddedAt,
         DateTimeOffset? lastGeneratedAt)
     {
@@ -198,6 +209,7 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
         }
 
         return categoryAddedAt > generated
+            || categorizedAt > generated
             || (publishedAt is { } published && published > generated);
     }
 }

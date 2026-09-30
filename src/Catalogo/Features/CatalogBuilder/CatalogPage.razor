@@ -134,14 +134,14 @@
                     <div class="painel-bloco__hd">
                         <h2>Prévia do que vai sair</h2>
 
-                        @if (resolved is { IsEmpty: false } preview)
+                        @* Cada selo tem marcador próprio. Sem eles, afirmar "4 produtos" no HTML
+                           encontrava também a contagem **por categoria** mais abaixo, e apagar o
+                           total e a estimativa da tela mantinha o teste verde. *@
+                        @if (draft.CategoryIds.Count > 0 && resolved is { IsEmpty: false } preview)
                         {
-                            <span class="selo selo--no-ar">
-                                @preview.ProductCount @(preview.ProductCount == 1 ? "produto" : "produtos")
-                            </span>
-                            <span class="selo selo--rascunho">
-                                ~@preview.EstimatedPages @(preview.EstimatedPages == 1 ? "página" : "páginas")
-                            </span>
+                            <span class="selo selo--no-ar" data-previa="total">@CountLabel(preview.ProductCount)</span>
+                            <span class="selo" data-previa="categorias">@CategoryLabel(preview.Categories.Count)</span>
+                            <span class="selo selo--rascunho" data-previa="paginas">@PageLabel(preview.EstimatedPages)</span>
                         }
                     </div>
 
@@ -149,6 +149,19 @@
                         @if (resolved is null)
                         {
                             <p class="campo__ajuda">Salve o critério para ver a prévia.</p>
+                        }
+                        else if (draft.CategoryIds.Count == 0)
+                        {
+                            @* `UI-08.semCategoria`: a prévia dá lugar à orientação, porque o que
+                               ela mostraria é o critério **anterior** — e mostrar a lista antiga
+                               ao lado de um critério vazio faria o dono gerar aquilo sem saber. *@
+                            <p class="campo__erro" role="alert" data-estado="semCategoriaPrevia">
+                                <b>Nenhuma categoria marcada.</b><br />
+                                <span class="campo__ajuda">
+                                    Marque ao menos uma categoria e salve o critério. Até lá não há
+                                    prévia nem geração — a lista de antes não vale mais.
+                                </span>
+                            </p>
                         }
                         else if (resolved.IsEmpty)
                         {
@@ -354,6 +367,14 @@
     /// </summary>
     private bool CanGenerate =>
         !generating
+
+        // O critério **em tela** também conta, e não só o gravado. Desmarcar todas as categorias
+        // levava a folha ao estado `semCategoria` e desabilitava Salvar, mas `resolved` continuava
+        // sendo o do critério anterior: a prévia seguia listando produtos e Gerar seguia habilitado,
+        // então o dono que desmarcou tudo para refazer o recorte gerava o PDF **antigo** com a tela
+        // dizendo que não havia critério. O estado que a UI-08 desenhou como bloqueio era o estado
+        // em que a geração continuava liberada.
+        && draft.CategoryIds.Count > 0
         && resolved is { IsEmpty: false } preview
         && preview.ProductCount <= CatalogGeneration.MaxProducts;
 
@@ -433,6 +454,21 @@
     /// mesmo texto para quem lê a página nem para quem a verifica.
     /// </summary>
     private static string CountLabel(int count) => $"{count} {(count == 1 ? "produto" : "produtos")}";
+
+    /// <summary>
+    /// O número de categorias do recorte. A SPEC-UI o pede ao lado do total, e ele é o que diz ao
+    /// dono se o critério é o que ele acha que é: um recorte que resolve cinco categorias quando
+    /// ele marcou duas significa que alguém mexeu no acervo.
+    /// </summary>
+    private static string CategoryLabel(int count) =>
+        $"{count} {(count == 1 ? "categoria" : "categorias")}";
+
+    /// <summary>
+    /// A estimativa leva o til: a contagem exata só existe depois de compor, porque célula que não
+    /// cabe desce inteira para a página seguinte (RN-42).
+    /// </summary>
+    private static string PageLabel(int pages) =>
+        $"~{pages} {(pages == 1 ? "página" : "páginas")}";
 
     private static string Size(int bytes) => bytes switch
     {
