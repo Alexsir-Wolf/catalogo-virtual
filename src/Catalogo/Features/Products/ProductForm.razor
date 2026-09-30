@@ -254,12 +254,20 @@
                     }
                 </div>
 
-                @if (confirmingDeletion)
+                @* A guarda de `Id` acompanha a do botão **Excluir**: sem produto gravado não há
+                   o que confirmar, e a confirmação desenhada sobre um formulário em branco
+                   levaria o clique a excluir com `Id` nulo. *@
+                @if (Id is not null && confirmingDeletion)
                 {
                     @* UI-05.confirmarExclusao. A confirmação é do **dono**, nunca automática:
                        a operação não tem volta e leva a foto junto (RN-20). O que ela declara
                        é exatamente o que vai acontecer — sem eufemismo. *@
-                    <div class="painel-bloco__ft" data-estado="confirmarExclusao">
+                    @* `ConfirmacaoDestrutiva.processando`: a espera não é instantânea — a
+                       exclusão faz o DELETE no banco e cinco requisições ao armazenamento pela
+                       rede (RN-11). Os botões apagados diziam que algo estava acontecendo; não
+                       diziam **o quê**, e o dono ficava sem saber se o produto já saiu. *@
+                    <div class="painel-bloco__ft"
+                         data-estado="@(deleting ? "processando" : "confirmarExclusao")">
                         <p class="campo__erro" role="alert">
                             <b>Excluir “@confirmedName” definitivamente?</b><br />
                             Esta operação <b>não pode ser desfeita</b>. O produto sai do
@@ -276,7 +284,9 @@
                         </p>
 
                         <button type="button" class="btn btn--perigo" @onclick="DeleteAsync"
-                                disabled="@deleting">Excluir definitivamente</button>
+                                disabled="@deleting" role="@(deleting ? "status" : null)">
+                            @(deleting ? "Excluindo…" : "Excluir definitivamente")
+                        </button>
 
                         <button type="button" class="btn btn--fantasma"
                                 @onclick="CancelDeletion" disabled="@deleting">
@@ -314,6 +324,13 @@
 
     private bool notFound;
     private bool saved;
+
+    /// <summary>
+    /// O <c>Id</c> que esta instância está mostrando. Existe para reconhecer a troca de produto:
+    /// navegar de <c>/painel/produtos/5</c> direto para <c>/painel/produtos/7</c> reaproveita a
+    /// instância sem passar por <see cref="Reset"/>, que só roda quando o <c>Id</c> é nulo.
+    /// </summary>
+    private int? loadedId;
 
     private bool confirmingDeletion;
     private bool deleting;
@@ -381,6 +398,16 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        // A confirmação nomeia **um** produto e afirma o que vai acontecer com ele, então ela não
+        // pode sobreviver à troca de `Id`: a tela do produto novo exibiria o texto do anterior e o
+        // clique apagaria o produto errado sob um aviso que nomeia outro. Aqui é o caso da
+        // navegação direta entre duas edições, que não passa por `Reset`.
+        if (Id != loadedId)
+        {
+            loadedId = Id;
+            ClearDeletionState();
+        }
+
         categories = await Maintenance.ListCategoriesAsync();
 
         if (Id is null)
@@ -420,6 +447,21 @@
         uploadError = null;
         publication = null;
         publicationRefusal = null;
+        ClearDeletionState();
+    }
+
+    /// <summary>
+    /// Descarta a confirmação pendente. Os cinco campos saem juntos porque o texto exibido é
+    /// montado dos três últimos: deixar qualquer um para trás mantém na tela uma afirmação sobre
+    /// um produto que já não é o desta instância.
+    /// </summary>
+    private void ClearDeletionState()
+    {
+        confirmingDeletion = false;
+        deleting = false;
+        deletionError = null;
+        confirmedName = null;
+        deletionAffectsStorefront = false;
     }
 
     private async Task PublishAsync()
@@ -560,9 +602,17 @@
             return;
         }
 
+        // Defesa em profundidade, no mesmo formato de `PublishAsync`: sem `Id` a exclusão não tem
+        // alvo, e `Id!.Value` estouraria dentro do manipulador de evento — o que derruba o
+        // circuito, porque não há `ErrorBoundary` acima dele (ADR-010).
+        if (Id is null)
+        {
+            return;
+        }
+
         deleting = true;
 
-        var outcome = await Removal.RemoveAsync(Id!.Value);
+        var outcome = await Removal.RemoveAsync(Id.Value);
 
         if (!outcome.Succeeded)
         {
