@@ -75,7 +75,8 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
         var catalogId = await SeedAsync(products: 18);
         await SetCoverAsync();
 
-        var outcome = await CreateGeneration().GenerateAsync(catalogId);
+        var generation = CreateGeneration();
+        var outcome = await generation.GenerateAsync(catalogId);
 
         Assert.True(outcome.Succeeded);
         Assert.NotNull(outcome.Content);
@@ -86,8 +87,37 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
         // O arquivo é um PDF de verdade, não um vetor de bytes qualquer.
         Assert.Equal("%PDF"u8.ToArray(), outcome.Content!.Take(4).ToArray());
 
+        // A data **não** é gravada por compor: ela é gravada por entregar. Enquanto a confirmação
+        // não chega, o catálogo continua com a data anterior — e é isso que impede que um download
+        // que falhou apague o destaque da RN-32 de produtos que ninguém viu.
+        var antes = (await CreateMaintenance().ListAsync()).Single(catalog => catalog.Id == catalogId);
+        Assert.False(antes.WasGenerated);
+
+        await generation.ConfirmDeliveryAsync(catalogId, outcome);
+
+        var depois = (await CreateMaintenance().ListAsync()).Single(catalog => catalog.Id == catalogId);
+        Assert.True(depois.WasGenerated);
+    }
+
+    /// <summary>
+    /// A metade que o review de T-24/T-25 cobrou: a confirmação de uma geração que **não**
+    /// aconteceu não grava data. Sem isso, um `ConfirmDeliveryAsync` chamado no caminho de erro
+    /// avançaria `LastGeneratedAt` para uma entrega que nunca existiu.
+    /// </summary>
+    [Fact]
+    public async Task Confirmar_entrega_de_uma_recusa_nao_grava_data()
+    {
+        var catalogId = await SeedAsync(products: 3);
+
+        var generation = CreateGeneration();
+        var outcome = await generation.GenerateAsync(catalogId);
+
+        Assert.Equal(GenerationRefusal.NoCover, outcome.Refusal);
+
+        await generation.ConfirmDeliveryAsync(catalogId, outcome);
+
         var listed = (await CreateMaintenance().ListAsync()).Single(catalog => catalog.Id == catalogId);
-        Assert.True(listed.WasGenerated);
+        Assert.False(listed.WasGenerated);
     }
 
     /// <summary>
@@ -167,7 +197,7 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
     /// que falta a capa seria trabalho jogado fora — e é a única pista que a UI-10 dá ao dono.
     /// </summary>
     [Fact]
-    public async Task RN_65_sem_capa_configurada_a_geracao_e_recusada()
+    public async Task CA_36_sem_capa_configurada_a_geracao_e_recusada_com_orientacao()
     {
         var catalogId = await SeedAsync(products: 3);
 
@@ -215,6 +245,54 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
             ? string.Empty
             : System.Text.Encoding.Latin1.GetString(
                 contents.GetDictionary(0)!.Stream.UnfilteredValue);
+    }
+
+    /// <summary>
+    /// CA-15: o preço alterado sai na **geração seguinte**, sem nenhum ajuste no catálogo salvo
+    /// (RN-29, RN-30). É a razão de existir da ADR-014, verificada de ponta a ponta: o mesmo
+    /// catálogo, gerado duas vezes, produz documentos diferentes porque o acervo mudou.
+    ///
+    /// A verificação é sobre o **tamanho e o conteúdo bruto** do PDF, e não sobre o texto: o
+    /// QuestPDF embute fonte em subconjunto e codifica por glifo, então ler "1.120,00" do arquivo
+    /// não é possível. O que se afirma é que os dois documentos **diferem** — e, para que a
+    /// diferença não possa vir de outra coisa, nada além do preço muda entre as duas gerações.
+    /// </summary>
+    [Fact]
+    public async Task CA_15_preco_alterado_aparece_na_geracao_seguinte()
+    {
+        var catalogId = await SeedAsync(products: 1);
+        await SetCoverAsync();
+
+        var generation = CreateGeneration();
+
+        var primeira = await generation.GenerateAsync(catalogId);
+        Assert.True(primeira.Succeeded);
+
+        await AlterarPrecoAsync(catalogId, 1120.00m);
+
+        var segunda = await generation.GenerateAsync(catalogId);
+        Assert.True(segunda.Succeeded);
+
+        // Documentos diferentes a partir do **mesmo critério salvo**: é o que a RN-30 promete.
+        Assert.NotEqual(primeira.Content, segunda.Content);
+
+        // E o catálogo não foi tocado: a contagem de categorias do critério é a mesma.
+        var criterio = await CreateMaintenance().FindAsync(catalogId);
+        Assert.Single(criterio!.CategoryIds);
+    }
+
+    private async Task AlterarPrecoAsync(int catalogId, decimal preco)
+    {
+        await using var context = CreateContext();
+
+        var categoryIds = await context.Catalogs
+            .Where(catalog => catalog.Id == catalogId)
+            .SelectMany(catalog => catalog.Categories.Select(link => link.CategoryId))
+            .ToListAsync();
+
+        await context.Products
+            .Where(product => categoryIds.Contains(product.CategoryId))
+            .ExecuteUpdateAsync(update => update.SetProperty(product => product.Price, preco));
     }
 
     [Fact]
@@ -394,14 +472,15 @@ public sealed class CatalogGenerationTests : IAsyncLifetime, IDisposable
                 options,
                 settings,
                 NullLogger<CatalogComposer>.Instance),
-            new CatalogMaintenance(contextFactory),
+            new CatalogMaintenance(contextFactory, TimeProvider.System),
             settings,
             new FakeCoverSource(),
             TimeProvider.System,
             NullLogger<CatalogGeneration>.Instance);
     }
 
-    private CatalogMaintenance CreateMaintenance() => new(new ContextFactory(connectionString));
+    private CatalogMaintenance CreateMaintenance() =>
+        new(new ContextFactory(connectionString), TimeProvider.System);
 
     private CatalogDbContext CreateContext() =>
         new(new DbContextOptionsBuilder<CatalogDbContext>().UseNpgsql(connectionString).Options);

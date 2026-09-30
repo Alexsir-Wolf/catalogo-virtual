@@ -34,12 +34,22 @@ public sealed record GenerationOutcome(
     GenerationRefusal Refusal,
     byte[]? Content = null,
     string? FileName = null,
-    int ProductCount = 0)
+    int ProductCount = 0,
+
+    /// <summary>
+    /// O instante do conteúdo, capturado **antes** de resolver o critério. É o que vai para o
+    /// registro da RN-33 quando a entrega se confirmar.
+    /// </summary>
+    DateTimeOffset? Moment = null)
 {
     public bool Succeeded => Refusal == GenerationRefusal.None;
 
-    public static GenerationOutcome Generated(byte[] content, string fileName, int productCount) =>
-        new(GenerationRefusal.None, content, fileName, productCount);
+    public static GenerationOutcome Generated(
+        byte[] content,
+        string fileName,
+        int productCount,
+        DateTimeOffset moment) =>
+        new(GenerationRefusal.None, content, fileName, productCount, moment);
 
     public static GenerationOutcome Refused(GenerationRefusal refusal, int productCount = 0) =>
         new(refusal, ProductCount: productCount);
@@ -110,6 +120,13 @@ public sealed class CatalogGeneration(
     {
         progress?.Report(GenerationProgress.Resolving);
 
+        // O instante é capturado **antes** de resolver, e é ele que vai para o registro da
+        // geração. Marcar com a hora do fim da composição abriria uma janela de segundos a
+        // minutos — baixar até 250 imagens e concatenar leva tempo — em que um produto publicado
+        // **não sai no PDF entregue** e ainda assim fica com `PublishedAt` anterior à data
+        // gravada: nunca mais seria destacado em prévia alguma (RN-32, RN-33).
+        var momento = time.GetUtcNow();
+
         var resolved = await resolution.ResolveAsync(catalogId, cancellationToken);
 
         if (resolved is null)
@@ -169,15 +186,36 @@ public sealed class CatalogGeneration(
             return GenerationOutcome.Refused(GenerationRefusal.Failed, resolved.ProductCount);
         }
 
-        // A data é registrada **depois** de o documento existir: marcar antes faria um catálogo
-        // que falhou parecer gerado, e o destaque de itens novos da RN-32 passaria a comparar
-        // com uma geração que nunca chegou a ninguém.
-        await maintenance.MarkGeneratedAsync(catalogId, time.GetUtcNow(), cancellationToken);
-
         progress?.Report(GenerationProgress.Done);
 
-        return GenerationOutcome.Generated(content, FileNameFor(resolved), resolved.ProductCount);
+        // **A data não é gravada aqui.** "O documento existe" não é "o documento chegou": a
+        // entrega acontece depois, pelo circuito, e pode falhar — reconexão, aba fechada, tempo
+        // de espera do JavaScript esgotado. Gravar antes fazia `LastGeneratedAt` avançar para uma
+        // geração que ninguém recebeu, e o destaque da RN-32 passava a comparar com ela: os
+        // produtos que entraram desde a geração **anterior** deixavam de ser destacados para
+        // sempre. Quem confirma a entrega é quem entrega — ver `ConfirmDeliveryAsync`.
+        return GenerationOutcome.Generated(
+            content,
+            FileNameFor(resolved),
+            resolved.ProductCount,
+            momento);
     }
+
+    /// <summary>
+    /// Registra a geração (RN-33), e só depois de a entrega ter acontecido.
+    ///
+    /// Fica separado de <see cref="GenerateAsync"/> porque a entrega é do circuito, não daqui: o
+    /// documento pode existir e não chegar. Enquanto esta chamada não acontece, o catálogo segue
+    /// com a data anterior — e o destaque da RN-32 continua comparando com a última geração que
+    /// alguém de fato recebeu.
+    /// </summary>
+    public Task ConfirmDeliveryAsync(
+        int catalogId,
+        GenerationOutcome outcome,
+        CancellationToken cancellationToken = default) =>
+        outcome is { Succeeded: true, Moment: { } moment }
+            ? maintenance.MarkGeneratedAsync(catalogId, moment, cancellationToken)
+            : Task.CompletedTask;
 
     /// <summary>
     /// Nome do arquivo que o dono recebe. Leva o nome do catálogo e a data, porque o arquivo

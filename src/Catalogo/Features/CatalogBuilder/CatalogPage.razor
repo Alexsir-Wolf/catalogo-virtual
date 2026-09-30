@@ -1,5 +1,6 @@
 @page "/painel/catalogos/novo"
 @page "/painel/catalogos/{Id:int}"
+@implements IDisposable
 @layout PanelLayout
 @rendermode InteractiveServer
 @using Catalogo.Features.Categories
@@ -294,6 +295,13 @@
     private bool notFound;
     private bool saved;
 
+    /// <summary>
+    /// Cancela a geração quando o dono sai da tela. Sem isso, navegar durante a composição deixava
+    /// o trabalho rodando e **o semáforo preso**: a próxima tentativa recebia "já existe uma
+    /// geração em andamento" sem que houvesse ninguém esperando o resultado.
+    /// </summary>
+    private CancellationTokenSource? cancelamento;
+
     private bool generating;
     private GenerationProgress? stage;
     private GenerationOutcome? generated;
@@ -369,7 +377,9 @@
                     StateHasChanged();
                 }));
 
-            var outcome = await Generation.GenerateAsync(Id!.Value, report);
+            cancelamento = new CancellationTokenSource();
+
+            var outcome = await Generation.GenerateAsync(Id!.Value, report, cancelamento.Token);
 
             if (!outcome.Succeeded)
             {
@@ -377,23 +387,34 @@
                 return;
             }
 
-            generated = outcome;
-
-            // O arquivo vai do servidor para o navegador e **não é gravado em disco** em
-            // momento nenhum (RN-35). O fluxo é lido a partir da memória e descartado quando o
-            // download termina.
+            // O arquivo vai do servidor para o navegador e **não é gravado em disco** em momento
+            // nenhum (RN-35). O fluxo é lido a partir da memória e descartado quando o download
+            // termina.
             using var stream = new MemoryStream(outcome.Content!);
             using var reference = new DotNetStreamReference(stream);
 
             await Download.InvokeVoidAsync("baixarArquivo", outcome.FileName, reference);
+
+            // **Só agora** o documento é dado por entregue, e a data da RN-33 é registrada. Se a
+            // chamada acima falhar — reconexão, aba fechada, espera esgotada — nada é marcado, e o
+            // destaque da RN-32 continua comparando com a última geração que alguém recebeu.
+            await Generation.ConfirmDeliveryAsync(Id!.Value, outcome);
+
+            generated = outcome;
         }
         catch (Exception exception)
         {
             Logger.LogError(exception, "Falha ao gerar o catálogo {Id}.", Id);
+
+            // `generated` é limpo: sem isso a tela mostrava "Documento pronto" e "a composição
+            // falhou" ao mesmo tempo, e o dono não tinha como saber qual das duas era verdade.
+            generated = null;
             refusal = GenerationRefusal.Failed;
         }
         finally
         {
+            cancelamento?.Dispose();
+            cancelamento = null;
             generating = false;
 
             // A data da última geração mudou: a prévia precisa refletir isso, porque o destaque
@@ -468,6 +489,12 @@
         {
             Navigation.NavigateTo($"/painel/catalogos/{outcome.Id}");
         }
+    }
+
+    public void Dispose()
+    {
+        cancelamento?.Cancel();
+        cancelamento?.Dispose();
     }
 
     private static string MessageFor(CatalogFailure failure) => failure switch

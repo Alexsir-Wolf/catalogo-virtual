@@ -105,7 +105,9 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
                 candidate.Id,
                 candidate.Name,
                 candidate.LastGeneratedAt,
-                CategoryIds = candidate.Categories.Select(link => link.CategoryId).ToList()
+                Criterion = candidate.Categories
+                    .Select(link => new { link.CategoryId, link.AddedAt })
+                    .ToList()
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -114,13 +116,18 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
             return null;
         }
 
+        var categoryIds = catalog.Criterion.Select(link => link.CategoryId).ToList();
+        var entradaNoCriterio = catalog.Criterion.ToDictionary(
+            link => link.CategoryId,
+            link => link.AddedAt);
+
         // Só produtos No ar (RN-30, RN-15). Rascunho não sai no documento, e é o que faz o
         // CA-18 existir: um catálogo cujas categorias só têm rascunho resolve vazio.
         var products = await context.Products
             .AsNoTracking()
             .Where(product =>
                 product.Status == ProductStatus.Published
-                && catalog.CategoryIds.Contains(product.CategoryId))
+                && categoryIds.Contains(product.CategoryId))
             .OrderBy(product => product.Category!.Position)
             .ThenBy(product => product.Position)
             .ThenBy(product => product.Id)
@@ -159,7 +166,10 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
                     product.PriceLabel,
                     product.Thumbnail,
                     product.Print,
-                    IsNew(product.PublishedAt, catalog.LastGeneratedAt))).ToList()))
+                    IsNew(
+                        product.PublishedAt,
+                        entradaNoCriterio.GetValueOrDefault(product.CategoryId),
+                        catalog.LastGeneratedAt))).ToList()))
             .ToList();
 
         return new ResolvedCatalog(catalog.Id, catalog.Name, categories, catalog.LastGeneratedAt);
@@ -169,7 +179,25 @@ public sealed class CatalogResolution(IDbContextFactory<CatalogDbContext> contex
     /// Novo desde a última geração (RN-32). Catálogo nunca gerado **não destaca nada**: se
     /// tudo é novo, destacar tudo não informa nada, e o dono nunca gerou este recorte — ele
     /// não tem expectativa anterior a contrariar.
+    ///
+    /// Há **dois** caminhos para um produto passar a integrar o catálogo, e a RN-32 fala do
+    /// resultado, não do caminho: o produto foi publicado depois da última geração, **ou** a
+    /// categoria dele entrou no critério depois dela. Olhar só a publicação deixa o segundo caso
+    /// invisível — acrescentar uma categoria com trinta produtos publicados em julho não
+    /// destacaria nenhum, e o dono descobriria o crescimento no cliente, que é exatamente o
+    /// risco que a RN-32 existe para mitigar.
     /// </summary>
-    private static bool IsNew(DateTimeOffset? publishedAt, DateTimeOffset? lastGeneratedAt) =>
-        lastGeneratedAt is { } generated && publishedAt is { } published && published > generated;
+    private static bool IsNew(
+        DateTimeOffset? publishedAt,
+        DateTimeOffset categoryAddedAt,
+        DateTimeOffset? lastGeneratedAt)
+    {
+        if (lastGeneratedAt is not { } generated)
+        {
+            return false;
+        }
+
+        return categoryAddedAt > generated
+            || (publishedAt is { } published && published > generated);
+    }
 }

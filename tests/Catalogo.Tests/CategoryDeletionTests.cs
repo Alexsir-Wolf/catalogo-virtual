@@ -163,7 +163,7 @@ public sealed class CategoryDeletionTests(PostgresFixture postgres)
         var retida = await CreateCategoryAsync(CreateMaintenance());
         var outra = await CreateCategoryAsync(CreateMaintenance());
 
-        var catalogs = new CatalogMaintenance(new ContextFactory(postgres.ConnectionString));
+        var catalogs = new CatalogMaintenance(new ContextFactory(postgres.ConnectionString), TimeProvider.System);
         var name = $"Catálogo {Guid.NewGuid():N}";
 
         var saved = await catalogs.SaveAsync(new CatalogDraft
@@ -186,7 +186,7 @@ public sealed class CategoryDeletionTests(PostgresFixture postgres)
     {
         var name = $"Catálogo {Guid.NewGuid():N}";
 
-        var outcome = await new CatalogMaintenance(new ContextFactory(postgres.ConnectionString))
+        var outcome = await new CatalogMaintenance(new ContextFactory(postgres.ConnectionString), TimeProvider.System)
             .SaveAsync(new CatalogDraft { Name = name, CategoryIds = [categoryId] });
 
         Assert.True(outcome.Succeeded);

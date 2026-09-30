@@ -112,8 +112,10 @@ public sealed class CatalogResolutionTests(PostgresFixture postgres)
         var antigoId = await PublishProductAsync(category.Id, "Impressora antiga");
         var catalogId = await SaveCatalogAsync([category.Id]);
 
-        // O catálogo foi gerado depois do produto antigo, e antes do novo.
+        // O catálogo foi gerado depois do produto antigo, e antes do novo. O critério é anterior
+        // aos dois — ele existia quando a geração aconteceu.
         await BackdatePublicationAsync(antigoId, Days(-40));
+        await BackdateCriterionAsync(catalogId, Days(-45));
         await CreateMaintenance().MarkGeneratedAsync(catalogId, Days(-30));
 
         var novoId = await PublishProductAsync(category.Id, "Impressora nova");
@@ -126,6 +128,55 @@ public sealed class CatalogResolutionTests(PostgresFixture postgres)
         Assert.Equal(1, resolved.NewSinceLastGeneration);
         Assert.True(products.Single(product => product.Name == "Impressora nova").IsNewSinceLastGeneration);
         Assert.False(products.Single(product => product.Name == "Impressora antiga").IsNewSinceLastGeneration);
+    }
+
+    /// <summary>
+    /// RN-32 pelo **outro** caminho, que é o que quase passou batido: o produto não é novo, o
+    /// catálogo é que cresceu.
+    ///
+    /// Tintas tem trinta produtos publicados em julho. O dono acrescenta a categoria ao critério
+    /// hoje, depois de já ter gerado o catálogo — os trinta entram de uma vez. Comparar só
+    /// `PublishedAt` com `LastGeneratedAt` não destacaria nenhum deles, e o dono geraria um
+    /// documento trinta produtos maior sem ver aviso nenhum. É literalmente o risco que a RN-32
+    /// existe para mitigar, pela porta que a implementação inicial deixou aberta.
+    /// </summary>
+    [Fact]
+    public async Task RN_32_categoria_acrescentada_ao_criterio_depois_da_geracao_destaca_seus_produtos()
+    {
+        var impressoras = await CreateCategoryAsync("Impressoras", position: 1);
+        var tintas = await CreateCategoryAsync("Tintas", position: 2);
+
+        var impressoraId = await PublishProductAsync(impressoras.Id, "Impressora antiga");
+        var tintaId = await PublishProductAsync(tintas.Id, "Tinta antiga");
+
+        // Nenhum dos dois é novo: os dois foram publicados antes da última geração.
+        await BackdatePublicationAsync(impressoraId, Days(-60));
+        await BackdatePublicationAsync(tintaId, Days(-60));
+
+        var catalogId = await SaveCatalogAsync([impressoras.Id]);
+        await BackdateCriterionAsync(catalogId, Days(-45));
+        await CreateMaintenance().MarkGeneratedAsync(catalogId, Days(-30));
+
+        // O critério cresce **agora** — só isso.
+        var name = (await CreateMaintenance().FindAsync(catalogId))!.Name;
+        var outcome = await CreateMaintenance().SaveAsync(new CatalogDraft
+        {
+            Id = catalogId,
+            Name = name,
+            CategoryIds = [impressoras.Id, tintas.Id]
+        });
+
+        Assert.True(outcome.Succeeded);
+
+        var resolved = await CreateResolution().ResolveAsync(catalogId);
+        var produtos = resolved!.Categories.SelectMany(category => category.Products).ToList();
+
+        Assert.Equal(1, resolved.NewSinceLastGeneration);
+        Assert.True(produtos.Single(product => product.Name == "Tinta antiga").IsNewSinceLastGeneration);
+
+        // A categoria que já estava no critério **não** é destacada: ela não mudou, e destacar
+        // o catálogo inteiro a cada edição do critério devolveria o ruído que a RN-32 combate.
+        Assert.False(produtos.Single(product => product.Name == "Impressora antiga").IsNewSinceLastGeneration);
     }
 
     /// <summary>
@@ -211,6 +262,23 @@ public sealed class CatalogResolutionTests(PostgresFixture postgres)
 
     private static DateTimeOffset Days(int offset) => DateTimeOffset.UtcNow.AddDays(offset);
 
+    /// <summary>
+    /// Recua a entrada das categorias no critério.
+    ///
+    /// Os casos que datam a geração para trás precisam disto: um catálogo **não pode** ter sido
+    /// gerado antes de o critério existir, e o fixture que grava o critério agora e depois diz
+    /// "gerado há trinta dias" monta uma linha do tempo impossível — na qual tudo é
+    /// legitimamente novo. Recuar a entrada é o que torna o cenário o que ele pretende ser.
+    /// </summary>
+    private async Task BackdateCriterionAsync(int catalogId, DateTimeOffset moment)
+    {
+        await using var context = postgres.CreateContext();
+
+        await context.Set<CatalogCategory>()
+            .Where(link => link.CatalogId == catalogId)
+            .ExecuteUpdateAsync(update => update.SetProperty(link => link.AddedAt, moment));
+    }
+
     private async Task BackdatePublicationAsync(int productId, DateTimeOffset moment)
     {
         await using var context = postgres.CreateContext();
@@ -289,7 +357,7 @@ public sealed class CatalogResolutionTests(PostgresFixture postgres)
         new(new ContextFactory(postgres.ConnectionString));
 
     private CatalogMaintenance CreateMaintenance() =>
-        new(new ContextFactory(postgres.ConnectionString));
+        new(new ContextFactory(postgres.ConnectionString), TimeProvider.System);
 
     private sealed class ContextFactory(string connectionString) : IDbContextFactory<CatalogDbContext>
     {

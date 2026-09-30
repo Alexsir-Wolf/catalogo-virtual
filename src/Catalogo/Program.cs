@@ -12,6 +12,7 @@ using Catalogo.Features.Storefront;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 // A licença Community do QuestPDF vale para uso interno e receita abaixo do teto da licença;
@@ -114,6 +115,8 @@ app.MapRazorComponents<App>()
 
 app.MapGet("/health", async (
     IConfiguration configuration,
+    IObjectStorage objectStorage,
+    IOptions<ObjectStorageOptions> storageOptions,
     ILoggerFactory loggerFactory,
     CancellationToken cancellationToken) =>
 {
@@ -134,7 +137,11 @@ app.MapGet("/health", async (
         // O armazenamento de objeto é a segunda dependência externa (ADR-018), e uma falha nele
         // é invisível no banco: as páginas respondem e as imagens não abrem. Verificar só o
         // banco daria "healthy" com a vitrine quebrada.
-        var storage = await StorageHealth.CheckAsync(app.Services, cancellationToken);
+        var storage = await StorageHealth.CheckAsync(
+            objectStorage,
+            storageOptions.Value,
+            loggerFactory.CreateLogger("Health"),
+            cancellationToken);
 
         return Results.Json(
             new
@@ -148,18 +155,25 @@ app.MapGet("/health", async (
     }
     catch (Exception exception)
     {
-        // A mensagem da exceção carrega host e usuário do banco e por isso fica só no log.
-        // A resposta devolve o código SQLSTATE, que identifica a causa sem expor nada.
-        loggerFactory.CreateLogger("Health").LogError(exception, "Falha ao conectar no banco.");
+        // A mensagem da exceção carrega **host e usuário** do banco, e a forma da cadeia de
+        // conexão carrega o host: as duas ficam só no log. O endpoint é público — quem monitora
+        // não tem credencial do painel —, então a resposta leva apenas o que identifica a causa
+        // sem descrever a infraestrutura.
+        //
+        // Antes desta correção o `detail` devolvia a mensagem do Postgres (que num erro `28P01`
+        // nomeia o usuário) e o `shape` devolvia o host, contrariando o próprio comentário que
+        // dizia ficarem no log.
+        loggerFactory.CreateLogger("Health").LogError(
+            exception,
+            "Falha ao conectar no banco. Forma da cadeia: {Forma}.",
+            DatabaseConnectionStringShape.Describe(configured));
 
         return Results.Json(new
         {
             status = "unhealthy",
             failure = exception.GetType().Name,
             cause = exception.InnerException?.GetType().Name,
-            sqlState = (exception as PostgresException)?.SqlState,
-            detail = exception is ArgumentException or PostgresException ? exception.Message : null,
-            shape = DatabaseConnectionStringShape.Describe(configured)
+            sqlState = (exception as PostgresException)?.SqlState
         }, statusCode: 503);
     }
 });

@@ -1,0 +1,169 @@
+using System.Net;
+using System.Text.RegularExpressions;
+using Catalogo.Data;
+using Catalogo.Features.Account;
+using Catalogo.Features.CatalogBuilder;
+using Catalogo.Features.Categories;
+using Catalogo.Features.Products;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+
+namespace Catalogo.Tests;
+
+/// <summary>
+/// A tela do catálogo (UI-08). O que estes casos protegem é uma regra **de disposição**, não de
+/// dado: a RN-31 exige que a pré-visualização preceda a geração, e isso é verificável na ordem
+/// dos elementos da página.
+/// </summary>
+[Collection(PostgresCollection.Name)]
+public sealed class CatalogScreenTests : IDisposable
+{
+    private const string OwnerUserName = "dono-catalogo";
+    private const string OwnerPassword = "Catalogo!2026";
+
+    private readonly PostgresFixture postgres;
+    private readonly WebApplicationFactory<Program> factory;
+
+    public CatalogScreenTests(PostgresFixture postgres)
+    {
+        this.postgres = postgres;
+
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("ConnectionStrings:Default", postgres.ConnectionString);
+            builder.UseSetting($"{OwnerAccountOptions.SectionName}:UserName", OwnerUserName);
+            builder.UseSetting($"{OwnerAccountOptions.SectionName}:Password", OwnerPassword);
+        });
+    }
+
+    public void Dispose() => factory.Dispose();
+
+    [Fact]
+    public async Task A_tela_de_catalogos_exige_autenticacao()
+    {
+        using var client = factory.CreateClient(
+            new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/painel/catalogos");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    }
+
+    /// <summary>
+    /// CA-16 / RN-31: a pré-visualização **precede** a geração, e não existe caminho que a pule.
+    ///
+    /// A garantia é de construção — o bloco da prévia vem antes do botão no mesmo documento —, e é
+    /// isso que se verifica: a posição de um no HTML contra a do outro. Um botão "gerar direto"
+    /// acima da prévia, ou numa página só dele, passaria em qualquer teste de presença e anularia
+    /// a proteção que justifica a ADR-014.
+    /// </summary>
+    [Fact]
+    public async Task CA_16_a_previa_precede_a_geracao_na_pagina()
+    {
+        using var client = await SignedInClientAsync();
+        var catalogId = await SeedCatalogAsync();
+
+        var html = await client.GetStringAsync($"/painel/catalogos/{catalogId}");
+
+        var previa = html.IndexOf("Prévia do que vai sair", StringComparison.Ordinal);
+        var gerar = html.IndexOf("Gerar o PDF", StringComparison.Ordinal);
+
+        Assert.True(previa >= 0, "A prévia não está na tela.");
+        Assert.True(gerar >= 0, "A ação de gerar não está na tela.");
+        Assert.True(previa < gerar, "A ação de gerar aparece antes da prévia.");
+    }
+
+    /// <summary>
+    /// A prévia mostra o que a RN-31 exige: a lista resolvida, a contagem e a estimativa de
+    /// páginas. Faltar a contagem deixaria o dono confirmando um conteúdo que ele não mediu.
+    /// </summary>
+    [Fact]
+    public async Task CA_16_a_previa_mostra_contagem_e_estimativa_de_paginas()
+    {
+        using var client = await SignedInClientAsync();
+        var catalogId = await SeedCatalogAsync(products: 4);
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/painel/catalogos/{catalogId}"));
+
+        Assert.Contains("4 produtos", html);
+        Assert.Contains("página", html);
+        Assert.Contains("Produto 0", html);
+    }
+
+    /// <summary>
+    /// UI-08.previaVazia: critério que não resolve nenhum produto No ar impede a geração **com a
+    /// razão** (RN-46). "Nada aqui" sem motivo faz o dono achar que o catálogo quebrou, quando o
+    /// acervo é que está em Rascunho.
+    /// </summary>
+    [Fact]
+    public async Task UI_08_previa_vazia_explica_a_razao_e_nao_oferece_geracao()
+    {
+        using var client = await SignedInClientAsync();
+        var catalogId = await SeedCatalogAsync(products: 3, published: false);
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync($"/painel/catalogos/{catalogId}"));
+
+        Assert.Contains("""data-estado="previaVazia" """.TrimEnd(), html);
+        Assert.Contains("Rascunho", html);
+    }
+
+    private async Task<int> SeedCatalogAsync(int products = 2, bool published = true)
+    {
+        await using var context = postgres.CreateContext();
+
+        var category = new Category { Name = $"Categoria {Guid.NewGuid():N}", Position = 1 };
+        context.Categories.Add(category);
+        await context.SaveChangesAsync();
+
+        for (var index = 0; index < products; index++)
+        {
+            context.Products.Add(new Product
+            {
+                Name = $"Produto {index}",
+                Summary = "Resumo do produto",
+                Price = 99.90m,
+                CategoryId = category.Id,
+                Position = index + 1,
+                Status = published ? ProductStatus.Published : ProductStatus.Draft,
+                PublishedAt = published ? DateTimeOffset.UtcNow : null
+            });
+        }
+
+        await context.SaveChangesAsync();
+
+        var catalog = new Catalog
+        {
+            Name = $"Catálogo {Guid.NewGuid():N}",
+            Categories = [new CatalogCategory { CategoryId = category.Id }]
+        };
+
+        context.Catalogs.Add(catalog);
+        await context.SaveChangesAsync();
+
+        return catalog.Id;
+    }
+
+    private async Task<HttpClient> SignedInClientAsync()
+    {
+        var client = factory.CreateDefaultClient(new Uri("https://localhost"), new CookieHandler());
+
+        var page = await client.GetStringAsync(PanelAuthentication.LoginPath);
+        var token = Regex.Match(
+            page,
+            """name="__RequestVerificationToken"[^>]*value="([^"]+)""").Groups[1].Value;
+
+        using var response = await client.PostAsync(
+            PanelAuthentication.LoginPath,
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["_handler"] = "acesso",
+                ["Input.UserName"] = OwnerUserName,
+                ["Input.Password"] = OwnerPassword,
+                ["__RequestVerificationToken"] = token
+            }));
+
+        response.EnsureSuccessStatusCode();
+
+        return client;
+    }
+}

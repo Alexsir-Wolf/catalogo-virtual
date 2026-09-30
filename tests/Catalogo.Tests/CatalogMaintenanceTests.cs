@@ -303,7 +303,7 @@ public sealed class CatalogMaintenanceTests(PostgresFixture postgres)
     }
 
     private CatalogMaintenance CreateMaintenance() =>
-        new(new ContextFactory(postgres.ConnectionString));
+        new(new ContextFactory(postgres.ConnectionString), TimeProvider.System);
 
     private sealed class ContextFactory(string connectionString) : IDbContextFactory<CatalogDbContext>
     {

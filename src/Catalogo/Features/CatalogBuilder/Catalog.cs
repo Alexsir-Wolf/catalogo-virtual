@@ -46,4 +46,18 @@ public class CatalogCategory
     public int CategoryId { get; set; }
 
     public Category Category { get; set; } = null!;
+
+    /// <summary>
+    /// Quando esta categoria entrou no critério.
+    ///
+    /// Existe por causa da RN-32, que fala de produtos que passaram a **integrar o catálogo**
+    /// desde a última geração — e isso não é a mesma coisa que produtos publicados desde então.
+    /// Acrescentar uma categoria a um critério traz para dentro do catálogo todos os produtos
+    /// dela, publicados meses antes: sem esta data, nenhum seria destacado, e o dono descobriria
+    /// no cliente que o catálogo cresceu. É exatamente o risco que a RN-32 existe para mitigar.
+    ///
+    /// **Continua sendo critério, não lista de produtos** — a ADR-014 fica intacta: o que se
+    /// data é a escolha do dono, não o resultado dela.
+    /// </summary>
+    public DateTimeOffset AddedAt { get; set; }
 }

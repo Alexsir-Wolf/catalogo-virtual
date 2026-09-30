@@ -113,11 +113,16 @@ public sealed class StorefrontCacheTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
-    /// CA-15: alterar o preço de um produto publicado reflete na vitrine **na requisição
-    /// seguinte** — não em cinco minutos, não depois de reiniciar.
+    /// Alterar o preço de um produto publicado reflete na vitrine **na requisição seguinte** — não
+    /// em cinco minutos, não depois de reiniciar.
+    ///
+    /// **Não é o CA-15.** O CA-15 do PRD é sobre o preço novo sair na **geração seguinte do PDF**,
+    /// e está coberto em `CatalogGenerationTests`. Este caso é o critério de vitrine de T-21, que
+    /// não tem CA próprio — etiquetá-lo como CA-15 fechava um elo de rastreabilidade sobre um
+    /// cenário que ninguém verificava.
     /// </summary>
     [Fact]
-    public async Task CA_15_alterar_preco_reflete_na_vitrine_na_requisicao_seguinte()
+    public async Task Alterar_preco_reflete_na_vitrine_na_requisicao_seguinte()
     {
         var productId = await SeedPublishedAsync(price: 100m);
         using var client = factory.CreateClient();

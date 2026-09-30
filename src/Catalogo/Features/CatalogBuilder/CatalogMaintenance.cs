@@ -59,7 +59,9 @@ public sealed record CatalogSummary(
 /// abas abertas ao mesmo tempo contornariam a verificação em memória, e o índice não. É a
 /// mesma decisão da RN-23 nas categorias.
 /// </summary>
-public sealed class CatalogMaintenance(IDbContextFactory<CatalogDbContext> contextFactory)
+public sealed class CatalogMaintenance(
+    IDbContextFactory<CatalogDbContext> contextFactory,
+    TimeProvider time)
 {
     /// <summary>
     /// Os catálogos com a contagem de produtos **No ar** que cada critério resolve agora.
@@ -142,9 +144,21 @@ public sealed class CatalogMaintenance(IDbContextFactory<CatalogDbContext> conte
 
         // O critério é substituído, não mesclado: a tela entrega a seleção inteira, e
         // acumular as anteriores faria o catálogo crescer sozinho a cada salvamento.
+        //
+        // **A data de entrada de quem já estava é preservada.** Regravar tudo com a hora de agora
+        // apagaria a informação que a RN-32 usa: uma categoria que está no critério desde março
+        // não passou a integrar o catálogo neste salvamento, e destacar os produtos dela seria
+        // alarme falso.
+        var agora = time.GetUtcNow();
+        var entradaAnterior = catalog.Categories
+            .ToDictionary(link => link.CategoryId, link => link.AddedAt);
+
         catalog.Categories.Clear();
-        catalog.Categories.AddRange(
-            categoryIds.Select(categoryId => new CatalogCategory { CategoryId = categoryId }));
+        catalog.Categories.AddRange(categoryIds.Select(categoryId => new CatalogCategory
+        {
+            CategoryId = categoryId,
+            AddedAt = entradaAnterior.TryGetValue(categoryId, out var quando) ? quando : agora
+        }));
 
         if (draft.Id is null)
         {
@@ -156,8 +170,16 @@ public sealed class CatalogMaintenance(IDbContextFactory<CatalogDbContext> conte
             await context.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException exception)
-            when (exception.InnerException is PostgresException { SqlState: UniqueViolation })
+            when (exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: NameIndex
+            })
         {
+            // Qualificado **pela restrição**, e não por qualquer violação de unicidade: sem isso,
+            // um conflito na chave da tabela de junção — possível com duas abas salvando o mesmo
+            // catálogo — viraria a mensagem "já existe um catálogo com este nome", que manda o
+            // dono procurar um problema de nome que não existe.
             return new CatalogOutcome(CatalogFailure.NameAlreadyInUse);
         }
 
@@ -201,5 +223,6 @@ public sealed class CatalogMaintenance(IDbContextFactory<CatalogDbContext> conte
                 cancellationToken);
     }
 
-    private const string UniqueViolation = "23505";
+    /// <summary>O índice que garante a RN-27. O nome vem da convenção do EF para `HasIndex`.</summary>
+    private const string NameIndex = "IX_Catalogs_Name";
 }

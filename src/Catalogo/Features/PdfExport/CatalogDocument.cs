@@ -58,7 +58,25 @@ public sealed class CatalogDocument(
     private const int ColumnCount = 3;
     private const float PageMarginMillimetres = 14f;
     private const float CellSpacing = 8f;
-    private const float PhotoHeight = 90f;
+    /// <summary>
+    /// Altura da caixa da foto, em pontos — **145 pt é 51,2 mm**, que é a largura medida no
+    /// gabarito por T-04.
+    ///
+    /// O spike de T-03 havia assumido 90 pt (31,75 mm) e disse isso em voz alta nas próprias
+    /// medições: "a altura de 90 pt é escolha deste spike, não medida do gabarito". T-04 mediu e
+    /// registrou que a foto do cliente tem **51,3 mm** — caixa 62% maior. A primeira versão desta
+    /// composição copiou os 90 pt do spike, o que contrariava a medição do próprio projeto.
+    /// </summary>
+    private const float PhotoHeight = 145f;
+
+    /// <summary>
+    /// Corpo do nome do produto, medido no gabarito por T-04. É o número que sustenta o limite de
+    /// 120 caracteres do resumo (RN-03): a 11,2 pt cabem ~34 caracteres por linha na coluna de
+    /// ~51 mm, e quatro linhas comportam ~136 para nome e resumo somados.
+    /// </summary>
+    private const float NameFontSize = 11.2f;
+
+    private const float SummaryFontSize = 9.5f;
 
     private static readonly CultureInfo Brazil = CultureInfo.GetCultureInfo("pt-BR");
 
@@ -134,7 +152,12 @@ public sealed class CatalogDocument(
             // borrada, e o erro só aparece no papel.
             if (product.PrintFileName is { } name && printImage(name) is { } image)
             {
-                cell.Item().Height(PhotoHeight).AlignCenter().Image(image).FitArea();
+                // `UseOriginalImage` porque a derivada de impressão **já é** a imagem certa: 800 px
+                // no lado maior, medidos em T-04 para dar 396 DPI na caixa do gabarito. Sem isso o
+                // QuestPDF reduz para o DPI alvo padrão (288) e reencoda em qualidade 75 — jogando
+                // fora o trabalho de T-08 e entregando no papel menos do que a ADR-005 decidiu.
+                cell.Item().Height(PhotoHeight).AlignCenter()
+                    .Image(image).FitArea().UseOriginalImage();
             }
             else
             {
@@ -143,14 +166,16 @@ public sealed class CatalogDocument(
                 cell.Item().Height(PhotoHeight);
             }
 
-            cell.Item().PaddingTop(5).Text(product.Name).FontSize(8.5f).Bold();
+            // 11,2 pt é o corpo do texto de produto medido no gabarito por T-04 — o spike usava
+            // 8,5 pt, e é dessa diferença que vem o limite de 120 caracteres do resumo (RN-03).
+            cell.Item().PaddingTop(5).Text(product.Name).FontSize(NameFontSize).Bold();
 
             // CA-04: sem resumo, a célula mostra **apenas nome e preço** — nada é herdado da
             // descrição, que por decisão da ADR-016 não entra no documento.
             if (!string.IsNullOrWhiteSpace(product.Summary))
             {
                 cell.Item().PaddingTop(1).Text(product.Summary)
-                    .FontSize(7.5f).FontColor(Colors.Grey.Darken2);
+                    .FontSize(SummaryFontSize).FontColor(Colors.Grey.Darken2);
             }
 
             cell.Item().PaddingTop(4).Text(text =>

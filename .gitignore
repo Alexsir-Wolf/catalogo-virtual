@@ -33,3 +33,6 @@ desktop.ini
 spike/saida/fotos/
 spike/saida/impressao/
 spike/saida/paginas/
+
+# Visual Studio
+.vs/
