@@ -148,6 +148,10 @@ else
 
 
 @code {
+    // Os nomes dos parâmetros de navegação são constantes porque não são só desta página:
+    // `StorefrontCache.NavigationQueryKeys` os referencia para compor a chave do cache de saída.
+    // Parâmetro novo aqui é parâmetro novo lá — `StorefrontNavigationKeysTests` confronta os dois
+    // conjuntos e falha na adição que esquecer o outro lado.
     public const string TermParameter = "busca";
     public const string CategoryParameter = "categoria";
     public const string PageParameter = "pagina";

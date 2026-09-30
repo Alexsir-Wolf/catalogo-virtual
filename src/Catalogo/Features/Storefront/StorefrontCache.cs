@@ -31,8 +31,24 @@ public static class StorefrontCache
     /// memória do cache, algumas milhares de variantes despejam justamente a entrada quente da raiz,
     /// que é o alvo da meta de tempo de resposta. Listar as três também torna a linha significativa:
     /// removê-la passa a mudar comportamento, o que antes não acontecia.
+    ///
+    /// Os nomes vêm das constantes da própria vitrine, e não repetidos como literais: enquanto eram
+    /// dois textos independentes, renomear um parâmetro deixava a chave do cache apontando para um
+    /// nome que ninguém mais envia — duas URLs distintas passariam a dividir a mesma entrada, e o
+    /// visitante receberia a página do anterior sem nada quebrar e sem nada no log. A dependência
+    /// aponta para quem define o contrato da URL, que é a página.
+    ///
+    /// Referenciar resolve o rename, mas não resolve a **adição**: um quarto parâmetro de navegação
+    /// — a ordenação que a ADR-008 já prevê — nasceria fora desta lista do mesmo jeito. Por isso o
+    /// conjunto é confrontado com os `[SupplyParameterFromQuery]` da vitrine em
+    /// `StorefrontNavigationKeysTests`, que falha no dia da adição dizendo qual parâmetro faltou.
     /// </summary>
-    public static readonly string[] NavigationQueryKeys = ["busca", "categoria", "pagina"];
+    public static readonly string[] NavigationQueryKeys =
+    [
+        Storefront.TermParameter,
+        Storefront.CategoryParameter,
+        Storefront.PageParameter
+    ];
 
     /// <summary>
     /// A tag única da vitrine. Toda escrita no painel invalida esta tag — produto, categoria,

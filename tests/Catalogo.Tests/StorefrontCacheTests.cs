@@ -92,11 +92,19 @@ public sealed class StorefrontCacheTests : IAsyncLifetime, IDisposable
     /// <summary>
     /// A resposta servida **do cache** não carrega `Set-Cookie`.
     ///
-    /// A remoção acontece em `Response.OnStarting`, e a pergunta que este caso responde é se isso
-    /// acontece antes ou depois de o cache tirar o retrato dos cabeçalhos. Se for depois, a entrada
-    /// guardada conserva o cookie de antiforgery do **primeiro** visitante e o replica em todo
-    /// acerto — um cookie por visitante, compartilhado por todos, dentro de conteúdo cacheado, que
-    /// é exatamente o que a ADR-008 exclui.
+    /// A pergunta que este caso responde é de ordem: a remoção do cabeçalho acontece **antes ou
+    /// depois** de o cache tirar o retrato dos cabeçalhos? Se for depois, a entrada guardada conserva
+    /// o cookie de antiforgery do **primeiro** visitante e o replica em todo acerto — um cookie por
+    /// visitante, compartilhado por todos, dentro de conteúdo cacheado, que é exatamente o que a
+    /// ADR-008 exclui.
+    ///
+    /// Por isso a remoção vive no `CookieStrippingStream`, no primeiro byte escrito, e **não** em
+    /// `Response.OnStarting`: os `OnStarting` do Kestrel rodam depois do retrato, e a tentativa por
+    /// ali foi medida e descartada — servia resposta limpa e guardava entrada suja, que é o pior dos
+    /// dois mundos porque a primeira requisição parecia correta. `UseStorefrontCacheableResponses`
+    /// registra o detalhe.
+    ///
+    /// A segunda resposta é a que interessa: é ela que vem do cache e denuncia o que ficou guardado.
     /// </summary>
     [Fact]
     public async Task A_resposta_servida_do_cache_nao_carrega_cookie()
