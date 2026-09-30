@@ -1,0 +1,125 @@
+@inherits LayoutComponentBase
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+
+@*
+    Cromo do painel: rail lateral com marca, navegação agrupada e o bloco do dono no pé —
+    extraído de `docs/prototype/prototipos/painel.html`, onde esse desenho já existia e não
+    tinha sido trazido para o código: até aqui o painel era uma lista de links solta.
+
+    Sem `@@rendermode`: o layout não reintroduz circuito, e cada página decide o próprio modo
+    (ADR-010). A tela de acesso **não** usa este layout — ela é a única rota anônima do painel e
+    tem cromo próprio.
+
+    A identidade vem do estado de autenticação em cascata, que desde T-31 é revalidado pelo selo
+    de segurança: se a sessão cai, o rail deixa de exibir o dono junto com o resto.
+*@
+
+<div class="app">
+    <aside class="rail">
+        <a class="brand" href="/painel">
+            <span class="brand__mark">CT</span>
+            <span>
+                <span class="brand__name">Painel do Catálogo</span>
+                <span class="brand__sub">Suprimentos &amp; Informática</span>
+            </span>
+        </a>
+
+        <nav class="nav" aria-label="Seções do painel">
+            <div class="nav__label">Acervo</div>
+
+            @* `aria-current` marca a seção corrente, e o critério é o **prefixo** da rota: a
+               edição de um produto continua sendo a seção Produtos. *@
+            <a href="/painel/produtos" aria-current="@CurrentFor("/painel/produtos")">Produtos</a>
+            <a href="/painel/produtos/novo" aria-current="@ExactFor("/painel/produtos/novo")">Novo produto</a>
+            <a href="/painel/categorias" aria-current="@CurrentFor("/painel/categorias")">Categorias</a>
+
+            <div class="nav__label nav__label--espaco">Publicação</div>
+
+            <a href="/painel/catalogos" aria-current="@CurrentFor("/painel/catalogos")">Catálogos em PDF</a>
+
+            <div class="nav__label nav__label--espaco">Portal</div>
+
+            <a href="/painel/configuracoes" aria-current="@CurrentFor("/painel/configuracoes")">Configurações</a>
+            <a href="/" target="_blank" rel="noopener">Ver a vitrine ↗</a>
+        </nav>
+
+        <div class="rail__foot">
+            <div class="who">
+                <span class="who__av">@Initials</span>
+                <span>
+                    <span class="who__n">@UserName</span>
+                    <span class="who__r">Dono do catálogo</span>
+                </span>
+            </div>
+
+            @* A saída fica no pé do rail, longe das ações de acervo: é o lugar onde se procura,
+               e não algo que se clique por acidente ao navegar. *@
+            <a class="btn btn--fantasma btn--pequeno" href="/painel/sair">Sair</a>
+        </div>
+    </aside>
+
+    <main class="main">
+        @Body
+    </main>
+</div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? Authentication { get; set; }
+
+    private string? userName;
+
+    /// <summary>
+    /// O nome de quem está logado. Há um usuário só (ADR-006), então isto é identificação e não
+    /// autorização — serve para o dono ver em qual conta está antes de trocar a senha.
+    /// </summary>
+    private string UserName => userName ?? "Dono";
+
+    private string Initials
+    {
+        get
+        {
+            var name = UserName.Trim();
+
+            if (name.Length == 0)
+            {
+                return "??";
+            }
+
+            var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            return parts.Length > 1
+                ? $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[^1][0])}"
+                : name[..Math.Min(2, name.Length)].ToUpperInvariant();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Authentication is not null)
+        {
+            userName = (await Authentication).User.FindFirst(ClaimTypes.Name)?.Value;
+        }
+    }
+
+    /// <summary>
+    /// Marca a seção quando a rota corrente **começa** com o caminho do item: a tela de edição de
+    /// produto pertence à seção Produtos, e destacar só a listagem deixaria o dono sem saber onde
+    /// está.
+    /// </summary>
+    private string? CurrentFor(string path) =>
+        Path.StartsWith(path, StringComparison.OrdinalIgnoreCase) ? "page" : null;
+
+    /// <summary>
+    /// Marca só na rota exata. Existe para "Novo produto", que é um caminho **dentro** de
+    /// `/painel/produtos` — pelo critério de prefixo, os dois itens acenderiam juntos.
+    /// </summary>
+    private string? ExactFor(string path) =>
+        Path.Equals(path, StringComparison.OrdinalIgnoreCase) ? "page" : null;
+
+    private string Path => new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/') is { Length: > 0 } trimmed
+        ? trimmed
+        : "/";
+}

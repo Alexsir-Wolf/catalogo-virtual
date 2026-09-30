@@ -1,16 +1,152 @@
 @page "/painel"
+@layout PanelLayout
+@rendermode InteractiveServer
+@using Catalogo.Features.CatalogBuilder
+@using Catalogo.Features.Categories
+@using Catalogo.Features.Products
+@using Catalogo.Features.Settings
+@inject CategoryMaintenance Categories
+@inject ProductListing Products
+@inject CatalogMaintenance Catalogs
+@inject PortalSettingsService Settings
+
+@*
+    Tela inicial do painel. Era uma lista de links solta; passou a mostrar **o estado do acervo**,
+    porque é a primeira coisa que o dono quer saber ao entrar — e porque a pendência que importa
+    (capa ausente bloqueando a geração) ficava invisível até ele tentar gerar um PDF.
+
+    A navegação em si vive no rail do `PanelLayout`. Os atalhos aqui são para as ações, não para
+    as seções: duplicar o menu no corpo da página só cria dois lugares para manter.
+*@
 
 <PageTitle>Painel</PageTitle>
 
-<h1>Painel</h1>
+<div class="painel">
+    <h1>Painel</h1>
+    <div class="painel__sub">
+        Manutenção do acervo que alimenta a vitrine e os catálogos em PDF.
+    </div>
 
-<p>Manutenção do acervo que alimenta a vitrine e os catálogos em PDF.</p>
+    <div class="painel__folha">
+        @if (carregando)
+        {
+            <p>Carregando…</p>
+        }
+        else
+        {
+            @* RN-65: sem capa a geração está bloqueada, e a UI-10 é a única pista disso no
+               sistema. Aqui o aviso aparece **antes** de o dono tentar gerar, porque descobrir a
+               pendência na hora de enviar o catálogo ao cliente é tarde. *@
+            @if (!temCapa)
+            {
+                <div class="painel-bloco">
+                    <div class="painel-bloco__bd">
+                        <p class="campo__erro" role="alert" data-estado="semCapa">
+                            <b>A geração de catálogos em PDF está bloqueada:</b> nenhuma capa foi
+                            enviada.<br />
+                            <span class="campo__ajuda">
+                                O documento é a capa que você envia mais as páginas de produtos
+                                compostas pelo sistema.
+                            </span>
+                        </p>
 
-<ul>
-    <li><a href="/painel/categorias">Categorias</a> — pré-requisito de qualquer produto</li>
-    <li><a href="/painel/produtos">Produtos</a> — o acervo, a situação de cada item e a ordem impressa</li>
-    <li><a href="/painel/catalogos">Catálogos</a> — os recortes salvos que viram PDF</li>
-    <li><a href="/painel/configuracoes">Configurações</a> — capa do PDF, contato e senha</li>
-    <li><a href="/painel/produtos/novo">Novo produto</a> — cadastro do acervo</li>
-    <li><a href="/painel/sair">Sair</a> — encerra a sessão neste navegador</li>
-</ul>
+                        <a class="btn btn--primario" href="/painel/configuracoes">
+                            Enviar a capa
+                        </a>
+                    </div>
+                </div>
+            }
+
+            <div class="painel-bloco">
+                <div class="painel-bloco__hd">
+                    <h2>Acervo agora</h2>
+                    <span class="selo @(produtosNoAr > 0 ? "selo--no-ar" : "selo--rascunho")">
+                        @produtosNoAr no ar
+                    </span>
+                </div>
+
+                <div class="painel-bloco__bd">
+                    <div class="atalhos">
+                        <a class="atalho" href="/painel/produtos">
+                            <span class="atalho__t">@totalDeProdutos @(totalDeProdutos == 1 ? "produto" : "produtos")</span>
+                            <span class="atalho__d">
+                                @produtosNoAr no ar, @rascunhos em rascunho. A ordem aqui é a ordem
+                                no PDF e na vitrine.
+                            </span>
+                        </a>
+
+                        <a class="atalho" href="/painel/categorias">
+                            <span class="atalho__t">@totalDeCategorias @(totalDeCategorias == 1 ? "categoria" : "categorias")</span>
+                            <span class="atalho__d">
+                                Pré-requisito de qualquer produto — todo produto pertence a
+                                exatamente uma.
+                            </span>
+                        </a>
+
+                        <a class="atalho" href="/painel/catalogos">
+                            <span class="atalho__t">@totalDeCatalogos @(totalDeCatalogos == 1 ? "catálogo" : "catálogos")</span>
+                            <span class="atalho__d">
+                                @(nuncaGerados == 0
+                                    ? "Todos já foram gerados ao menos uma vez."
+                                    : $"{nuncaGerados} nunca {(nuncaGerados == 1 ? "gerado" : "gerados")}.")
+                                Cada um é um critério salvo, não uma lista fechada.
+                            </span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="painel-bloco__ft">
+                    <a class="btn btn--primario" href="/painel/produtos/novo">Novo produto</a>
+                    <a class="btn" href="/painel/catalogos/novo">Novo catálogo</a>
+                    <a class="btn btn--fantasma" href="/" target="_blank" rel="noopener">
+                        Ver a vitrine ↗
+                    </a>
+                </div>
+            </div>
+
+            @if (rascunhos > 0)
+            {
+                <p class="campo__ajuda">
+                    Produto em rascunho não aparece na vitrine nem sai no PDF (RN-15). São
+                    @rascunhos agora — confira a situação deles em
+                    <a href="/painel/produtos">Produtos</a> se esperava vê-los publicados.
+                </p>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private bool carregando = true;
+
+    private int totalDeProdutos;
+    private int produtosNoAr;
+    private int totalDeCategorias;
+    private int totalDeCatalogos;
+    private int nuncaGerados;
+    private bool temCapa;
+
+    private int rascunhos => totalDeProdutos - produtosNoAr;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var categorias = await Categories.ListAsync();
+        var catalogos = await Catalogs.ListAsync();
+        var configuracao = await Settings.LoadAsync();
+
+        // A contagem vem da **mesma** consulta que a listagem do painel usa: um número próprio
+        // aqui poderia divergir do que a tela de Produtos mostra, e duas contagens diferentes
+        // para a mesma coisa é pior que nenhuma.
+        var grupos = await Products.ListAsync(ProductSituationFilter.All);
+        var itens = grupos.SelectMany(grupo => grupo.Products).ToList();
+
+        totalDeProdutos = itens.Count;
+        produtosNoAr = itens.Count(product => product.Status == ProductStatus.Published);
+        totalDeCategorias = categorias.Count;
+        totalDeCatalogos = catalogos.Count;
+        nuncaGerados = catalogos.Count(catalog => !catalog.WasGenerated);
+        temCapa = configuracao.HasCover;
+
+        carregando = false;
+    }
+}

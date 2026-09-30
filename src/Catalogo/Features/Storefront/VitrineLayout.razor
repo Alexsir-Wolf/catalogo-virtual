@@ -20,6 +20,15 @@
             <div class="util__in">
                 <span class="util__pill">Catálogo</span>
                 <span>Atendimento Seg–Sex 08h–18h</span>
+
+                @* Acesso ao painel. Discreto e à direita porque a vitrine é para o visitante — o
+                   dono é uma pessoa só (ADR-006) e entra poucas vezes por semana. Sem isso ele
+                   precisa decorar a URL, que é o tipo de atrito que não se justifica.
+
+                   É link estático: não varia por pessoa e não quebra a premissa do cache
+                   (ADR-008). Quem não está autenticado cai na tela de acesso pelo gate do
+                   painel (RN-58). *@
+                <a class="util__acesso" href="/painel">Painel do dono</a>
             </div>
         </div>
 

@@ -725,3 +725,17 @@
         padding: 0 16px 30px;
     }
 }
+
+/* Acesso ao painel na faixa utilitária. Discreto: a vitrine é do visitante, e o dono entra
+   poucas vezes por semana (ADR-006). */
+.util__acesso {
+    margin-left: auto;
+    color: rgba(255, 255, 255, .78);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255, 255, 255, .28);
+}
+
+.util__acesso:hover {
+    color: #fff;
+    border-bottom-color: #fff;
+}
