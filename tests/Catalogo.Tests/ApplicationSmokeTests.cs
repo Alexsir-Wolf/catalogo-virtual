@@ -33,6 +33,47 @@ public sealed class ApplicationSmokeTests(PostgresFixture postgres) : IDisposabl
     }
 
     /// <summary>
+    /// T-28: o endpoint de saúde responde e verifica **banco e armazenamento**. Verificar só o
+    /// banco daria `healthy` com a vitrine sem imagens — o pior tipo de monitoramento, o que
+    /// tranquiliza sem motivo.
+    /// </summary>
+    [Fact]
+    public async Task O_endpoint_de_saude_verifica_banco_e_armazenamento()
+    {
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/health");
+        var body = await response.Content.ReadAsStringAsync();
+
+        response.EnsureSuccessStatusCode();
+
+        Assert.Contains("\"status\":\"healthy\"", body);
+        Assert.Contains("\"database\":", body);
+
+        // Sem credencial do Supabase o armazenamento reporta `not configured` e **não** derruba
+        // a saúde: é o estado de um ambiente de teste, e chamar isso de degradado treinaria quem
+        // monitora a ignorar o sinal.
+        Assert.Contains("\"storage\":", body);
+    }
+
+    /// <summary>
+    /// O endpoint de saúde é **público** — quem monitora não tem credencial do painel. Em
+    /// contrapartida, a resposta não pode carregar segredo: o que ela traz é a versão do banco e
+    /// um rótulo de estado, nunca host, usuário ou chave.
+    /// </summary>
+    [Fact]
+    public async Task O_endpoint_de_saude_nao_expoe_credencial_nem_host()
+    {
+        using var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/health");
+
+        Assert.DoesNotContain("Password", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ServiceKey", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("supabase.co", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Marcador que o Blazor emite no HTML quando um componente é entregue em modo
     /// interativo de servidor — é o que faz o cliente abrir o circuito persistente.
     /// O painel, que é o lado interativo da ADR-010, é verificado em

@@ -1067,7 +1067,7 @@ Estende a verificação de T-11: além de produtos, a categoria também fica ret
 
 #### T-27 — Backup e restauração
 
-- **Status:** Pendente
+- **Status:** Bloqueado
 - **Complexidade:** Média
 - **Depende de:** T-21, T-25
 - **Implementa:** —
@@ -1083,12 +1083,12 @@ Com a mudança para plataformas gerenciadas *(ADR-018)* **não existe mais servi
 Mais o procedimento escrito de restauração — e a execução dele, de verdade, em ambiente limpo. E o procedimento de redefinição da senha única, já que não há recuperação pelo sistema *(RN-59)*.
 
 **Critério de aceite (testável):**
-- [ ] Rotina agendada **fora do Render e do Supabase**, executando o dump do banco
-- [ ] Cópia gravada em terceiro lugar, independente das duas plataformas
-- [ ] Os arquivos do armazenamento de objeto também são copiados
+- [ ] Rotina agendada **fora do Render e do Supabase**, executando o dump do banco — *script pronto; o agendamento não foi configurado*
+- [ ] Cópia gravada em terceiro lugar, independente das duas plataformas — *`BACKUP_DESTINO` é parâmetro; apontar para fora é passo manual não executado*
+- [x] Os arquivos do armazenamento de objeto também são copiados *(os dois buckets, paginados)*
 - [ ] **Restauração executada em ambiente limpo, com o sistema funcionando ao final**
-- [ ] Procedimento de restauração escrito e verificado
-- [ ] Procedimento de redefinição da senha escrito e testado
+- [x] Procedimento de restauração escrito — ⚠️ *verificado não: a seção 5 de `RESTORE.md` está em branco de propósito*
+- [x] Procedimento de redefinição da senha escrito — ⚠️ *testado não*
 
 **Testes a escrever:** *Não aplicável* — validação por execução do procedimento.
 
@@ -1101,7 +1101,7 @@ Mais o procedimento escrito de restauração — e a execução dele, de verdade
 
 #### T-28 — Log estruturado e endpoint de saúde
 
-- **Status:** Pendente
+- **Status:** Concluído
 - **Complexidade:** Baixa
 - **Depende de:** T-27
 - **Implementa:** —
@@ -1113,10 +1113,10 @@ Mais o procedimento escrito de restauração — e a execução dele, de verdade
 Log estruturado nos pontos que importam — autenticação, publicação, upload, geração de PDF, invalidação de cache — e um endpoint de saúde que verifique banco e volume. É o mínimo previsto na arquitetura, que assume observabilidade enxuta.
 
 **Critério de aceite (testável):**
-- [ ] Endpoint de saúde responde e verifica banco e acesso ao volume
-- [ ] Autenticação, publicação, upload e geração produzem log
-- [ ] Log não contém senha, credencial nem conteúdo de arquivo
-- [ ] Erro não tratado é registrado com contexto suficiente para diagnóstico
+- [x] Endpoint de saúde responde e verifica banco e acesso ao volume *(volume = armazenamento de objeto, por ADR-018)*
+- [x] Autenticação, publicação, upload e geração produzem log
+- [x] Log não contém senha, credencial nem conteúdo de arquivo
+- [x] Erro não tratado é registrado com contexto suficiente para diagnóstico
 
 **Testes a escrever:**
 - *Integration:* endpoint de saúde responde com sucesso quando banco e volume estão acessíveis

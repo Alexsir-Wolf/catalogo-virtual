@@ -131,12 +131,20 @@ app.MapGet("/health", async (
         await using var command = new NpgsqlCommand("select 1", connection);
         var result = await command.ExecuteScalarAsync(cancellationToken);
 
-        return Results.Ok(new
-        {
-            status = "healthy",
-            database = connection.PostgreSqlVersion.ToString(),
-            query = result
-        });
+        // O armazenamento de objeto é a segunda dependência externa (ADR-018), e uma falha nele
+        // é invisível no banco: as páginas respondem e as imagens não abrem. Verificar só o
+        // banco daria "healthy" com a vitrine quebrada.
+        var storage = await StorageHealth.CheckAsync(app.Services, cancellationToken);
+
+        return Results.Json(
+            new
+            {
+                status = storage.Healthy ? "healthy" : "degraded",
+                database = connection.PostgreSqlVersion.ToString(),
+                query = result,
+                storage = storage.Detail
+            },
+            statusCode: storage.Healthy ? 200 : 503);
     }
     catch (Exception exception)
     {
