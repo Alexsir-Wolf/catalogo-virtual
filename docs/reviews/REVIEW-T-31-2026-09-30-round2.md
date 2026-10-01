@@ -31,7 +31,7 @@ Os dois bloqueantes têm em comum uma coisa que vale registrar porque é a liç�
 | Severidade | Quantidade |
 |------------|------------|
 | Bloqueante | 2 |
-| Importante | 9 |
+| Importante | 10 |
 | Sugestão | 11 |
 
 ---
@@ -77,11 +77,11 @@ O que isso permite e o que não permite: as regras de validação de capa, de co
 
 | Eixo | Esperado | Encontrado | Situação |
 |---|---|---|---|
-| 1. Aderência ao plano | Três blocos (capa, contato, senha), dez critérios de aceite | Todos os dez materializados; um com divergência não registrada | ⚠️ ver R-09 |
-| 2. Rastreabilidade | RN-61 a RN-68, CA-34/35/38/39, ADR-017 e ADR-006 | Todos os IDs existem na origem; nenhum fantasma. Faltam RN-60 e `contatoRecusado` na declaração da tarefa | ⚠️ ver R-11, R-20 |
+| 1. Aderência ao plano | Três blocos (capa, contato, senha), dez critérios de aceite | Todos os dez materializados; um com divergência não registrada, e a troca obrigatória da ADR-006 declarada e inexistente | ⚠️ ver R-09, R-11 |
+| 2. Rastreabilidade | RN-61 a RN-68, CA-34/35/38/39, ADR-017 e ADR-006 | Todos os IDs existem na origem; nenhum fantasma. Faltam RN-60 e `contatoRecusado` na declaração da tarefa | ⚠️ ver R-12, R-21 |
 | 3. Aderência ao spec | Validar lendo a estrutura do arquivo (risco declarado) | Lê a estrutura, e o guarda que a protege é contornável | ⛔ ver R-01 |
 | 4. Cobertura de teste | 5 testes de integração prometidos | 23 entregues, e os dois elos que mais importam sem caso: o contorno da varredura e o provider revalidante | ⛔ ver R-01, R-02 |
-| 5. Qualidade do código | Padrão do projeto (T-13 como referência no mesmo tipo de upload) | Constantes nomeadas, razões declaradas, ordem valida→sobe→grava preservada; orquestração do upload ainda no `.razor` | ⚠️ ver R-13 |
+| 5. Qualidade do código | Padrão do projeto (T-13 como referência no mesmo tipo de upload) | Constantes nomeadas, razões declaradas, ordem valida→sobe→grava preservada; orquestração do upload ainda no `.razor` | ⚠️ ver R-14 |
 | 6. Conformidade de interface | UI-10 com 7 estados | Os 7 existem no código; 1 com asserção | ⚠️ ver R-06 do round 1 |
 
 ---
@@ -218,7 +218,16 @@ O que isso permite e o que não permite: as regras de validação de capa, de co
 - **Por quê é Importante:** é a mesma falha de elo que o R-05 do round 1 corrigiu do outro lado — critério declarado fechado sem verificação do caminho que importa.
 - **Sugestão de correção:** um caso que grava contato por `SaveContactAsync` e afirma o valor no documento composto; se extrair texto do PDF for caro, afirmar ao menos que o composer entrega ao `DocumentFooter` o que leu das configurações.
 
-#### R-11 — `Telas:` de T-31 lista seis estados; a SPEC-UI declara sete
+#### R-11 — `MustChangePassword` é escrito em dois lugares e lido em nenhum: a troca obrigatória da ADR-006 não existe, e três textos afirmam que existe
+
+- **Eixo:** 1. Aderência ao plano / 2. Rastreabilidade
+- **Referência cruzada:** ADR-006, declarada **Decisão base** de T-31 e marcada "Respeitada" no round 1 e no histórico do plano (linha 1387)
+- **Evidência:** `OwnerAccount.cs:15` (declaração), `OwnerAccountSeeder.cs:35` (`= true`), `PortalSettingsService.cs:240` (`= false`). Varredura de `src/` e `tests/` fora de migrations devolve **essas três ocorrências e nenhuma leitura** — sem guard, sem redirect, sem aviso na tela, sem teste
+- **Descrição:** o campo que materializa a troca obrigatória não é consultado por caminho nenhum. Desligá-lo não cumpre a ADR, porque o que a ADR pede é **cobrar** a troca, não registrar que ela aconteceu. Três textos afirmam o contrário: ADR-006 (`proposta-arquitetural.md:271`) — *"A conta é semeada na primeira subida, **com troca de senha obrigatória**"*; `OwnerAccount.cs:12-13` — *"Enquanto não for trocada, **o painel cobra a troca no primeiro acesso** (ADR-006)"*; `OwnerAccountOptions.cs:4-5` — *"a senha **deve ser trocada** no primeiro acesso (ADR-006)"*.
+- **Por quê é Importante:** `render.yaml:19-21` injeta `Owner__Password` como variável de ambiente com `sync: false`. Quem tem acesso ao dashboard da plataforma lê a senha do dono ali, e **nada no sistema obriga que ela deixe de valer** — o dono pode operar o painel por meses com a credencial de implantação. Não é Bloqueante porque exige acesso à configuração da plataforma, e é lacuna de controle, não defeito de dados reproduzível. **Por que o dono é T-31 e não T-07:** o round 1 tocou nisso dentro de R-12 e concluiu *"sem consequência observável hoje, porque `MustChangePassword` não é consultado em lugar nenhum"* — tratou a ausência de leitura como atenuante do descarte do `IdentityResult`, não como o defeito. E o histórico do plano (linha 1387) usa o desligamento da flag para declarar *"ADR-006 — Respeitada, e a tarefa fecha uma pendência… era exigência da ADR que T-07 persistia e nunca cobrava"*. A correção de R-12 está certa e verificada (`PortalSettingsService.cs:242-252`, com `LogWarning`), mas o elo que essa frase fecha não existe.
+- **Sugestão de correção:** ou implementar a cobrança — redirecionar para `/painel/configuracoes` enquanto a flag for verdadeira, no mesmo gate de `UsePanelAuthorization`, com o bloco de senha em evidência —, ou remover o campo e corrigir os três textos, registrando a decisão na ADR-006. O estado atual, em que a coluna existe, a ADR promete e nada acontece, é o que não se sustenta. Teste que fecha o elo: conta recém-semeada é redirecionada para as configurações ao tentar `/painel/produtos`.
+
+#### R-12 — `Telas:` de T-31 lista seis estados; a SPEC-UI declara sete
 
 - **Eixo:** 2. Rastreabilidade
 - **Evidência:** `docs/plans/PLAN-001-catalogo-virtual.md:1200` contra `SPEC-UI:499`
@@ -229,49 +238,49 @@ O que isso permite e o que não permite: as regras de validação de capa, de co
 
 ### 🔵 Sugestões
 
-#### R-12 — O veredito da varredura é descartado, e a investigação fica sem o motivo
+#### R-13 — O veredito da varredura é descartado, e a investigação fica sem o motivo
 
 `PdfNestingScan.Scan` distingue `TooDeep`, `UnbalancedDelimiters` e `UnterminatedToken`, e o próprio XML doc diz que a distinção existe "para que cada motivo tenha caso de teste próprio" — mas em produção os três colapsam em `MalformedStructure` (`PortalSettingsService.cs:148-152`) e o log registra só a razão genérica. Se uma capa legítima for recusada pela heurística, ninguém descobre qual regra mordeu. Levar o veredito ao log de recusa, sem mudar a mensagem ao dono.
 
 *Verificado e descartado como achado:* o risco de falso positivo da varredura em PDF real — 40 documentos com `CompressContentStreams` e imagem de bytes aleatórios passaram todos, nenhuma recusa.
 
-#### R-13 — A orquestração do upload da capa continua no `.razor`, ao contrário de T-13, e por isso sem teste
+#### R-14 — A orquestração do upload da capa continua no `.razor`, ao contrário de T-13, e por isso sem teste
 
 `SettingsPage.razor:285-350` guarda a decisão. Em T-13 o mesmo tipo de upload virou serviço (`ProductPhotoUpload.StoreAsync`, com mensagens em constantes nomeadas e testes próprios), e a extração foi — segundo o histórico — a correção pedida no review de T-16 justamente porque "a decisão central vivia num manipulador de evento, onde nada a protegia". Aqui o porteiro de `Size` (`:300`) e a separação de `IOException` (`:332`) são exatamente as duas correções de R-02/R-12 do round 1, e **nenhuma das duas tem teste**: apagar a linha `:300` deixa a suíte verde. As mensagens também são literais inline, fora do padrão.
 
-#### R-14 — O intervalo de 1 minuto é uma janela não declarada, e há dois critérios para a mesma decisão
+#### R-15 — O intervalo de 1 minuto é uma janela não declarada, e há dois critérios para a mesma decisão
 
 `RevalidatingAuthenticationState.cs:29` usa 1 minuto; `PanelAuthentication.cs:47-48` usa zero. O `Task.Delay(RevalidationInterval)` da fonte do framework roda **antes** da primeira validação, então o piso da janela é o intervalo inteiro. E o comentário de `:16-18` afirma "um só lugar decide se a identidade ainda vale" — na prática são dois lugares com dois intervalos, o que é defensável e contradiz o texto. Depois de resolvido R-02, alinhar a promessa da tela de saída ao mecanismo ("pode levar até um minuto para alcançar outras abas") ou reduzir o intervalo.
 
-#### R-15 — A mensagem de bloqueio pode prometer minutos e liberar em um segundo
+#### R-16 — A mensagem de bloqueio pode prometer minutos e liberar em um segundo
 
 `PasswordAttemptLimiter.cs:42-53` e `:69-70`: a janela é fixa e ancorada na **primeira** falha (`windowStart` só é escrito quando `failures == 1`). Com 4 falhas em `t=0` e a 5ª em `t=4:59`, a tela diz "Aguarde alguns minutos" e a contagem zera em `t=5:00`. Efeito colateral: até 10 tentativas num intervalo curto atravessando a borda. O teto médio continua de pé; o que erra é o texto. Ancorar na última falha, ou devolver o tempo restante para a mensagem dizer um número.
 
-#### R-16 — `ValidationInterval = Zero` cobra do dono também na vitrine, contra o que o comentário afirma
+#### R-17 — `ValidationInterval = Zero` cobra do dono também na vitrine, contra o que o comentário afirma
 
 `PanelAuthentication.cs:45-46` diz que "o custo é uma consulta por requisição **autenticada**, e a vitrine é anônima" — verdadeiro para o visitante, falso para o dono. `UseAuthentication` autentica o esquema padrão em toda requisição que traga o cookie, inclusive `/` e `/produto/...`, e por `StorefrontCache.IsCacheable` nenhuma dessas é cacheada. O comportamento está correto e o cache protegido; o registro é que está pela metade.
 
-#### R-17 — A honestidade da contagem não chegou ao log
+#### R-18 — A honestidade da contagem não chegou ao log
 
 `PortalSettingsService.cs:148-151` emite `inspection.PagesFound` sem considerar `PageCountTruncated`. O PDF de 300 páginas produz "Páginas encontradas: 65" no log — exatamente o número inventado que `4684fa1` removeu da tela.
 
-#### R-18 — O estado `carregando` não existe em nenhuma tabela da SPEC-UI
+#### R-19 — O estado `carregando` não existe em nenhuma tabela da SPEC-UI
 
 `SettingsPage.razor:255`, `CatalogList.razor:140` e `CatalogPage.razor:394` emitem `data-estado="carregando"`, e o documento de interface não declara esse estado em nenhuma delas. É padrão já estabelecido no projeto — por isso sugestão —, mas é estado observável que ninguém especificou. Declarar nas telas interativas, ou registrar como convenção transversal na seção de componentes.
 
-#### R-19 — O comentário do caso de estado promete duas asserções e há uma
+#### R-20 — O comentário do caso de estado promete duas asserções e há uma
 
 `PortalSettingsTests.cs:98` diz "Este caso ancora **os dois estados** que se pode alcançar por requisição sem dirigir o circuito", e `:108` afirma só `semCapa`. O `default`, com capa configurada, não é exercitado. Acrescentar o caso ou corrigir o comentário.
 
-#### R-20 — RN-60 é materializada em T-31 e não é declarada por ela
+#### R-21 — RN-60 é materializada em T-31 e não é declarada por ela
 
 `PortalSettingsService.cs:219-231` entrega o teto de tentativas contra a senha atual, com caso nomeado `RN_60_…` na suíte da tarefa, e o `Implementa:` de T-31 (linha 1197) não cita RN-60. Declarar como parcial, no padrão já usado para RN-65 e RN-67: *RN-60 (parcial — o teto no formulário de troca; o do acesso é de T-07)*.
 
-#### R-21 — A linha de T-31 no histórico está sem commit, e os hashes são conhecidos
+#### R-22 — A linha de T-31 no histórico está sem commit, e os hashes são conhecidos
 
 `docs/plans/PLAN-001-catalogo-virtual.md:1384` tem `—` na coluna Commit, ao contrário da maioria das linhas. Os commits existem e foram verificados nesta sessão: `fba27be` (código, 2026-09-28) e `4c2eaac` (registro).
 
-#### R-22 — Resíduos das rodadas de correção
+#### R-23 — Resíduos das rodadas de correção
 
 Três itens pequenos, todos de leitura: (a) `Logout.razor:70` e `SettingsPage.razor:315` citam `REVIEW-T-31-2026-09-29-round2`, relatório que **não existe** em `docs/reviews/` — e os IDs `R-02`/`R-05` "de round 2" que eles nomeiam vão colidir com a numeração **deste** relatório; (b) `stream`/`endstream` aparecem como literais soltos em `PdfNestingScan.cs:133`, `:250`, `:254`, `:258`, no ponto mais sensível do arquivo, enquanto `CoverValidation.cs:121-127` nomeia todas as chaves em constantes; (c) `CoverValidation.cs:336-347` e `SettingsPage.razor:238-252` têm duas tags `<summary>` no mesmo membro — em `CoverValidation` o primeiro bloco descreve `Oriented` e está pousado sobre `HasArea`.
 
@@ -307,8 +316,9 @@ Itens que pedem entrada no plano como tarefa, independentemente da decisão de s
 4. **R-05** — validação de caminho local no `retorno`, com caso de teste.
 5. **R-06 + R-07** — os dois logs que faltam nos controles de sessão, no padrão de `AuthenticationLogTests`.
 6. **R-10** — o caso que prova a fiação do rodapé, e não o formatador.
+7. **R-11** — decidir entre implementar a cobrança da troca de senha ou remover o campo e corrigir os três textos; o estado atual não se sustenta.
 
-R-08, R-09, R-11 e R-21 são atualizações de documento — plano e SPEC-UI. R-12 a R-20 e R-22 são correções pequenas e localizadas.
+R-08, R-09, R-12 e R-22 são atualizações de documento — plano e SPEC-UI. R-13 a R-21 e R-23 são correções pequenas e localizadas.
 
 ---
 
@@ -318,4 +328,6 @@ Esta tarefa foi corrigida com cuidado e com diagnóstico de verdade. Onze dos tr
 
 O que bloqueia não é qualidade de código: é que **dois mecanismos de defesa foram construídos e não foram ligados ao ponto onde produzem efeito.** A varredura de PDF é correta e está na frente do parser errado — lexical contra estrutural, e onde discordam ela se desliga, por 20 bytes. A revalidação do circuito é correta e ninguém escuta o que ela decide — `ForceSignOut` troca o estado e as sete páginas do painel seguem gravando. Nos dois casos, o commit que declara a correção descreve um comportamento que o código atual não tem.
 
-E há um padrão comum aos dois que vale mais que qualquer finding individual: **o elo final não tem teste.** O contorno de R-01 passa exatamente pelo caso que a suíte usa como prova; o provider de R-02 não é tocado por caso nenhum. As duas correções foram verificadas por sondagem descartável fora do repositório, e sondagem não sobrevive à próxima mudança — é por isso que a terceira rodada do mesmo defeito de PDF chegou aqui. O que fecha essa tarefa não é mais uma correção pontual: é um teste que nasça do contorno, e a decisão de arquitetura que o próprio código já registra como a saída definitiva.
+O padrão aparece uma terceira vez, fora dos bloqueantes, e por isso vale nomeá-lo: **este código declara controles de sessão em comentário e em ADR com mais frequência do que os liga.** Foi exatamente isso que o round 1 cobrou em R-03, quando a tela afirmava que a sessão caía e ela não caía — e a correção daquele finding é boa. Mas o logout fala de abas que não alcança, a revalidação revalida sem bloquear, e a ADR-006 cobra uma troca de senha que ninguém cobra (R-11). Os três textos sobre `MustChangePassword` descrevem um comportamento que nunca existiu em nenhuma linha executável.
+
+E há um padrão comum aos dois bloqueantes que vale mais que qualquer finding individual: **o elo final não tem teste.** O contorno de R-01 passa exatamente pelo caso que a suíte usa como prova; o provider de R-02 não é tocado por caso nenhum. As duas correções foram verificadas por sondagem descartável fora do repositório, e sondagem não sobrevive à próxima mudança — é por isso que a terceira rodada do mesmo defeito de PDF chegou aqui. O que fecha essa tarefa não é mais uma correção pontual: é um teste que nasça do contorno, e a decisão de arquitetura que o próprio código já registra como a saída definitiva.
