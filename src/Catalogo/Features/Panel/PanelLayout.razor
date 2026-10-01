@@ -12,8 +12,11 @@
     (ADR-010). A tela de acesso **não** usa este layout — ela é a única rota anônima do painel e
     tem cromo próprio.
 
-    A identidade vem do estado de autenticação em cascata, que desde T-31 é revalidado pelo selo
-    de segurança: se a sessão cai, o rail deixa de exibir o dono junto com o resto.
+    A identidade vem do estado de autenticação em cascata. **Alcance, corrigido:** este layout é
+    SSR estático — a interatividade neste projeto é por página —, então ele lê a identidade da
+    requisição e não acompanha o circuito. Se a sessão cair com a aba aberta, o rail continua
+    exibindo o nome até a próxima navegação; quem recusa a escrita nesse intervalo é
+    `PanelPageBase.SessionIsAliveAsync`, na página (A-04 de `REVIEW-T-31-2026-09-30-round3`).
 *@
 
 <div class="app">

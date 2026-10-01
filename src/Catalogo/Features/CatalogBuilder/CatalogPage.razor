@@ -2,6 +2,8 @@
 @page "/painel/catalogos/{Id:int}"
 @implements IDisposable
 @layout PanelLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inherits PanelPageBase
 @rendermode InteractiveServer
 @using Catalogo.Features.Categories
 @using Catalogo.Features.PdfExport
@@ -13,7 +15,6 @@
 @inject IJSRuntime Download
 @inject ILogger<CatalogPage> Logger
 @inject CategoryMaintenance Categories
-@inject NavigationManager Navigation
 
 @*
     UI-08, primeira parte: o **critério**. A prévia e a geração são T-23 e T-25, e é por isso
@@ -450,6 +451,11 @@
 
     private async Task GenerateAsync()
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         if (generating)
         {
             return;
@@ -610,6 +616,11 @@
 
     private async Task SaveAsync()
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         saved = false;
 
         var outcome = await Maintenance.SaveAsync(draft);

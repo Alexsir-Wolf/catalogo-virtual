@@ -1,8 +1,9 @@
 @page "/painel/catalogos"
 @layout PanelLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inherits PanelPageBase
 @rendermode InteractiveServer
 @inject CatalogMaintenance Maintenance
-@inject NavigationManager Navigation
 
 @*
     UI-07. Lista dos recortes salvos.
@@ -152,6 +153,11 @@
 
     private async Task DeleteAsync(int id)
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         if (deleting)
         {
             return;

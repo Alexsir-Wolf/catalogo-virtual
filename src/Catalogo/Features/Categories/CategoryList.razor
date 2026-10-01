@@ -1,5 +1,7 @@
 @page "/painel/categorias"
 @layout PanelLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inherits PanelPageBase
 @rendermode InteractiveServer
 @inject CategoryMaintenance Maintenance
 
@@ -150,6 +152,11 @@ else
 
     private async Task CreateAsync()
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         var outcome = await Maintenance.CreateAsync(newName);
         failure = outcome.Succeeded ? null : outcome.Failure;
 
@@ -175,6 +182,11 @@ else
 
     private async Task RenameAsync(int id)
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         var outcome = await Maintenance.RenameAsync(id, editingName);
         failure = outcome.Succeeded ? null : outcome.Failure;
 
@@ -221,6 +233,11 @@ else
 
     private async Task DeleteAsync(int id)
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         var outcome = await Maintenance.DeleteAsync(id);
         pendingDeletionId = null;
 
@@ -243,6 +260,11 @@ else
 
     private async Task MoveAsync(int id, MoveDirection direction)
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         await Maintenance.MoveAsync(id, direction);
         await ReloadAsync();
     }

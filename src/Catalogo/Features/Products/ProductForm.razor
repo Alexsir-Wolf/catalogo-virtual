@@ -1,6 +1,8 @@
 @page "/painel/produtos/novo"
 @page "/painel/produtos/{Id:int}"
 @layout PanelLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inherits PanelPageBase
 @rendermode InteractiveServer
 @using Catalogo.Features.Media
 @inject ProductMaintenance Maintenance
@@ -9,7 +11,6 @@
 @inject ProductPhotoUpload Upload
 @inject ProductPublication Publication
 @inject ILogger<ProductForm> Logger
-@inject NavigationManager Navigation
 
 <PageTitle>@(Id is null ? "Novo produto" : "Editar produto")</PageTitle>
 
@@ -355,6 +356,11 @@
 
     private async Task UploadAsync(InputFileChangeEventArgs change)
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         uploadError = null;
         uploading = true;
 
@@ -466,6 +472,11 @@
 
     private async Task PublishAsync()
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         publicationRefusal = null;
 
         if (Id is null)
@@ -494,6 +505,11 @@
 
     private async Task WithdrawAsync()
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         publicationRefusal = null;
 
         if (Id is null)
@@ -530,6 +546,11 @@
 
     private async Task SaveAsync()
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         saved = false;
 
         var outcome = await Maintenance.SaveAsync(draft);
@@ -595,6 +616,11 @@
 
     private async Task DeleteAsync()
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         // Trava de reentrância: dois cliques antes do re-render disparariam duas exclusões, e
         // `disabled` no markup não impede a segunda chamada já em voo.
         if (deleting)

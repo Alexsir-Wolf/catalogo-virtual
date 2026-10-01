@@ -1,6 +1,28 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+﻿@*
+    `AuthorizeRouteView`, e não `RouteView`, para que a recusa de autorização tenha uma saída
+    desenhada em vez de uma página em branco.
+
+    **O que isto NÃO faz, dito aqui porque a primeira versão deste comentário afirmava o
+    contrário:** não alcança o circuito interativo. Neste projeto a interatividade é **por
+    página** — `App.razor` renderiza `Routes` sem render mode e cada página do painel declara o
+    seu —, e render mode propaga só para baixo. Então o roteador e este `AuthorizeRouteView`
+    vivem no renderizador de SSR da requisição, que é descartado quando a resposta termina, e o
+    componente raiz do circuito é a própria página. A troca de estado que `ForceSignOut` faz
+    quando o selo de segurança cai nunca chega aqui
+    (R-01 de `REVIEW-T-31-2026-09-30-round3`).
+
+    Quem cobra a sessão dentro do circuito é `PanelPageBase.SessionIsAliveAsync`, chamada em cada
+    ponto de escrita das páginas. As três camadas, em ordem de quem responde primeiro:
+    `UsePanelAuthorization` e o `[Authorize]` das páginas na requisição HTTP, este bloco na
+    renderização de SSR, e a guarda das páginas durante o circuito.
+*@
+<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                <RedirectToLogin />
+            </NotAuthorized>
+        </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>

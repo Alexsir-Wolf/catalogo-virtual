@@ -1,5 +1,7 @@
 @page "/painel/configuracoes"
 @layout PanelLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inherits PanelPageBase
 @rendermode InteractiveServer
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
@@ -232,9 +234,6 @@
     private string? passwordMessage;
     private bool passwordChanged;
 
-    [CascadingParameter]
-    private Task<AuthenticationState>? Authentication { get; set; }
-
     /// <summary>
     /// O estado da folha é o mais específico que estiver valendo. `semCapa` vem por último
     /// entre os persistentes porque é condição de fundo, não resultado de ação — os outros
@@ -284,6 +283,11 @@
 
     private async Task UploadCoverAsync(InputFileChangeEventArgs change)
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         coverError = null;
         coverSaved = false;
         contactSaved = false;
@@ -351,6 +355,11 @@
 
     private async Task SaveContactAsync()
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         contactRejection = null;
         coverError = null;
         coverSaved = false;
@@ -378,6 +387,11 @@
 
     private async Task ChangePasswordAsync()
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         passwordChanged = false;
         passwordFailure = PasswordFailure.None;
         passwordMessage = null;

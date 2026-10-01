@@ -1,5 +1,7 @@
 @page "/painel/produtos"
 @layout PanelLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inherits PanelPageBase
 @rendermode InteractiveServer
 @using System.Globalization
 @using Catalogo.Features.Categories
@@ -7,7 +9,6 @@
 @inject ProductListing Listing
 @inject ProductOrdering Ordering
 @inject ProductPhotoService PhotoService
-@inject NavigationManager Navigation
 
 <PageTitle>Produtos</PageTitle>
 
@@ -235,6 +236,11 @@
 
     private async Task MoveAsync(int productId, MoveDirection direction)
     {
+        if (!await SessionIsAliveAsync())
+        {
+            return;
+        }
+
         moving = true;
 
         try

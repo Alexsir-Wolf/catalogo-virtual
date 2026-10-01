@@ -1,0 +1,26 @@
+@inject NavigationManager Navigation
+
+@*
+    Leva para a tela de acesso quem chegou a uma rota do painel sem identidade válida.
+
+    Existe como componente próprio, e não como `NavigateTo` no `NotAuthorized` do
+    `AuthorizeRouteView`, porque navegar durante a renderização é o que `OnInitialized` resolve:
+    o bloco `NotAuthorized` é conteúdo, e um redirect disparado de dentro dele no corpo do
+    componente correria a cada render.
+
+    **Alcance, corrigido:** este componente renderiza no `NotAuthorized` do `AuthorizeRouteView`,
+    que é SSR estático — não no circuito. Em SSR a requisição raramente chega até aqui, porque
+    `UseAuthorization` já enforça o `[Authorize]` das páginas como metadata de endpoint e o gate
+    por caminho fecha o prefixo; este é o caminho de borda, para que uma recusa de autorização
+    tenha destino em vez de página vazia. A recusa **dentro** do circuito é de
+    `PanelPageBase.SessionIsAliveAsync` (R-01 de `REVIEW-T-31-2026-09-30-round3`).
+
+    `forceLoad` porque em SSR a navegação vira redirecionamento HTTP de qualquer forma, e porque
+    se este ramo um dia passar a renderizar com o circuito de pé, recarregar é o que derruba o
+    estado morto em vez de preservá-lo.
+*@
+
+@code {
+    protected override void OnInitialized() =>
+        Navigation.NavigateTo(PanelAuthentication.LoginPath, forceLoad: true);
+}
