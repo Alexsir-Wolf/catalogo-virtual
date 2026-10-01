@@ -67,6 +67,10 @@ public static class PdfNestingScan
     /// </summary>
     public const int MaxDepth = 128;
 
+    private const string StreamKeyword = "stream";
+
+    private const string EndStreamKeyword = "endstream";
+
     private const byte Backslash = (byte)'\\';
 
     /// <summary>
@@ -130,7 +134,7 @@ public static class PdfNestingScan
                     index++;
                     break;
 
-                case (byte)'s' when StartsWith(content, index, "stream"):
+                case (byte)'s' when IsStreamKeyword(content, index):
                     if (!TrySkipStream(content, index, out index))
                     {
                         return PdfScanVerdict.UnterminatedToken;
@@ -239,6 +243,37 @@ public static class PdfNestingScan
     }
 
     /// <summary>
+    /// `stream` só abre stream quando é **token**, e não quando é sufixo de outra coisa.
+    ///
+    /// Reconhecê-lo em qualquer posição era o quarto contorno desta varredura, e o mais barato:
+    /// um nome como `/Xstream` fazia o salto até `endstream` engolir o aninhamento profundo que
+    /// estava no meio, o veredito voltava `Safe`, e o parser — que não tem essa regra — lia o
+    /// array e recursava até matar o processo (R-01 de `REVIEW-T-31-2026-09-30-round2`).
+    ///
+    /// A regra é a do PDF: o byte anterior tem de ser espaço ou delimitador. `/` **não** conta,
+    /// porque dentro de um nome a palavra é só texto. Começo do arquivo não é stream: um PDF
+    /// válido abre com `%PDF`, e `stream` solto na primeira posição não tem dicionário a que
+    /// pertencer.
+    /// </summary>
+    private static bool IsStreamKeyword(byte[] content, int index)
+    {
+        if (!StartsWith(content, index, StreamKeyword))
+        {
+            return false;
+        }
+
+        if (index == 0)
+        {
+            return false;
+        }
+
+        var previous = content[index - 1];
+
+        return previous is (byte)' ' or (byte)'\n' or (byte)'\r' or (byte)'\t'
+            or (byte)'\f' or 0 or (byte)'>' or (byte)']' or (byte)')';
+    }
+
+    /// <summary>
     /// Dados de stream são binários e podem conter qualquer byte, inclusive sequências que
     /// pareçam delimitadores. Contá-los produziria profundidade inventada.
     ///
@@ -247,13 +282,13 @@ public static class PdfNestingScan
     /// </summary>
     private static bool TrySkipStream(byte[] content, int index, out int next)
     {
-        index += "stream".Length;
+        index += StreamKeyword.Length;
 
         while (index < content.Length)
         {
-            if (content[index] == (byte)'e' && StartsWith(content, index, "endstream"))
+            if (content[index] == (byte)'e' && StartsWith(content, index, EndStreamKeyword))
             {
-                next = index + "endstream".Length;
+                next = index + EndStreamKeyword.Length;
 
                 return true;
             }

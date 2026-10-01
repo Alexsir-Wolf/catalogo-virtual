@@ -53,6 +53,45 @@ public sealed class PdfNestingScanTests
         Assert.Equal(PdfScanVerdict.UnterminatedToken, PdfNestingScan.Scan(content));
     }
 
+    /// <summary>
+    /// **O quarto contorno, e o de vinte bytes.** `stream` era reconhecido em qualquer posição,
+    /// inclusive dentro de um **nome** — `/Xstream` bastava para a varredura saltar até o próximo
+    /// `endstream` e engolir o aninhamento que estava no meio, devolvendo `Safe`. O parser do
+    /// PdfSharp não tem essa regra: ele lê o array e recursa até o processo morrer
+    /// (R-01 de `REVIEW-T-31-2026-09-30-round2`).
+    ///
+    /// A palavra só abre stream quando é **token**: precedida de delimitador ou espaço, nunca de
+    /// `/`, e depois do `>>` que fecha o dicionário. Este caso usa a forma exata do payload que
+    /// matou o processo na sondagem, com `/Xstream` antes do aninhamento e `endstream` depois.
+    /// </summary>
+    [Fact]
+    public void Nome_terminado_em_stream_nao_desliga_a_varredura()
+    {
+        var content = Ascii(
+            "<</Type/Page/Xstream 0/Lixo "
+            + Nested('[', ']', PdfNestingScan.MaxDepth + 10)
+            + " endstream>>");
+
+        Assert.Equal(PdfScanVerdict.TooDeep, PdfNestingScan.Scan(content));
+        Assert.True(PdfNestingScan.IsUnsafeToParse(content));
+    }
+
+    /// <summary>
+    /// A contraprova do caso acima: stream de verdade continua sendo saltado, senão a correção
+    /// trocaria o contorno por recusa de capa legítima — todo PDF com imagem tem stream binário,
+    /// e bytes comprimidos contêm `[` e `<<` em qualquer quantidade.
+    /// </summary>
+    [Fact]
+    public void Stream_de_verdade_continua_sendo_saltado()
+    {
+        var content = Ascii(
+            "<</Length 40>>stream\n"
+            + Nested('[', ']', PdfNestingScan.MaxDepth + 10)
+            + "\nendstream <</Type/Page/MediaBox[0 0 595 842]>>");
+
+        Assert.Equal(PdfScanVerdict.Safe, PdfNestingScan.Scan(content));
+    }
+
     [Fact]
     public void String_hexadecimal_sem_fechamento_e_recusada()
     {
